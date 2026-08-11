@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Nebula — Рулетка дня</title>
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --panel: #1a1a2e;
+    --panel-2: #22223f;
+    --accent: #9d4edd;
+    --accent-dim: #3d3d6b;
+    --text: #e8e6f5;
+    --text-dim: #a7a4c0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(circle at 50% 20%, #17172c 0%, var(--bg) 65%);
+    color: var(--text);
+    font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .stars {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, #ffffff55 50%, transparent 51%),
+      radial-gradient(1px 1px at 70% 65%, #ffffff33 50%, transparent 51%),
+      radial-gradient(2px 2px at 85% 20%, #ffffff44 50%, transparent 51%),
+      radial-gradient(1px 1px at 40% 80%, #ffffff33 50%, transparent 51%),
+      radial-gradient(1px 1px at 60% 10%, #ffffff44 50%, transparent 51%),
+      radial-gradient(2px 2px at 10% 60%, #ffffff33 50%, transparent 51%);
+  }
+  .app {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px; padding: 32px;
+  }
+  h1 {
+    margin: 0; font-size: 15px; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--text-dim); font-weight: 500;
+  }
+  .wheel-wrap { position: relative; width: 360px; height: 360px; }
+  .pointer {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; z-index: 3;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 22px solid var(--accent);
+    filter: drop-shadow(0 0 6px rgba(157, 78, 221, 0.8));
+  }
+  canvas {
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--accent-dim), 0 0 40px rgba(157, 78, 221, 0.25);
+  }
+  .hub {
+    position: absolute; top: 50%; left: 50%;
+    width: 54px; height: 54px; transform: translate(-50%, -50%);
+    background: var(--panel); border: 2px solid var(--accent);
+    border-radius: 50%; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 16px rgba(157, 78, 221, 0.5);
+  }
+  .hub svg { width: 22px; height: 22px; fill: var(--accent); }
+  button#spin {
+    all: unset; cursor: pointer;
+    padding: 12px 34px;
+    background: var(--accent); color: #14031f;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.15em;
+    text-transform: uppercase; border-radius: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 0 18px rgba(157, 78, 221, 0.45);
+  }
+  button#spin:hover { transform: translateY(-1px); box-shadow: 0 0 26px rgba(157, 78, 221, 0.7); }
+  button#spin:active { transform: translateY(0); }
+  button#spin:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+  .result {
+    min-height: 28px; font-size: 18px; font-weight: 600;
+    color: var(--accent); text-align: center;
+    text-shadow: 0 0 12px rgba(157, 78, 221, 0.5);
+  }
+  .editor {
+    width: 360px; background: var(--panel);
+    border: 1px solid var(--accent-dim); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .editor summary {
+    cursor: pointer; font-size: 12px; letter-spacing: 0.1em;
+    color: var(--text-dim); text-transform: uppercase; user-select: none;
+  }
+  .editor[open] summary { margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .row input {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--accent-dim);
+    border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px;
+    font-family: inherit;
+  }
+  .row input:focus { outline: none; border-color: var(--accent); }
+  .row button {
+    all: unset; cursor: pointer; padding: 6px 10px;
+    color: var(--text-dim); font-size: 15px; border-radius: 6px;
+  }
+  .row button:hover { color: #ff6b6b; background: #ff6b6b22; }
+  .add-row { display: flex; gap: 8px; margin-top: 4px; }
+  .add-row input {
+    flex: 1; background: var(--panel-2); border: 1px dashed var(--accent-dim);
+    border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px;
+    font-family: inherit;
+  }
+  .add-row button {
+    all: unset; cursor: pointer; padding: 6px 14px;
+    background: var(--accent-dim); color: var(--text); border-radius: 6px; font-size: 13px;
+  }
+  .add-row button:hover { background: var(--accent); color: #14031f; }
+</style>
+</head>
+<body>
+<div class="stars"></div>
+<div class="app">
+  <h1>Чим сьогодні займаюсь</h1>
+
+  <div class="wheel-wrap">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="360" height="360"></canvas>
+    <div class="hub">
+      <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v2.06a7 7 0 0 1 5.94 5.94H21a1 1 0 1 1 0 2h-2.06a7 7 0 0 1-5.94 5.94V21a1 1 0 1 1-2 0v-2.06A7 7 0 0 1 5.06 13H3a1 1 0 1 1 0-2h2.06A7 7 0 0 1 11 5.06V3a1 1 0 0 1 1-1zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
+    </div>
+  </div>
+
+  <div class="result" id="result"></div>
+  <button id="spin">Крутити</button>
+
+  <details class="editor" id="editor">
+    <summary>Редагувати список</summary>
+    <div id="rows"></div>
+    <div class="add-row">
+      <input id="newItem" type="text" placeholder="Нова активність…" maxlength="28">
+      <button id="addBtn">Додати</button>
+    </div>
+  </details>
+</div>
+
+<script>
+  const palette = ["#9d4edd", "#3d3d6b", "#c9b8ff", "#2d2d4f", "#7b2cbf", "#5a189a"];
+  let items = ["Мод для Minecraft", "Пограти в Forza", "Покопатись у NixOS", "Музика (Ardour/LMMS)", "Німецька", "Просто відпочити"];
+
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const resultEl = document.getElementById("result");
+  const spinBtn = document.getElementById("spin");
+  const rowsEl = document.getElementById("rows");
+
+  let rotation = 0;
+  let spinning = false;
+
+  function hexLuminance(hex) {
+    const c = hex.replace("#", "");
+    const r = parseInt(c.substring(0, 2), 16) / 255;
+    const g = parseInt(c.substring(2, 4), 16) / 255;
+    const b = parseInt(c.substring(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function renderWheel() {
+    const n = items.length;
+    const cx = 180, cy = 180, r = 178;
+    ctx.clearRect(0, 0, 360, 360);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotation);
+    const slice = (Math.PI * 2) / n;
+    for (let i = 0; i < n; i++) {
+      const start = i * slice;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, start, start + slice);
+      ctx.closePath();
+      ctx.fillStyle = palette[i % palette.length];
+      ctx.fill();
+      ctx.strokeStyle = "#0d0d1a";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.rotate(start + slice / 2);
+      ctx.textAlign = "right";
+      const bg = palette[i % palette.length];
+      const isLight = hexLuminance(bg) > 0.55;
+      ctx.fillStyle = isLight ? "#1a1330" : "#f5f3ff";
+      ctx.font = "600 13px 'JetBrainsMono Nerd Font', monospace";
+      ctx.shadowColor = isLight ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 3;
+      const label = items[i].length > 20 ? items[i].slice(0, 19) + "…" : items[i];
+      ctx.fillText(label, r - 16, 5);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function renderRows() {
+    rowsEl.innerHTML = "";
+    items.forEach((item, i) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const input = document.createElement("input");
+      input.value = item;
+      input.addEventListener("input", (e) => { items[i] = e.target.value; renderWheel(); });
+      const del = document.createElement("button");
+      del.textContent = "✕";
+      del.addEventListener("click", () => {
+        if (items.length <= 2) return;
+        items.splice(i, 1);
+        renderRows(); renderWheel();
+      });
+      row.appendChild(input);
+      row.appendChild(del);
+      rowsEl.appendChild(row);
+    });
+  }
+
+  document.getElementById("addBtn").addEventListener("click", () => {
+    const input = document.getElementById("newItem");
+    const val = input.value.trim();
+    if (!val) return;
+    items.push(val);
+    input.value = "";
+    renderRows(); renderWheel();
+  });
+  document.getElementById("newItem").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("addBtn").click();
+  });
+
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function spin() {
+    if (spinning || items.length === 0) return;
+    spinning = true;
+    spinBtn.disabled = true;
+    resultEl.textContent = "";
+
+    const n = items.length;
+    const slice = (Math.PI * 2) / n;
+    const extraTurns = 5 + Math.random() * 2;
+    const finalOffset = Math.random() * Math.PI * 2;
+    const startRotation = rotation;
+    const targetRotation = startRotation + extraTurns * Math.PI * 2 + finalOffset;
+    const duration = 3600;
+    const startTime = performance.now();
+
+    function frame(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = easeOutCubic(t);
+      rotation = startRotation + (targetRotation - startRotation) * eased;
+      renderWheel();
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        spinning = false;
+        spinBtn.disabled = false;
+        const norm = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const pointerAngle = ((Math.PI * 2) - norm + Math.PI * 1.5) % (Math.PI * 2);
+        const idx = Math.floor(pointerAngle / slice) % n;
+        resultEl.textContent = "→ " + items[idx];
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  spinBtn.addEventListener("click", spin);
+
+  renderRows();
+  renderWheel();
+</script>
+</body>
+</html>
