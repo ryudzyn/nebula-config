@@ -7,6 +7,14 @@
   # Основна мова системи
   i18n.defaultLocale = "uk_UA.UTF-8";
 
+  boot.extraModulePackages = [ config.boot.kernelPackages.v4l2loopback ];
+  boot.kernelModules = [ "v4l2loopback" ];
+  boot.extraModprobeConfig = ''
+    options v4l2loopback devices=1 video_nr=1 card_label="OBS Virtual Camera" exclusive_caps=1
+  '';
+  
+  services.logind.settings.Login.KillUserProcesses = true;
+
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "uk_UA.UTF-8";
     LC_IDENTIFICATION = "uk_UA.UTF-8";
@@ -19,6 +27,8 @@
     LC_TIME = "uk_UA.UTF-8";
   };
 
+  programs.nix-ld.enable = true;
+
   # Налаштування клавіатури для іксових/вейланд сесій
   services.xserver.xkb = {
     # Додаємо німецьку розкладку для зручного набору специфічних літер і текстів
@@ -27,4 +37,15 @@
     options = "grp:alt_shift_toggle"; # Перемикання через Alt+Shift
   };
   nixpkgs.config.allowUnfree = true;
+  nixpkgs.overlays = [
+    (final: prev: {
+      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+        (pyFinal: pyPrev: {
+          patool = pyPrev.patool.overridePythonAttrs (old: {
+            doCheck = false;
+          });
+        })
+      ];
+    })
+  ];
 }

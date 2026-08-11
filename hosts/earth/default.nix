@@ -9,9 +9,11 @@
     ../../core/users.nix
     ../../core/packages.nix
     ../../core/desktop.nix
-    ../../core/halley-session.nix # Тепер SDDM знає про Halley
+    ../../core/games.nix
     ../../core/virtualisation.nix
     ../../constellations/default.nix
+    ../../core/peripherals.nix
+    ../../core/security.nix
   ];
 
   # Встановлюємо ім'я нашого корабля в мережі
