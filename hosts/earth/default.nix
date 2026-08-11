@@ -14,6 +14,7 @@
     ../../constellations/default.nix
     ../../core/peripherals.nix
     ../../core/security.nix
+    ../../core/x11-greetd-sessions.nix
   ];
 
   # Встановлюємо ім'я нашого корабля в мережі
