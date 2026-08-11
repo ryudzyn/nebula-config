@@ -54,6 +54,7 @@
     wget
     ncdu
     lact
+    nh
   ];
 
   hardware.steam-hardware.enable = true;
