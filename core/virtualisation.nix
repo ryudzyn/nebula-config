@@ -9,4 +9,6 @@
   programs.virt-manager.enable = true;
 
   users.users.ryudzyn.extraGroups = [ "libvirtd" ];
+
+  virtualisation.spiceUSBRedirection.enable = true;
 }

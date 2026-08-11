@@ -29,6 +29,11 @@
 
   programs.nix-ld.enable = true;
 
+  # nh (і будь-який голий `nix build`/`nix eval`) на відміну від `nixos-rebuild --flake`
+  # не вмикає ці фічі самостійно — без цього `nh os switch` падає з "experimental
+  # Nix feature 'nix-command' is disabled".
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   # Налаштування клавіатури для іксових/вейланд сесій
   services.xserver.xkb = {
     # Додаємо німецьку розкладку для зручного набору специфічних літер і текстів

@@ -3,7 +3,7 @@
 {
   users.users.ryudzyn = {
     isNormalUser = true;
-    description = "Oleksandr";
+    description = "ryudzyn";
     extraGroups = [ 
       "networkmanager" 
       "wheel" # Надає права sudo
