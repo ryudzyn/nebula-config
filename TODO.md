@@ -1,14 +1,17 @@
 # Nebula OS: cleanup, hardening, workflow, gaming WM
 
-## Status: done, i3/bspwm xinit sessions confirmed working
+## Status: core fix done and committed; new black-screen regression under investigation (Follow-up #7)
 
 All four original work streams below are implemented and committed
 (`77a4bd6`..`bfa9247`). X11 sessions (`i3`, `bspwm`) initially never launched
 under the new `greetd` setup — root-caused across Follow-ups #1–#6 (missing
 `wait "$waitPID"`, then a `DISPLAY=:0` leak from inherited session
-environment instead of the intended `:1`) and fixed; both `i3 (xinit)` and
-`bspwm (xinit)` now hold at tuigreet, and PoE1 confirmed launching under
-`bspwm (xinit)`. Remaining: same PoE1/sxhkd check under plain `i3 (xinit)`.
+environment instead of the intended `:1`) and fixed (committed `3ad8397`);
+both `i3 (xinit)` and `bspwm (xinit)` held at tuigreet, and PoE1 confirmed
+launching under `bspwm (xinit)`. Since then, a **new, separate** issue
+surfaced: see Follow-up #7 — `bspwm (xinit)` black-screens unless a sway
+session is already active on another VT. Undiagnosed, diagnostics staged,
+not yet root-caused.
 
 ## Context
 
@@ -405,6 +408,134 @@ explanatory comment remain. `dry-build` re-confirmed clean after the cleanup.
 - The `sway-session.target`/`graphical-session.target` leftover-state anomaly (systemd `--user`
   manager not resetting between greetd sessions) is still unexplained, but no longer blocking —
   parked as a known oddity unless it causes a future problem.
+
+## Follow-up #7: new bug — `bspwm (xinit)` only renders if sway is already running on another VT (undiagnosed, diagnostics staged)
+
+2026-08-12. After Follow-up #6 was confirmed fully working (including a real PoE1 launch), a new,
+different failure surfaced on a later test: picking `bspwm (xinit)` at tuigreet on `tty1` produces a
+**black screen** — no bounce back to the greeter this time (unlike #1–#6), Xorg reportedly starts
+without a `Fatal` in its log per the same diagnostics as #6, but nothing is ever displayed.
+
+User-observed workaround/clue: `bspwm (xinit)` **does** render correctly when a sway (halley)
+session is already logged in and active on `tty2` (`ctrl+alt+f2`) at the same time. Without that,
+`tty1` stays black. Not yet confirmed for plain `i3 (xinit)` — only tested with bspwm so far.
+
+Leading theory (unconfirmed): this isn't a repeat of #6's `DISPLAY`/`WM_Sn` bug (Xorg itself starts
+clean either way) — more likely an AMD GPU (`amdgpu`) modeset/connector issue, where the monitor
+output only gets a real KMS mode set once *some* DRM client (sway, in this case) has successfully
+done a modeset since boot; a fresh Xorg started cold (nothing else has touched the GPU yet) may be
+silently failing to pick/apply a mode even though it logs no fatal error. Needs actual log evidence
+before treating this as confirmed — this is a hypothesis, not yet root-caused the way #1–#6 were.
+
+**Constraint on how this gets diagnosed**: the Claude Code shell session for this work runs *inside*
+the sway session on `tty2` (confirmed via `who`/`ps` — the shell's pty is a child of that login). So
+live monitoring (`tail -f` / `journalctl -f`) from this session cannot cover the "sway NOT running on
+F2" test case — stopping sway on F2 to test that case would kill the very shell doing the watching.
+Live monitoring only works for variants where F2/sway stays up throughout.
+
+Plan instead: **post-factum log analysis**, comparing a "black screen" run against a prior working
+run, using sources that persist on disk independent of any live session:
+- `journalctl -k -b0` (kernel/`amdgpu` messages — persists in the systemd journal regardless of
+  session state).
+- `/var/log/Xorg.1.log` (already made non-discarded by the Follow-up #2 fix; check for the chosen
+  mode/connector lines, not just fatal errors).
+- `/sys/class/drm/*/status` (connected/disconnected per output) — only useful if captured live
+  during the black-screen state itself (doesn't persist after the fact), so this one specifically
+  needs the user to check it manually in the moment, or needs a diagnostic script added to
+  `mkXinitSession` the same way Follow-ups #5/#6 did (temporary, removed once root-caused).
+
+**Test procedure (user-run, since it requires killing the sway session this Claude Code shell lives
+in)**:
+1. Log out of sway on `tty2` (`ctrl+alt+f2`) — this will also kill this Claude Code session's shell;
+   expect the conversation to stall until access returns.
+2. On `tty1`, at tuigreet, pick `bspwm (xinit)` and observe (should reproduce the black screen per
+   the report above).
+3. Restore access — log sway back in on `tty2` (or however this session's shell gets a working pty
+   again) so the conversation can resume.
+4. Once back: re-read `journalctl -k -b0` and `/var/log/Xorg.1.log`, diff against the equivalent
+   window from a prior *working* run (the confirmed-good bspwm run from Follow-up #6, 2026-08-11
+   night), looking specifically at `amdgpu`/connector/mode lines, not just fatal-error absence.
+
+**Not yet done**: the actual test run (step 1–3 above, blocked on the user doing the VT switch) and
+the log diff (step 4). No code changes proposed yet — root cause unknown, so no fix to write.
+
+### Next steps
+- User runs the test procedure above (sway off on F2 → bspwm on F1 → confirm black screen with sway
+  gone → bring sway back to restore this session).
+- Once access returns: pull `journalctl -k -b0` and `/var/log/Xorg.1.log` from that window, compare
+  against the last known-good bspwm run, focus on `amdgpu` connector/modeset messages.
+- If disk logs aren't conclusive, next escalation is a temporary `mkXinitSession` diagnostic (same
+  pattern as #5/#6) that dumps `/sys/class/drm/*/status` and `xrandr --verbose` output from inside
+  the client script itself, since that state doesn't survive being read after the fact from outside.
+- Confirm whether plain `i3 (xinit)` has the same sway-dependency or if it's bspwm-specific.
+
+### Round 2 (2026-08-12, post-factum log analysis): new symptom found — not just black, also no input
+
+The test above actually happened today, discovered via log archaeology rather than a live report
+(correcting the "not yet done" status above). **Important correction to the note about where Xorg
+logs**: with `-logfile /dev/null` already dropped (Follow-up #2), Xorg — run unprivileged via
+`xinit`, not as root — writes to `~/.local/share/xorg/Xorg.1.log` (+ `.old` for the previous run),
+**not** `/var/log/Xorg.1.log`. That path never existed and was the wrong place to look.
+
+Reconstructed from `journalctl -b0` (session/PID kill lists are unusually informative here — every
+`session-N.scope: Killing process PID (name)` line effectively enumerates what was running in each
+session) plus the two on-disk Xorg logs:
+
+- **15:08–15:21 (session-9, 13 min)**: `bspwm (xinit)` ran concurrently with a manual `login`+`sway`
+  session the user had started by hand on tty2 (not through greetd — a plain text-console login that
+  happened to reach "sway compositor session"). Confirms the known workaround (bspwm renders fine
+  when something has already touched the GPU via another session). Ended when **both** sessions —
+  bspwm/xinit *and* the sway one — were killed together in the same instant (session-7 and session-9
+  both torn down at 15:21:28, sway's `sxhkd`/`bspwm`/`polybar`/kitty and even a `loginctl` process
+  mid-command in the sway session all SIGTERM'd at once) — looks like the user ran something like
+  `loginctl terminate-user`/restarted greetd to wipe everything and start a clean test.
+- **15:21:36–15:25:37 (session-12, 4 min)**: a **new** X11 session started 8 seconds later, this
+  time with nothing else running (confirmed: this is the actual "sway not present" case). User
+  report: **sxhkd/bspwm keybindings didn't respond at all** (not just "looked black" — no input got
+  through either), so they switched to tty2, logged into a bare TTY (no sway) to keep working here,
+  and while that was happening, **bspwm on tty1 exited on its own, without any keypress** — matches
+  the journal exactly: `session-12.scope: Deactivated successfully` (a clean self-exit under
+  systemd's classification), not an externally-`Killed` teardown like session-9's.
+- **Xorg log comparison** (`Xorg.1.log.old` = session-9/sway-present run, `Xorg.1.log` = session-12/
+  alone run): byte-for-byte equivalent `modeset(0)` behavior — both detect `DP-2 connected`, read the
+  same EDID, and pick `Output DP-2 using initial mode 2560x1440 +0+0`. No `(EE)` lines in either
+  besides the pre-existing, unrelated `fbdev` driver load failure (present in both, harmless — an
+  unused fallback driver). **This weakens the "cold AMD modeset" theory** — Xorg itself believes it
+  configured the display identically both times — though it doesn't rule out a KMS/plane-level issue
+  Xorg wouldn't itself detect or log.
+- **No libinput/logind/seat/device-grab errors anywhere in `journalctl` for the 15:21:36–15:25:37
+  window.** Whatever blocked input isn't visible at the systemd/logind level — if it's real, it's
+  happening inside X/sxhkd, below journal visibility.
+- The `exec >>"$HOME/.local/state/${wm.name}-xinit.log" 2>&1` diagnostic added this round (staged,
+  `core/x11-greetd-sessions.nix`) caught nothing — both log files are 0 bytes. Inconclusive rather
+  than clean: i3/bspwm/sxhkd don't print anything on stdout during normal successful operation
+  either, so an empty file doesn't distinguish "silently broken" from "silently fine." **This
+  diagnostic approach is a dead end and should be dropped rather than iterated on.**
+
+New working theory, not yet confirmed: **a logind device-handoff race**, not a GPU-coldness issue.
+Session-12 started only ~8s after sessions 7 *and* 9 were killed together — plausible that
+`systemd-logind` hadn't finished releasing the evdev/`/dev/input/event*` file descriptors from the
+just-killed sessions before the new session's `sxhkd`/bspwm tried to grab them, leaving the new
+session with no working input for its whole (silent) lifetime, ending in whatever caused the
+self-exit. This would explain "no combos work" independent of the display/black-screen question, and
+is consistent with both the missing libinput errors (the grab may simply silently fail/no-op rather
+than error) and the lack of any Xorg-side signal (Xorg's own input handling is separate from
+sxhkd/bspwm grabbing global hotkeys).
+
+### Next steps (updated)
+- Re-test with a deliberate pause: at tuigreet, wait ~30s+ *before* picking `bspwm (xinit)` again
+  (rather than testing immediately after killing a prior session), to separate the "race on
+  session teardown" theory from a genuine cold-GPU/modeset issue. If input works fine after a pause,
+  that all but confirms the race theory.
+- Stop trying to capture WM stdout/stderr (dead end, see above); instead diagnose **input** directly
+  — e.g. check whether `sxhkd`/bspwm are even still alive and whether they hold open fds on
+  `/dev/input/event*` at the moment of failure (`ls -l /proc/<pid>/fd` from the tty2 vantage point,
+  or `fuser /dev/input/event*`), rather than assuming this is purely a display problem.
+- The already-planned `/sys/class/drm/*/status` + `xrandr --verbose` dump from inside `clientScript`
+  is still worth adding if the pause-retest above doesn't resolve it — but treat this as an input
+  problem first, display problem second, given this round's evidence.
+- Confirm whether plain `i3 (xinit)` has the same behavior — still untested, all rounds so far used
+  bspwm only.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
