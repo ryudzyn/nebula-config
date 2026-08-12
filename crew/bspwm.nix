@@ -138,6 +138,10 @@
       "super + shift + t" = "nwg-look";
       "super + shift + r" = "xdg-open file://${../assets/cprogram/roulette.html}";
 
+      # Панель керування мишею Swiftpoint X1 — в sway.nix запускається
+      # автостартом, тут — за біндом (той самий позасистемний бінарник).
+      "super + shift + m" = ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
+
       # floating toggle — bspc-еквівалент "floating toggle" з sway/i3.
       "super + shift + space" = "bspc node -t ~floating";
 
