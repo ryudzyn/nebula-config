@@ -750,6 +750,24 @@ the second confirmed case (after `DISPLAY`) of greetd leaking session-type metad
 sessions, and it's plausible other `XDG_SESSION_*`/`WAYLAND_*` variables could cause similar
 toolkit-specific breakage for apps that check them directly.
 
+## Follow-up #10: bspwm keybinding parity with sway (staged, not committed)
+
+2026-08-12. With `bspwm (xinit)` confirmed fully working (Follow-up #7), `crew/bspwm.nix` was
+missing several bindings that `crew/sway.nix` already has, ported over with X11-native
+equivalents where the sway originals are Wayland-only:
+- Keyboard layout: `setxkbmap -layout us,ua,de -option grp:alt_shift_toggle` in `bspwmrc`,
+  X11 equivalent of sway's `input.xkb_layout`/`xkb_options`.
+- Volume/brightness (`XF86Audio*`/`XF86MonBrightness*`): identical `wpctl`/`brightnessctl`
+  commands added to `services.sxhkd.keybindings` — these tools aren't Wayland-specific, so no
+  substitution needed, just copied over.
+- Screenshots: sway's `grim`/`slurp`/`wl-copy` (Wayland-only) replaced with `maim`/`xclip` under
+  the same `Print` / `super+shift+s` bindings; `home.packages` gained `maim`, `xclip`,
+  `brightnessctl`.
+
+`dry-build` clean (only `bspwmrc`, `sxhkdrc`, and the usual home-manager derivations rebuild).
+**Not yet committed** — left for the user per usual workflow. Not live-tested yet (no
+switch/restart performed for this round).
+
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
 - `core/system.nix` — drop insecure-package allowance
