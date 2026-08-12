@@ -44,8 +44,20 @@ let
     # чергою, забрало неявний "-keeptty", який xinit завжди сам додає до
     # команди сервера — без нього Xorg не міг отримати VT через
     # systemd-logind ("Cannot open virtual console: Permission denied").
+    #
+    # Follow-up #9: VSCodium не запускався в цій сесії — з'ясувалось,
+    # greetd/pam_systemd протікає `XDG_SESSION_TYPE=wayland` навіть у цю
+    # приватну X11-сесію (той самий клас багу, що й DISPLAY=:0 у Follow-up
+    # #6, лише інша змінна). Electron/Chromium (принаймні VSCodium) читає
+    # XDG_SESSION_TYPE напряму для вибору ozone-бекенду, незалежно від
+    # прапорців у власній обгортці пакета — бачить "wayland", намагається
+    # підключитись, отримує "Connection refused" (жодного wayland-компоцитора
+    # тут нема) і виходить, вікно так і не з'являється. Підтверджено
+    # порівняльним тестом: з протеклим XDG_SESSION_TYPE=wayland — та сама
+    # помилка; з форсованим XDG_SESSION_TYPE=x11 — запускається нормально.
     clientScript = ''
       export DISPLAY=:1
+      export XDG_SESSION_TYPE=x11
       ${pkgs.xorg-server}/bin/X -keeptty ${toString xserverArgs} :1 vt$XDG_VTNR &
       xpid=$!
       trap 'kill "$xpid" 2>/dev/null; wait "$xpid" 2>/dev/null' EXIT

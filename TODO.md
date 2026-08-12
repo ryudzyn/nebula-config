@@ -1,6 +1,6 @@
 # Nebula OS: cleanup, hardening, workflow, gaming WM
 
-## Status: all known X11-session bugs fixed (Follow-ups #1–#7), staged not yet committed
+## Status: all known X11-session bugs fixed (Follow-ups #1–#9)
 
 All four original work streams below are implemented and committed
 (`77a4bd6`..`bfa9247`). X11 sessions (`i3`, `bspwm`) initially never launched
@@ -10,15 +10,17 @@ environment instead of the intended `:1`) and fixed (committed `3ad8397`);
 both `i3 (xinit)` and `bspwm (xinit)` held at tuigreet, and PoE1 confirmed
 launching under `bspwm (xinit)`. A **new, separate** black-screen regression
 then surfaced (Follow-up #7): `bspwm (xinit)` only rendered when a sway
-session was already active on another VT. Root-caused and fixed (staged, not
-yet committed) — see Follow-up #7 for the full story: turned out to be two
-compounding bugs in `core/x11-greetd-sessions.nix`'s use of `xinit`, fixed by
-dropping `xinit` entirely in favor of starting Xorg directly and polling for
-its socket. **Confirmed working 2026-08-12** with real application testing
-(zen, Steam, PoE1, Minecraft all launch and render under `bspwm (xinit)`
-without any sway session active). Discord specifically does not work under
-this session — separate, not-yet-investigated issue, tracked as a new
-follow-up below.
+session was already active on another VT. Root-caused and fixed (committed):
+two compounding bugs in `core/x11-greetd-sessions.nix`'s use of `xinit`,
+fixed by dropping `xinit` entirely in favor of starting Xorg directly and
+polling for its socket. A third leaked-env bug (Follow-up #9, `greetd`
+leaking `XDG_SESSION_TYPE=wayland` into these X11 sessions, breaking any
+app — VSCodium, `discord-canary`, see Follow-up #8's correction note — that
+reads that variable directly for Ozone backend selection) has also been
+root-caused and fixed, **confirmed working 2026-08-12** across a real reboot:
+zen, Steam, PoE1, Minecraft, VSCodium, and `discord-canary` (including screen
+share) all launch and render correctly under `bspwm (xinit)` with no sway
+session active. Follow-up #9's fix is staged, not yet committed.
 
 ## Context
 
@@ -615,15 +617,138 @@ removed from `core/x11-greetd-sessions.nix` once the fix was confirmed; only the
 per this repo's usual workflow the actual `git commit` is left for the user to do (or ask for)
 separately.
 
-## Follow-up #8: Discord doesn't work under `bspwm (xinit)` (new, not yet investigated)
+## Follow-up #8: `discord-canary` never opens a window at all — CORRECTION: actually fixed by Follow-up #9, not a separate bug
+
+**Update**: after the Follow-up #9 fix (`export XDG_SESSION_TYPE=x11`) was switched, the user
+re-tested `discord-canary` from scratch (post-reboot) — it now launches, logs in, and screen share
+works too. So the investigation below, while technically accurate about *what* was observed (a real
+Mojo/network-service IPC timeout, confirmed via `strace`), drew the wrong conclusion about *why*: this
+was almost certainly the **same** `XDG_SESSION_TYPE=wayland` leak as Follow-up #9, not an independent
+upstream Electron/canary-channel bug. Electron's network-service/GPU-process bootstrap probably
+diverges or gets confused when `XDG_SESSION_TYPE` says `wayland` while the process is actually
+connected over X11 `DISPLAY`, producing a Mojo handshake timeout rather than VSCodium's cleaner
+"failed to connect to Wayland display" — different failure mode, plausibly the same root cause.
+**The "switch to stable `discord`" recommendation below is retracted** — no package change needed.
+Left the original investigation notes below for the record (the `strace`/ruled-out-causes work was
+real and might be useful context if a *genuinely* different Discord issue shows up later), but treat
+the "conclusion" and "recommendation" sections as superseded by this update.
+
+---
 
 2026-08-12, surfaced during the same testing pass that confirmed Follow-up #7 fixed: zen, Steam,
-PoE1, and Minecraft all work fine under `bspwm (xinit)`, but Discord specifically does not. No
-details yet on the failure mode (crashes? black window? won't launch at all?) — needs a follow-up
-report from the user before this can be diagnosed. Likely unrelated to the X11/greetd session-launch
-bugs just fixed (those blocked *everything* from rendering; other apps now work fine), more likely
-something Discord-specific (its own Wayland/X11 detection, GPU/ANGLE rendering flags, or a sandboxing
-issue) — but not confirmed either way yet.
+PoE1, and Minecraft all work fine under `bspwm (xinit)`, but Discord specifically "doesn't launch at
+all" (user's words) — no window ever appears.
+
+Reproduced directly from a shell (not through bspwm/sxhkd) via `DISPLAY=:1 discordcanary`, which made
+it possible to inspect live rather than guess from outside:
+
+- The process tree comes up looking healthy — main process, 2–3 zygotes, `chrome_crashpad_handler`,
+  a `gpu-process` — but **no `--type=renderer` process ever appears**, and `bspc query -N` /
+  `xlsclients` confirm no real UI window ever gets created (only a tiny 10x10 IPC "leader" window
+  shows up in some runs).
+- The `--type=utility --utility-sub-type=network.mojom.NetworkService` child process reliably becomes
+  a zombie (`<defunct>`) roughly 15s after launch, every single time, regardless of any of the
+  variables tried below.
+- `strace -f` on the whole tree nailed this precisely: the network-service process does one
+  `socketpair()` call to set up its Mojo bootstrap channel, then goes **completely silent** (no
+  further syscalls in the traced set) for **exactly ~15.0s**, then exits with status 0 — a clean,
+  voluntary exit, not a crash. This matches Chromium's own internal message, also present in the
+  regular (non-strace) log: `Terminating current process after 15 seconds with no connection`
+  (`content/child/child_thread_impl.cc:903`) — a real Chromium watchdog for "my Mojo bootstrap
+  handshake never completed." The main browser process's own IPC-related syscalls (per the same
+  filtered trace) also go quiet around the same time, though this wasn't traced broadly enough to
+  say for certain whether it's genuinely stuck vs. just busy elsewhere.
+- `coredumpctl list` additionally shows the **main** Discord process (not the network service)
+  SIGSEGV-crashing outright in several past sessions across multiple days (most recently today,
+  16:58) — a second, likely related but distinct symptom. No usable stack trace (stripped binary, no
+  `strings`/`gdb` on this system to go further).
+
+**Ruled out, each independently verified, none of them the cause:**
+- `programs.mangohud.enableSessionWide = true` (`core/games.nix`) — Discord's log does show a MangoHud
+  warning (`Could not find cpu temp sensor location`, confirming MangoHud does inject into Discord's
+  GPU process), but `MANGOHUD=0 discordcanary` reproduces the exact same 15s-zombie-then-nothing
+  pattern. Not the cause of the "no window" symptom (may still be a contributing factor to the
+  separate SIGSEGV crashes — not tested in isolation).
+- Chromium sandbox / setuid helper: `chrome-sandbox` inside the package is *not* setuid
+  (`-r-xr-xr-x`, no `s` bit), but unprivileged user namespaces are confirmed available and working on
+  this kernel (`unshare --user --pid` succeeds, `max_user_namespaces=63618`) — this is the normal
+  nixpkgs Electron-sandboxing setup and not the issue. `--no-sandbox` was tried explicitly too, same
+  result.
+- DNS/network: `getent hosts discord.com` and `curl -sI https://discord.com` both work instantly from
+  the same shell/session.
+- `/dev/shm`: healthy (7.8G tmpfs, plenty free, normal perms) — and Chromium's own `u1000-Shm_*`
+  shared-memory files from earlier runs are present, proving shared-memory allocation itself works
+  fine.
+- OpenASAR (a common culprit for `discord-canary` + NixOS "stuck at installing update" reports —
+  see nixpkgs issue #515106): checked directly, `grep -a -c openasar` on both `app.asar` and
+  `core.asar` inside the package returns 0 — this build is **not** patched with OpenASAR, so that
+  well-known bug class doesn't apply here. `core/packages.nix` just references plain `discord-canary`
+  with no override.
+- `--disable-features=NetworkService` (forces networking in-process instead of a separate Mojo
+  service, a common workaround for exactly this class of Electron bug): tried, same zombie-after-15s
+  pattern — either the flag isn't being honored by this Electron build, or it's not actually the
+  cause.
+- kernel LSM stack (`lsm=landlock,yama,bpf` on the kernel command line, `kernel.yama.ptrace_scope = 1`
+  from our own `core/security.nix`): no seccomp/Landlock denials found in `journalctl -k` /
+  `dmesg` for the relevant time windows, so no direct evidence implicating either.
+
+**Conclusion**: this looks like a genuine upstream Electron/Chromium Mojo-IPC-bootstrap bug specific
+to this exact `discord-canary` build (1.0.1398, an explicitly unstable/nightly channel by design),
+not something caused by anything in this repo's config — every plausible NixOS/WM-side lever
+(mangohud, sandboxing, DNS, shared memory, OpenASAR, network-service feature flag) was pulled and
+none of them changed the outcome. Going deeper would need actual Chromium debug symbols or the
+upstream issue tracker, which is past the point of reasonable return here.
+
+### Recommendation (not yet applied)
+Swap `discord-canary` for the stable `discord` package in `core/packages.nix`. Canary is Discord's
+nightly/beta channel and is far more likely to carry exactly this kind of fresh Electron-version
+regression; the stable channel is a much better bet for actually working, and is the standard
+day-to-day client anyway (canary is normally opted into for testing upcoming features, not as a
+daily driver). Not applied automatically since it's a product/workflow choice (losing whatever
+canary-only features prompted using it in the first place), not a pure bug fix — left for the user to
+decide.
+
+## Follow-up #9: VSCodium didn't launch under `bspwm (xinit)` (root-caused and fixed, confirmed)
+
+2026-08-12, reported by the user with their own correct hunch: "maybe it's because it's somehow tied
+to Wayland?" — exactly right.
+
+Root cause: `greetd`/`pam_systemd` leaks `XDG_SESSION_TYPE=wayland` into this private X11 session's
+environment, confirmed by reading `/proc/<bspwm-start-pid>/environ` directly on the live session —
+same *class* of bug as Follow-up #6's `DISPLAY=:0` leak (greetd mislabels/leaks session metadata into
+these xinit-less X11 sessions), just a different variable this time. `NIXOS_OZONE_WL=1` is also
+present (a normal global session variable, harmless on its own), but `WAYLAND_DISPLAY` is correctly
+*unset* — so VSCodium's own wrapper script (`${NIXOS_OZONE_WL:+${WAYLAND_DISPLAY:+--ozone-platform...}}}`)
+wouldn't add Wayland flags by that logic alone. The actual break is one level deeper: Electron/Chromium
+itself reads `XDG_SESSION_TYPE` directly to auto-select its Ozone backend, independent of the
+wrapper's own flag construction — sees `wayland`, tries to connect, and since no Wayland compositor is
+listening on this X11-only session, fails outright:
+```
+Failed to connect to Wayland display: Connection refused (111)
+Failed to initialize Wayland platform
+The platform failed to initialize.  Exiting.
+```
+No window ever appears — process exits almost immediately.
+
+Confirmed via a clean A/B test (`codium` launched twice, once with the leaked env reproduced exactly,
+once with `XDG_SESSION_TYPE=x11` forced): the leaked-env run hit the error above every time; the
+forced-x11 run opened a normal window (`window#validateWindowState` logged the correct real display
+geometry, 2560x1440).
+
+**Fix** (staged, `core/x11-greetd-sessions.nix`): added `export XDG_SESSION_TYPE=x11` to
+`clientScript`, right next to the existing `export DISPLAY=:1` from Follow-up #6 — same pattern,
+same root cause category (greetd-leaked session metadata), same fix shape (force the correct value
+explicitly rather than trusting what's inherited). `dry-build` clean.
+
+**Confirmed working.** Switched, greetd restarted, user rebooted and re-tested from a clean boot:
+VSCodium opens normally. As a bonus, this same fix also resolved Follow-up #8's `discord-canary`
+issue — see the correction note at the top of that section.
+
+Worth keeping in mind for any *future* app that mysteriously "doesn't launch" under these xinit-less
+sessions: check `/proc/<pid>/environ` for the actual process first, rather than guessing — this is now
+the second confirmed case (after `DISPLAY`) of greetd leaking session-type metadata into these
+sessions, and it's plausible other `XDG_SESSION_*`/`WAYLAND_*` variables could cause similar
+toolkit-specific breakage for apps that check them directly.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
