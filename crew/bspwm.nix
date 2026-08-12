@@ -1,7 +1,8 @@
 { pkgs, ... }:
 {
-  # Мінімальна X11-сесія для гри (PoE1 глючить і на sway, і на i3) — без
-  # композитора, з мінімальним polybar (лише workspace-індикатор + годинник).
+  # X11-сесія для гри (PoE1 глючить і на sway, і на i3) — без композитора
+  # (заради продуктивності), але з повноцінним polybar (паритет з waybar
+  # в crew/sway.nix), бо крок за кроком добудовується до заміни sway/i3.
   xdg.configFile."bspwm/bspwmrc".source = pkgs.writeShellScript "bspwmrc" ''
     bspc monitor -d 1 2 3 4 5
 
@@ -36,7 +37,11 @@
     foreground = #e0e0f0
     font-0 = monospace:size=10
     modules-left = bspwm
-    modules-right = date
+    modules-center = date
+    modules-right = pulseaudio network cpu memory
+    tray-position = right
+    tray-padding = 4
+    tray-background = #1a1a2e
 
     [module/bspwm]
     type = internal/bspwm
@@ -54,6 +59,40 @@
     type = internal/date
     date = %H:%M
     label = %date%
+
+    ; Решта модулів — паритет з waybar-набором в crew/sway.nix
+    ; (pulseaudio/network/cpu/memory/tray), X11-native через polybar internal-модулі.
+    [module/cpu]
+    type = internal/cpu
+    interval = 2
+    label = CPU %percentage%%
+    label-foreground = #c9b8ff
+
+    [module/memory]
+    type = internal/memory
+    interval = 2
+    label = RAM %gb_used%G
+    label-foreground = #c9b8ff
+
+    ; Стаціонарна машина на дроті — інтерфейс enp5s0 (перевірено `ip link`),
+    ; на відміну від waybar тут немає wifi/essid-гілки, лише ethernet.
+    [module/network]
+    type = internal/network
+    interface = enp5s0
+    interval = 3
+    label-connected = Ethernet
+    label-connected-foreground = #c9b8ff
+    label-disconnected = Немає мережі
+    label-disconnected-foreground = #888888
+
+    [module/pulseaudio]
+    type = internal/pulseaudio
+    format-volume = <label-volume>
+    format-muted = <label-muted>
+    label-volume = Vol %percentage%%
+    label-volume-foreground = #c9b8ff
+    label-muted = Vol Muted
+    label-muted-foreground = #888888
   '';
 
   # Системний модуль bspwm сам запускає sxhkd при старті сесії — тут ми лише
