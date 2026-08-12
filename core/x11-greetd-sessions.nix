@@ -34,56 +34,30 @@ let
     # `$DISPLAY` у клієнтському скрипті був :0 (де реально живе
     # halley/Xwayland-compat), а не :1. Форсуємо $DISPLAY явно, перед wm.start.
     #
-    # Follow-up #7, round 5: раніше тут був `xinit`, який сам піднімав Xorg і
-    # чекав, поки сервер стане готовим, перш ніж форкати клієнта. Живе
-    # трасування показало: Xorg стартує й повністю готовий (усі пристрої
-    # проліковано) менше ніж за секунду, і залишається абсолютно робочим —
-    # підключення (`DISPLAY=:1 xset q`) з іншого терміналу спрацьовувало 81/81
-    # разів поспіль, поки Xorg просто "висів" — але сам `xinit` весь цей час
-    # (рівно ~240с щоразу) друкував "waiting for X server to begin accepting
-    # connections", жодного разу не форкаючи клієнта, і зрештою здавався з
-    # "unable to connect to X server: Connection refused" та вбивав щойно
-    # робочий сервер. Причина в самому бінарнику `xinit` (nixpkgs, версія
-    # 1.4.4) не встановлена — без дизасемблера далі копати нема сенсу, а
-    # обхідний шлях (не покладатись на вбудовану в xinit перевірку готовності)
-    # і дешевший, і вже емпірично перевірений. Тому піднімаємо Xorg самі, у
-    # фоні, і чекаємо появи сокета `/tmp/.X11-unix/X<N>` власним пулінгом —
-    # саме той метод, яким я підключався 81 раз без жодного провалу.
+    # Follow-up #7: спершу піднімали Xorg через `xinit`, але його вбудована
+    # перевірка готовності сервера ("waiting for X server to begin accepting
+    # connections") ніколи не спрацьовувала — приблизно за 240с здавалась і
+    # вбивала сервер, хоча він сам увесь цей час був повністю робочий і
+    # приймав з'єднання (перевірено підключенням ззовні, 81/81 успіхів).
+    # Замінили на власний запуск Xorg у фоні + пулінг сокета
+    # /tmp/.X11-unix/X1, замість вбудованої в xinit перевірки. Це, своєю
+    # чергою, забрало неявний "-keeptty", який xinit завжди сам додає до
+    # команди сервера — без нього Xorg не міг отримати VT через
+    # systemd-logind ("Cannot open virtual console: Permission denied").
     clientScript = ''
       export DISPLAY=:1
-      TRACE=/tmp/${wm.name}-xinit-trace.log
-      echo "[$(date -Is)] clientScript start (no xinit, round 5)" >> "$TRACE"
-      exec >>"$TRACE" 2>&1
-
-      # Round 5 continued: без xinit зник неявний "-keeptty", який xinit завжди
-      # сам додає до команди X-сервера. Без нього X друкує "systemd-logind
-      # integration requires -keeptty ... disabling logind integration" і одразу
-      # "xf86OpenConsole: Cannot open virtual console 1 (Permission denied)" —
-      # без -keeptty X намагається відкрити VT напряму (ioctl), а не через
-      # logind-сесію, і в непривілейованого користувача на це нема прав.
       ${pkgs.xorg-server}/bin/X -keeptty ${toString xserverArgs} :1 vt$XDG_VTNR &
       xpid=$!
       trap 'kill "$xpid" 2>/dev/null; wait "$xpid" 2>/dev/null' EXIT
 
-      echo "[$(date -Is)] X forked as $xpid, polling for /tmp/.X11-unix/X1"
-      ready=0
       for i in $(seq 1 100); do
-        if [ -e /tmp/.X11-unix/X1 ]; then
-          ready=1
-          break
-        fi
+        [ -e /tmp/.X11-unix/X1 ] && break
         sleep 0.2
       done
-      echo "[$(date -Is)] socket poll done, ready=$ready after $i tries"
-      if [ "$ready" != 1 ]; then
-        echo "[$(date -Is)] X never became ready, bailing out"
-        exit 1
-      fi
+      [ -e /tmp/.X11-unix/X1 ] || exit 1
     '' + wm.start + ''
 
-      echo "[$(date -Is)] after wm.start block, waitPID=$waitPID"
       test -n "$waitPID" && wait "$waitPID"
-      echo "[$(date -Is)] wait returned (exit=$?), clientScript exiting"
     '';
     wrapper = pkgs.writeShellScript "${wm.name}-xinit-wrapper" ''
       exec ${pkgs.writeShellScript "${wm.name}-start" clientScript}

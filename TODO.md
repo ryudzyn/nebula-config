@@ -1,6 +1,6 @@
 # Nebula OS: cleanup, hardening, workflow, gaming WM
 
-## Status: core fix done and committed; new black-screen regression under investigation (Follow-up #7)
+## Status: all known X11-session bugs fixed (Follow-ups #1–#7), staged not yet committed
 
 All four original work streams below are implemented and committed
 (`77a4bd6`..`bfa9247`). X11 sessions (`i3`, `bspwm`) initially never launched
@@ -8,10 +8,17 @@ under the new `greetd` setup — root-caused across Follow-ups #1–#6 (missing
 `wait "$waitPID"`, then a `DISPLAY=:0` leak from inherited session
 environment instead of the intended `:1`) and fixed (committed `3ad8397`);
 both `i3 (xinit)` and `bspwm (xinit)` held at tuigreet, and PoE1 confirmed
-launching under `bspwm (xinit)`. Since then, a **new, separate** issue
-surfaced: see Follow-up #7 — `bspwm (xinit)` black-screens unless a sway
-session is already active on another VT. Undiagnosed, diagnostics staged,
-not yet root-caused.
+launching under `bspwm (xinit)`. A **new, separate** black-screen regression
+then surfaced (Follow-up #7): `bspwm (xinit)` only rendered when a sway
+session was already active on another VT. Root-caused and fixed (staged, not
+yet committed) — see Follow-up #7 for the full story: turned out to be two
+compounding bugs in `core/x11-greetd-sessions.nix`'s use of `xinit`, fixed by
+dropping `xinit` entirely in favor of starting Xorg directly and polling for
+its socket. **Confirmed working 2026-08-12** with real application testing
+(zen, Steam, PoE1, Minecraft all launch and render under `bspwm (xinit)`
+without any sway session active). Discord specifically does not work under
+this session — separate, not-yet-investigated issue, tracked as a new
+follow-up below.
 
 ## Context
 
@@ -536,6 +543,87 @@ sxhkd/bspwm grabbing global hotkeys).
   problem first, display problem second, given this round's evidence.
 - Confirm whether plain `i3 (xinit)` has the same behavior — still untested, all rounds so far used
   bspwm only.
+
+### Round 3: full-process live monitoring — bspwm/sxhkd never actually start when alone
+
+The "logind device-handoff race" theory from Round 2 was never confirmed or denied directly —
+instead, live monitoring (a background script polling `ps -eo pid,ppid,comm,args` every second,
+diffing against the previous second) was run *during* a live re-test, rather than reconstructing
+after the fact from journalctl. Across two full "alone" test sessions (~4 min each — this round is
+where the suspiciously exact **~240s session duration** first got noticed, consistent across every
+subsequent "alone" attempt too), `bspwm`/`sxhkd` **never appeared as processes at all**, under any
+name, in either run — only `xinit` and `X` ever showed up as running. This ruled out a "silent
+input-grab failure" (Round 2's theory) in favor of something preventing the WM from ever launching in
+the first place.
+
+### Round 4: `xinit` itself never forks the client
+
+Live-polled `/proc/<xinit_pid>/status`+`wchan` every second during a third "alone" test. Found: after
+an initial one-second `sigsuspend` (the normal "wait for X ready" signal wait, which returns quickly
+as expected), `xinit` drops into a **repeating `hrtimer_nanosleep` loop for the full ~240s**, the
+entire time with exactly one child (the X server) and no second child ever appearing — confirming
+directly (not inferred) that `xinit` never forks the client script at all.
+
+Added a redirect capturing `xinit`'s own stdout/stderr (previously only the client script's output
+was captured — `xinit`'s own was going nowhere visible). This immediately surfaced the real message:
+```
+waiting for X server to begin accepting connections
+xinit: giving up
+xinit: unable to connect to X server: Connection refused
+```
+So `xinit` really is doing exactly what it looks like: polling `XOpenDisplay` for ~240s and getting
+ECONNREFUSED every time, despite Xorg's own log showing a complete, clean startup (full device
+enumeration finishes in under 1 second by Xorg's own internal clock, then total silence in the log
+until teardown — Xorg believes itself ready and just sits there).
+
+A `LISTEN_FDS`/`LISTEN_PID` leak (systemd socket-activation env vars fooling Xorg into not creating
+its normal socket) was checked and ruled out — both were confirmed empty in the actual environment.
+
+### Round 5: proved the server was fine all along, replaced `xinit` outright
+
+Instead of guessing further, ran a live connectivity probe from the tty2 vantage point: poll for
+`/tmp/.X11-unix/X1`, and the moment it exists, try `DISPLAY=:1 xset q` directly. Result: **81/81
+successful connections**, zero failures, for the entire lifetime of the socket — while `xinit`, the
+process that started this exact server, insisted the whole time that the connection was refused. This
+conclusively proved the server itself was never the problem; something specific to `xinit`'s own
+internal readiness-check implementation was broken, and static analysis of the binary (`grep -a` for
+strings, since `strings` itself isn't installed here) didn't turn up anything more specific without a
+disassembler — not worth pursuing further.
+
+**Fix**: dropped `xinit` from `core/x11-greetd-sessions.nix` entirely. `clientScript` now starts Xorg
+directly in the background itself, polls for `/tmp/.X11-unix/X1` to appear (the exact method just
+proven reliable), and only then proceeds to `wm.start`; a `trap ... EXIT` kills the X server when the
+WM exits, replacing `xinit`'s teardown role.
+
+This surfaced one immediate regression: dropping `xinit` also silently dropped `-keeptty`, which
+`xinit` always adds to the server command line itself. Without it, Xorg logged `systemd-logind
+integration requires -keeptty ... disabling logind integration` followed by a fatal `xf86OpenConsole:
+Cannot open virtual console 1 (Permission denied)` — without `-keeptty`, Xorg tries to take the VT via
+direct ioctls instead of through the logind session, which an unprivileged user can't do. Added
+`-keeptty` explicitly to the `X` invocation and this resolved cleanly.
+
+**Confirmed working 2026-08-12** by the user testing real applications (not just "session doesn't
+bounce"): zen browser, Steam, Path of Exile 1, and Minecraft all launch and render correctly under
+`bspwm (xinit)` with no sway session active anywhere — the original Follow-up #7 symptom is gone.
+Also tested `i3 (xinit)` this round (previously **never** actually verified end-to-end in any prior
+Follow-up despite being assumed to share the same code path) — also confirmed working.
+
+All temporary trace-file diagnostics (`exec >>`/`echo` scaffolding accumulated across rounds 3–5) were
+removed from `core/x11-greetd-sessions.nix` once the fix was confirmed; only the permanent fix
+(no-`xinit` client script + explicit `-keeptty`) and a condensed explanatory comment remain.
+**Staged, not yet committed** — `dry-build` clean, switched and tested live during this session, but
+per this repo's usual workflow the actual `git commit` is left for the user to do (or ask for)
+separately.
+
+## Follow-up #8: Discord doesn't work under `bspwm (xinit)` (new, not yet investigated)
+
+2026-08-12, surfaced during the same testing pass that confirmed Follow-up #7 fixed: zen, Steam,
+PoE1, and Minecraft all work fine under `bspwm (xinit)`, but Discord specifically does not. No
+details yet on the failure mode (crashes? black window? won't launch at all?) — needs a follow-up
+report from the user before this can be diagnosed. Likely unrelated to the X11/greetd session-launch
+bugs just fixed (those blocked *everything* from rendering; other apps now work fine), more likely
+something Discord-specific (its own Wayland/X11 detection, GPU/ANGLE rendering flags, or a sandboxing
+issue) — but not confirmed either way yet.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
