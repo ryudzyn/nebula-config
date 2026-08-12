@@ -148,6 +148,12 @@
       # автостартом, тут — за біндом (той самий позасистемний бінарник).
       "super + shift + m" = ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
 
+      # Режими роботи/навчання/гри — ті самі скрипти, що й у sway.nix
+      # (crew/modes.nix), скрипти самі визначають bspwm vs sway в рантаймі.
+      "super + F1" = "mode-work";
+      "super + F2" = "mode-study";
+      "super + F3" = "mode-play";
+
       # floating toggle — bspc-еквівалент "floating toggle" з sway/i3.
       "super + shift + space" = "bspc node -t ~floating";
 
