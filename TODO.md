@@ -768,6 +768,82 @@ equivalents where the sway originals are Wayland-only:
 **Not yet committed** — left for the user per usual workflow. Not live-tested yet (no
 switch/restart performed for this round).
 
+## Follow-up #11: build bspwm up to sway parity, as prep for eventually retiring sway+i3
+
+2026-08-12. Decision: since bspwm (xinit) is now fully confirmed working (Follow-up #7) and is a
+genuinely different, working WM, the user wants to eventually delete `crew/sway.nix` and
+`crew/i3.nix` outright and make bspwm the only session — but only *after* bspwm has real parity,
+since sway is currently the de facto daily-driver session (not just a gaming WM). Strategy agreed:
+build bspwm up first, verify live, delete sway/i3 as a separate later step — not done in this pass.
+
+Gap analysis (compared `crew/sway.nix` against `crew/i3.nix`/`crew/bspwm.nix`) found: halley (the
+other Wayland session, wired in `core/desktop.nix`) has **zero** home-manager config anywhere in
+this repo — no bar, keybindings, lock, notifications — so it isn't a usable fallback either; sway
+really is the only fully-fleshed-out session today besides what's being built into bspwm here.
+
+Six commits landed this round, each `dry-build`-clean, none switched/live-tested yet:
+1. Trivial keybindings ported 1:1 from `crew/i3.nix`/`crew/sway.nix`: `super+Escape` → lock
+   (`i3lock-color`, same color as i3/sway), `super+shift+Escape` → `xset dpms force off`,
+   `super+n` → `toggle-theme` (already-portable script from `crew/theming.nix`),
+   `super+shift+space` → floating toggle (`bspc node -t ~floating`).
+2. `polybar` expanded from workspace+clock-only to parity with sway's waybar module set: cpu,
+   memory (`%gb_used%G`), network (hardcoded `enp5s0` — this machine is wired, confirmed via
+   `ip link`, no wifi/essid branch needed unlike waybar's), pulseaudio, tray. Deliberately no icon
+   glyphs (plain "Vol"/"CPU"/"RAM" text labels) since polybar's `font-0` here isn't a Nerd Font,
+   unlike waybar's CSS which explicitly sets one — avoids tofu-box rendering.
+3. Cosmetics ported: `wlsunset` (wayland-only) → `redshift` with a `~/.config/redshift.conf` using
+   `dawn-time=07:00`/`dusk-time=20:00` (redshift's fixed-clock-time override, independent of
+   geo-location — same effect as wlsunset's `-S`/`-s`), matching temps (day 6500K/night 4000K).
+   `waypaper` (wayland-only) → `nitrogen`. `nwg-look` and the roulette.html launcher are portable
+   as-is (gsettings/xdg-open) and were just copied over unchanged.
+4. `super+shift+m` bound to launch the Swiftpoint X1 Control Panel (the same out-of-tree
+   `~/Applications/SwiftpointX1` binary sway autostarts) — on-demand keybind here instead of
+   autostart, per explicit user request.
+5. `mako &` added directly to `bspwmrc`. Root cause it fixes: mako's bundled systemd user unit only
+   starts because sway explicitly reaches `sway-session.target`/`graphical-session.target`; the
+   xinit-based X11 session from `core/x11-greetd-sessions.nix` never does that, so notifications
+   (including `crew/modes.nix`'s `makoctl` calls) were silently dead under bspwm until now — same
+   *shape* of bug as Follow-up #6 (`DISPLAY`) and #9 (`XDG_SESSION_TYPE`): greetd's xinit sessions
+   don't get session-manager integration nixpkgs assumes is present, so anything relying on it
+   needs an explicit workaround here.
+6. `crew/modes.nix`'s `mode-work`/`mode-study`/`mode-play` were 100% `swaymsg`/`app_id`-coupled, so
+   F1/F2/F3 only ever worked under sway (i3 never bound them either). Each script now branches on
+   `$SWAYSOCK`: sway branch unchanged, new bspwm branch focuses the target desktop
+   (`bspc desktop -f '^N'`) *before* spawning each app (bspwm places new windows on the currently
+   focused desktop) instead of trying to match `WM_CLASS` after the fact — avoids having to guess
+   exact class names for vscodium/zen/anki/goldendict/steam/discord-canary without live `xprop`
+   access. Bound `super+F1/F2/F3` in `crew/bspwm.nix` to match.
+
+### Not done yet / explicitly deferred
+- **Nothing above has been switched or live-tested this round** — only `dry-build` per commit.
+  Needs a real `nh os switch` + `sudo systemctl restart greetd` (per the Follow-up #6 gotcha) and
+  then exercising every new bind under `bspwm (xinit)`: lock, dpms, floating toggle, theme toggle,
+  nitrogen, nwg-look, roulette, redshift's actual dawn/dusk transition, the mouse-app bind, mako
+  notifications actually popping (e.g. `notify-send test`), and all three F1/F2/F3 modes — the
+  `bspc desktop -f` timing (`sleep 0.3` between spawns) in particular is an untested guess and may
+  need tuning once watched live.
+- redshift's `dawn-time`/`dusk-time` config-file syntax was written from memory, not verified
+  against a running instance — check `redshift.conf`'s man-page-documented format actually parses
+  (redshift may log a config error rather than silently ignore it) once live.
+- The screen-share/screenshot portal question flagged during gap analysis (whether `bspwm`/`i3`'s
+  fallback to `core/desktop.nix`'s `config.common` halley portal actually works for an X11 session,
+  vs. needing its own scoped `xdg.portal.config` like sway's `config.sway` block in `core/games.nix`)
+  is **still unverified** — not touched this round. Likely lower-risk than it looks: X11 apps
+  (Discord, browsers) traditionally capture the display directly (XSHM/GLX) without going through a
+  portal at all, unlike Wayland where portals are mandatory — but this is an assumption, not
+  confirmed for this specific setup.
+- Not ported (explicitly out of scope this round, no i3 precedent existed either):
+  `dbus-update-activation-environment` call from sway's startup, and richer per-app `bspc rule`
+  window-placement (currently only `Steam:Popup`).
+
+### Next steps
+- Switch + restart greetd, then work through the "not live-tested" checklist above under
+  `bspwm (xinit)`.
+- Once everything above is confirmed working live: revisit deleting `crew/sway.nix` +
+  `crew/i3.nix` (+ the `programs.sway`/`services.xserver.windowManager.i3` system-level toggles in
+  `core/games.nix`) — user has confirmed this is the end goal, but explicitly wants it sequenced
+  *after* live verification here, not bundled into this round.
+
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
 - `core/system.nix` — drop insecure-package allowance
