@@ -28,6 +28,12 @@
     ${pkgs.feh}/bin/feh --bg-fill ${../assets/wallpaper/wallpaper.jpg}
     ${pkgs.polybar}/bin/polybar -c "$HOME/.config/polybar/config.ini" mybar &
 
+    # mako (сповіщення) в sway реально стартує лише тому, що sway явно
+    # запускає sway-session.target/graphical-session.target; наша xinit-сесія
+    # (core/x11-greetd-sessions.nix) цього не робить, тож без явного запуску
+    # тут makoctl (в т.ч. з crew/modes.nix) стукав би в порожнечу.
+    ${pkgs.mako}/bin/mako &
+
     # Нічний фільтр — X11-еквівалент wlsunset з crew/sway.nix (той самий
     # розклад/температури), налаштування розкладу в ~/.config/redshift.conf.
     ${pkgs.redshift}/bin/redshift &
