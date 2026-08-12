@@ -27,6 +27,26 @@
 
     ${pkgs.feh}/bin/feh --bg-fill ${../assets/wallpaper/wallpaper.jpg}
     ${pkgs.polybar}/bin/polybar -c "$HOME/.config/polybar/config.ini" mybar &
+
+    # Нічний фільтр — X11-еквівалент wlsunset з crew/sway.nix (той самий
+    # розклад/температури), налаштування розкладу в ~/.config/redshift.conf.
+    ${pkgs.redshift}/bin/redshift &
+  '';
+
+  # dawn-time/dusk-time дозволяють задати фіксовані години переходу без
+  # geo-провайдера — той самий підхід, що wlsunset -S/-s/-t/-T в sway.nix.
+  xdg.configFile."redshift.conf".text = ''
+    [redshift]
+    temp-day=6500
+    temp-night=4000
+    transition=1
+    location-provider=manual
+    dawn-time=07:00
+    dusk-time=20:00
+
+    [manual]
+    lat=0
+    lon=0
   '';
 
   xdg.configFile."polybar/config.ini".text = ''
@@ -111,6 +131,13 @@
       "super + shift + Escape" = "xset dpms force off";
       "super + n" = "toggle-theme";
 
+      # Косметика з crew/sway.nix: waypaper (wayland-only picker) →
+      # nitrogen (X11-native); nwg-look і roulette самі по собі portable
+      # (gsettings/xdg-open), тому запускаються без заміни.
+      "super + w" = "${pkgs.nitrogen}/bin/nitrogen";
+      "super + shift + t" = "nwg-look";
+      "super + shift + r" = "xdg-open file://${../assets/cprogram/roulette.html}";
+
       # floating toggle — bspc-еквівалент "floating toggle" з sway/i3.
       "super + shift + space" = "bspc node -t ~floating";
 
@@ -146,5 +173,14 @@
     };
   };
 
-  home.packages = with pkgs; [ rofi polybar maim xclip brightnessctl i3lock-color ];
+  home.packages = with pkgs; [
+    rofi
+    polybar
+    maim
+    xclip
+    brightnessctl
+    i3lock-color
+    nitrogen
+    redshift
+  ];
 }
