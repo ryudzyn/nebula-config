@@ -10,7 +10,11 @@
   # Дефолтний консольний (TTY) шрифт не містить кириличних гліфів, тож навіть
   # з uk_UA-локаллю українські символи в голій консолі (nano/less/journalctl
   # тощо на tty2) показувались би квадратиками. ter-v16n (Terminus) кириличні
-  # гліфи має; console.packages вже дефолтно містить terminus_font.
+  # гліфи має. console.packages за замовчуванням ПОРОЖНІЙ (не містить
+  # terminus_font сам по собі, попри те, що тут раніше було написано) — без
+  # явного пакета setfont не знаходить ter-v16n.psf.gz і systemd-vconsole-setup
+  # падає з "Unable to find file: ter-v16n" (підтверджено живим запуском).
+  console.packages = [ pkgs.terminus_font ];
   console.font = "ter-v16n";
   # Перевикористовуємо ту саму xkb-розкладку (us,ua,de + alt+shift toggle),
   # що й для X11/Wayland (services.xserver.xkb нижче), у самій консолі — щоб
