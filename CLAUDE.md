@@ -25,6 +25,13 @@ Home Manager user profile (`ryudzyn`), managed together as one flake. All prose 
   there is no `nix fmt` / flake-level formatter wired up).
 - There is no test suite; correctness is checked via `dry-build` and, for real changes, a switch
   + manual verification of the affected service/session.
+- Boot-test a generation on a disposable VM instead of the real `earth` host: `scripts/test-vm.sh`.
+  Builds `earth`'s own `config.system.build.vm` (no separate host config needed — every
+  `nixosSystem` already has this target) and boots it headless with SSH access. Reliable for a
+  cold-boot check (services starting cleanly, generated session files, etc.) and for a one-shot
+  `switch-to-configuration dry-activate`/`test` to preview what a switch would touch. A live
+  `nixos-rebuild switch` *inside* the guest is unreliable — see the script's header comment for
+  why (it tears down its own 9p store/share mounts mid-switch). `--fresh` wipes the guest disk.
 
 ## Architecture
 
