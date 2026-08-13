@@ -58,6 +58,16 @@ let
     clientScript = ''
       export DISPLAY=:1
       export XDG_SESSION_TYPE=x11
+
+      # Follow-up #12: home.sessionVariables (напр. crew/theming.nix'ів
+      # XDG_DATA_DIRS для gsettings-desktop-schemas) експортуються лише в
+      # /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh,
+      # який джерелять login-шели — ця xinit-сесія такою не є, тож sxhkd/WM
+      # їх ніколи не бачили (підтверджено читанням /proc/<sxhkd>/environ:
+      # XDG_DATA_DIRS без gsettings-schemas). Джерелимо той самий файл тут,
+      # той самий клас фіксу, що й DISPLAY/XDG_SESSION_TYPE вище.
+      . /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh
+
       ${pkgs.xorg-server}/bin/X -keeptty ${toString xserverArgs} :1 vt$XDG_VTNR &
       xpid=$!
       trap 'kill "$xpid" 2>/dev/null; wait "$xpid" 2>/dev/null' EXIT

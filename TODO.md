@@ -909,9 +909,24 @@ original "no schema installed" error even though a plain login shell now works. 
 by literally pressing `super+n`** — this is inferred from the environment diff, not a live keypress
 test — but the mechanism is the same one already documented in Follow-ups #6/#9/#11 item 5 (things
 that assume login-shell or session-manager env propagation silently don't get it under these xinit
-sessions). Next step if this is confirmed: export `XDG_DATA_DIRS` explicitly in `bspwmrc` itself
-(same pattern as #11 item 5's `mako &`), or have `clientScript` run
-`dbus-update-activation-environment --systemd --all` after exporting it, so sxhkd inherits it.
+sessions).
+
+**Fix applied (staged, not yet switched/live-tested):** rather than duplicating the
+`gsettings-desktop-schemas` path expression a second time in `crew/bspwm.nix`/`bspwmrc`, sourced
+the real generated file directly — `core/x11-greetd-sessions.nix`'s `clientScript` now runs
+`. /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh` right after the existing
+`DISPLAY`/`XDG_SESSION_TYPE` exports, before `wm.start`. This picks up *all* of
+`home.sessionVariables` (not just `XDG_DATA_DIRS`), the same general fix shape as those two prior
+leaks. Verified by building the derivation directly (`nix-store --realise` on
+`bspwm-xinit-wrapper.drv`, no switch needed) and reading the resulting `bspwm-start` script from the
+store: the `.`-source line runs before `sxhkd`/`bspwm` are launched, so both inherit the corrected
+`XDG_DATA_DIRS`. `dry-build` and a full `system.build.toplevel` build both succeed (only the
+expected small set of derivations rebuild: `bspwm-start`, `-xinit-wrapper`, `-xsession-xinit`,
+`desktops`, and the top-level closure).
+
+**Not yet switched or tested with a real `super+n` keypress** — that's the next step (`nh os
+switch` + the Follow-up #6-established `sudo systemctl restart greetd` gotcha, since this touches
+the session-list-affecting `core/x11-greetd-sessions.nix`).
 
 ## Follow-up #13: sway/i3 deleted, bspwm made sole session (committed `192697a`, switched and confirmed live)
 
@@ -958,10 +973,10 @@ confirmed, not a sign anything is out of sync.
   toggle, theme toggle, nitrogen, nwg-look, roulette, redshift, mouse-app bind, mako, F1/F2/F3)
   to make sure removing the sway/i3 code paths didn't regress anything that was working. Not done
   as part of this doc-status pass.
-- Follow-up #12 (`XDG_DATA_DIRS` reaching `super+n` through sxhkd, not just a login shell): no
-  longer just an open question — `/proc/<sxhkd_pid>/environ` confirms the var is missing there, so
-  the keybind is almost certainly still broken. Needs an actual `super+n` keypress test to confirm,
-  then a fix (export in `bspwmrc`, same pattern as #11 item 5's `mako &`).
+- Follow-up #12 (`XDG_DATA_DIRS` reaching `super+n` through sxhkd, not just a login shell): fix
+  staged in `core/x11-greetd-sessions.nix` (source `hm-session-vars.sh` in `clientScript`), verified
+  by reading the built script, but not yet switched or confirmed with a real `super+n` keypress —
+  do that together with the switch for this section.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
