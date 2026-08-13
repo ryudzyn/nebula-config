@@ -898,6 +898,50 @@ instance of the same "xinit-session env propagation" bug class as Follow-ups #6/
 `dbus-update-activation-environment`/`systemctl --user import-environment` for `XDG_DATA_DIRS`
 specifically, the same way `bspwmrc`/sway already do for other vars).
 
+## Follow-up #13: sway/i3 deleted, bspwm made sole session (staged, not committed/switched)
+
+2026-08-13. Per the Follow-up #11 end goal (bspwm at parity → retire sway/i3), and since the
+user confirmed the Follow-up #11 checklist already works live, jumped straight to deletion —
+deferring Follow-up #12's `XDG_DATA_DIRS`-through-sxhkd open question to later, since it doesn't
+block this.
+
+Removed:
+- `crew/sway.nix`, `crew/i3.nix` deleted outright.
+- `crew/default.nix`: dropped their imports; also dropped the standalone
+  `programs.waybar.enable = true;` — nothing uses waybar now that sway (its only consumer) is
+  gone (bspwm uses polybar instead, per Follow-up #11 #2).
+- `core/games.nix`: dropped `services.xserver.windowManager.i3.enable`, the whole
+  `programs.sway = { ... }` block, and the `xdg.portal { extraPortals = [ xdg-desktop-portal-wlr
+  ]; config.sway = { ... }; }` block — all sway/i3-only, nothing else in the repo referenced
+  `xdg-desktop-portal-wlr` (grepped to confirm). halley's own portal config
+  (`core/desktop.nix`'s `config.common`) is untouched and unaffected.
+- `crew/modes.nix`: `mode-work`/`mode-study`/`mode-play` had a `$SWAYSOCK`-branching `if/else`
+  (Follow-up #11 #6) to support both sessions at once — collapsed to bspwm-only unconditional
+  logic now that sway can't run these binds anymore.
+- `crew/theming.nix`: dropped `waypaper`, `swaybg`, `wlsunset` from `home.packages` — grepped
+  first to confirm all three were sway-only (bspwm already uses nitrogen/redshift instead, per
+  Follow-up #11 #3); `nwg-look` stayed since bspwm still binds it.
+- `core/x11-greetd-sessions.nix` needed **no changes**: `mkXinitSession` is driven by
+  `config.services.xserver.windowManager.session` (filtered to enabled WMs with a non-empty
+  `.start`), so dropping i3's system-level `.enable` automatically stops generating its xinit
+  session — confirmed via `dry-build`'s derivation list, which now only shows
+  `none+bspwm-xsession`/the bspwm xinit session, no i3/sway entries at all.
+
+`dry-build` clean (exit 0), 34 derivations, none of them i3/sway-related. **Not yet
+switched/live-tested** — per usual workflow, `nh os switch` + the Follow-up #6-established
+`sudo systemctl restart greetd` gotcha (session-list changes need it) are left for the user, as
+is the actual commit.
+
+### Next steps
+- `nh os switch` + `sudo systemctl restart greetd`, then confirm at tuigreet: only `bspwm
+  (xinit)` (+ the non-functional `none+bspwm`) show up, halley is still there, no `i3`/`sway`
+  entries remain anywhere in the list.
+- Re-run the full Follow-up #11 live checklist once more post-deletion (lock, dpms, floating
+  toggle, theme toggle, nitrogen, nwg-look, roulette, redshift, mouse-app bind, mako, F1/F2/F3)
+  to make sure removing the sway/i3 code paths didn't regress anything that was working.
+- Follow-up #12 (`XDG_DATA_DIRS` reaching `super+n` through sxhkd, not just a login shell) is
+  still open and independent of this — pick it back up whenever.
+
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
 - `core/system.nix` — drop insecure-package allowance
@@ -905,6 +949,8 @@ specifically, the same way `bspwmrc`/sway already do for other vars).
 - `core/games.nix`, `crew/default.nix`, `crew/bspwm.nix` — bspwm session
 - `core/x11-greetd-sessions.nix` — xinit wrapper for i3/bspwm under greetd (follow-up fix)
 - `crew/theming.nix` — `toggle-theme`, `XDG_DATA_DIRS` gsettings-schemas fix (Follow-up #12)
+- `crew/sway.nix`, `crew/i3.nix` (deleted), `crew/modes.nix` (sway branch dropped) — sway/i3
+  retirement (Follow-up #13)
 - `log/log.txt` (deleted), `constellations/gravity-drive.nix` / `propulsion.nix` (deleted), `.gitignore`
 
 ## Verification

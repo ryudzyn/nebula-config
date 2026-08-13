@@ -29,9 +29,6 @@ in
 
   home.packages = with pkgs; [
     nwg-look
-    waypaper
-    swaybg
-    wlsunset
     dconf
     glib
     gsettings-desktop-schemas

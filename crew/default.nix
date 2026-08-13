@@ -7,10 +7,8 @@
     ./cli-tools.nix
     ./media.nix
     ./vscodium.nix
-    ./sway.nix
     ./theming.nix
     ./modes.nix
-    ./i3.nix
     ./bspwm.nix
 
     # Ці файли ми напишемо трохи згодом, тому поки вони закоментовані (#)
@@ -46,7 +44,6 @@
     tldr
     duf
   ];
-  programs.waybar.enable = true;
 
   # Дозволяємо Home Manager самому керувати своїми оновленнями
   programs.home-manager.enable = true;

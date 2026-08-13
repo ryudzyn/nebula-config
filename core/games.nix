@@ -10,7 +10,6 @@
   ];
 
   services.xserver.enable = true;
-  services.xserver.windowManager.i3.enable = true;
   services.xserver.windowManager.bspwm.enable = true;
   services.xserver.xkb = {
     layout = "us,ua,de";
@@ -32,20 +31,6 @@
       enable = true;
       capSysNice = true;
       args = [ "--rt" "--expose-wayland" ];
-    };
-  };
-
-    programs.sway = {
-    enable = true;
-    wrapperFeatures.gtk = true; # щоб GTK-застосунки (типу файлових діалогів) виглядали й працювали нормально
-  };
-
-    xdg.portal = {
-    extraPortals = [ pkgs.xdg-desktop-portal-wlr ];
-    config.sway = {
-      default = [ "gtk" ];
-      "org.freedesktop.impl.portal.ScreenCast" = [ "wlr" ];
-      "org.freedesktop.impl.portal.Screenshot" = [ "wlr" ];
     };
   };
 
