@@ -848,7 +848,7 @@ Six commits landed this round, each `dry-build`-clean, none switched/live-tested
   `core/games.nix`) — user has confirmed this is the end goal, but explicitly wants it sequenced
   *after* live verification here, not bundled into this round.
 
-## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (committed `e3a7db2`, switched; fix confirmed for login shells, still likely broken via the actual `super+n` keybind — see update below)
+## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (committed `e3a7db2` + `70c5a95`; propagation mechanism confirmed, real `super+n` keypress still pending — see updates below)
 
 2026-08-13. `toggle-theme` (`crew/theming.nix`, bound `super+n` in both `crew/sway.nix` and the new
 `crew/bspwm.nix` per Follow-up #11) failed with `gsettings` reporting no schema installed
@@ -924,9 +924,19 @@ store: the `.`-source line runs before `sxhkd`/`bspwm` are launched, so both inh
 expected small set of derivations rebuild: `bspwm-start`, `-xinit-wrapper`, `-xsession-xinit`,
 `desktops`, and the top-level closure).
 
-**Not yet switched or tested with a real `super+n` keypress** — that's the next step (`nh os
-switch` + the Follow-up #6-established `sudo systemctl restart greetd` gotcha, since this touches
-the session-list-affecting `core/x11-greetd-sessions.nix`).
+**Mechanism confirmed live (2026-08-14), independent of the graphical session**: ran the exact
+`export DISPLAY=:1; export XDG_SESSION_TYPE=x11; . /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh`
+sequence in a throwaway shell, backgrounded a child process at that point (standing in for
+`sxhkd`/`bspwm`, which is what `wm.start` does next in the real `clientScript`), and read
+`/proc/<child>/environ` directly — `XDG_DATA_DIRS` there has the `gsettings-desktop-schemas` path
+prepended, matching exactly what a login shell already had. Since environment inheritance at fork
+time doesn't care whether the parent script is running under a real xinit session or a plain
+shell, this is conclusive for the propagation mechanism itself.
+
+**Still not switched or tested with a real `super+n` keypress** — that's the one remaining step
+(`nh os switch` + the Follow-up #6-established `sudo systemctl restart greetd` gotcha, since this
+touches the session-list-affecting `core/x11-greetd-sessions.nix`), left for the user per usual
+workflow.
 
 ## Follow-up #13: sway/i3 deleted, bspwm made sole session (committed `192697a`, switched and confirmed live)
 
