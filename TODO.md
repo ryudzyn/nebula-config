@@ -844,12 +844,67 @@ Six commits landed this round, each `dry-build`-clean, none switched/live-tested
   `core/games.nix`) — user has confirmed this is the end goal, but explicitly wants it sequenced
   *after* live verification here, not bundled into this round.
 
+## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (staged, not committed)
+
+2026-08-13. `toggle-theme` (`crew/theming.nix`, bound `super+n` in both `crew/sway.nix` and the new
+`crew/bspwm.nix` per Follow-up #11) failed with `gsettings` reporting no schema installed
+("Схем не встановлено") — happened identically under sway and bspwm (confirmed live, from a real
+tty2 shell post-switch), so unrelated to the xinit-session-leak bug class from Follow-ups #6/#9/#11.
+
+**First attempted fix was wrong, reverted before committing.** Initial hypothesis: NixOS's
+`programs.dconf.enable` (system-level) was needed for `gschemas.compiled` compilation, since
+`crew/theming.nix` only sets HM's own (differently-namespaced) `dconf.enable`. This was staged in
+`core/desktop.nix`, dry-build clean — but after the actual switch+reboot the user confirmed live
+that `toggle-theme`/`gsettings` still failed identically. Investigation (reading nixpkgs source
+directly, not guessing) found `programs.dconf` (`nixos/modules/programs/dconf.nix`) only wires up
+the dconf *storage* backend (dbus service, `environment.systemPackages = [ pkgs.dconf ]`) — it does
+**not** compile or gather any GSettings schemas. Reverted this change entirely (net-zero diff on
+`core/desktop.nix`).
+
+**Actual root cause**, confirmed by reading `pkgs/by-name/gs/gsettings-desktop-schemas/package.nix`
+and glib's `setup-hook.sh`: nixpkgs deliberately does *not* install `gsettings-desktop-schemas`'s
+XML files at the standard `share/glib-2.0/schemas/` path. Glib's own setup hook moves them at build
+time to a package-specific `share/gsettings-schemas/gsettings-desktop-schemas-<ver>/glib-2.0/schemas/`
+(to avoid collisions when many schema-providing packages are merged into one profile) — and a
+`gschemas.compiled` is already pre-built there. Neither NixOS's `system-path.nix` (which only
+compiles schemas already sitting at `$out/share/glib-2.0/schemas`, and only for
+`environment.systemPackages`) nor home-manager (grepped its entire source — no glib-schema handling
+at all) ever gathers these relocated per-package schema dirs back onto `XDG_DATA_DIRS` for a normal
+profile. So `gsettings`/`toggle-theme` had no way to find `org.gnome.desktop.interface` regardless
+of any `dconf.enable` flag, HM or NixOS — `dconf.enable` is about value storage, not schema
+*existence*, a different concern entirely.
+
+Fix (staged, `crew/theming.nix`, `home.sessionVariables`): prepend the package's own precompiled
+schema dir to `XDG_DATA_DIRS`:
+```nix
+XDG_DATA_DIRS = "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}\${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}";
+```
+Verified two ways before proposing this as done, not just dry-build: (1) built the actual
+`hm-session-vars.sh` derivation standalone (`nix build ...home.activationPackage`, no switch) and
+read the generated `/etc/profile.d/hm-session-vars.sh` — the `export XDG_DATA_DIRS=...` line renders
+exactly as intended, correctly preserving any pre-existing `XDG_DATA_DIRS` via
+`${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}`; (2) ran `gsettings get org.gnome.desktop.interface color-scheme`
+directly with only that one schema dir on `XDG_DATA_DIRS` (no other exports) — returned `'prefer-dark'`
+correctly, confirming the compiled schema there is valid and sufficient on its own.
+
+`dry-build` clean. **Not yet switched/live-tested as a real session-wide env var** — this fix only
+touches `home.sessionVariables`, which is exported via `/etc/profile.d/hm-session-vars.sh` (sourced
+by login shells, e.g. the zsh session the user tested `toggle-theme` from directly). Whether this
+same env var reaches `super+n` when triggered *through* sxhkd (not a login shell) is a separate,
+open question — sxhkd's environment comes from however bspwm/sway's own startup chain propagates
+env vars, not automatically from `/etc/profile.d`. If the keybind still fails after switch even
+though a fresh login-shell `gsettings get ...` works, that's the next thing to chase (likely another
+instance of the same "xinit-session env propagation" bug class as Follow-ups #6/#9, needing
+`dbus-update-activation-environment`/`systemctl --user import-environment` for `XDG_DATA_DIRS`
+specifically, the same way `bspwmrc`/sway already do for other vars).
+
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
 - `core/system.nix` — drop insecure-package allowance
 - `flake.nix` — formatter output
 - `core/games.nix`, `crew/default.nix`, `crew/bspwm.nix` — bspwm session
 - `core/x11-greetd-sessions.nix` — xinit wrapper for i3/bspwm under greetd (follow-up fix)
+- `crew/theming.nix` — `toggle-theme`, `XDG_DATA_DIRS` gsettings-schemas fix (Follow-up #12)
 - `log/log.txt` (deleted), `constellations/gravity-drive.nix` / `propulsion.nix` (deleted), `.gitignore`
 
 ## Verification
