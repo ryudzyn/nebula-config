@@ -750,7 +750,7 @@ the second confirmed case (after `DISPLAY`) of greetd leaking session-type metad
 sessions, and it's plausible other `XDG_SESSION_*`/`WAYLAND_*` variables could cause similar
 toolkit-specific breakage for apps that check them directly.
 
-## Follow-up #10: bspwm keybinding parity with sway (staged, not committed)
+## Follow-up #10: bspwm keybinding parity with sway (committed `f77c916`, live-confirmed)
 
 2026-08-12. With `bspwm (xinit)` confirmed fully working (Follow-up #7), `crew/bspwm.nix` was
 missing several bindings that `crew/sway.nix` already has, ported over with X11-native
@@ -765,8 +765,12 @@ equivalents where the sway originals are Wayland-only:
   `brightnessctl`.
 
 `dry-build` clean (only `bspwmrc`, `sxhkdrc`, and the usual home-manager derivations rebuild).
-**Not yet committed** — left for the user per usual workflow. Not live-tested yet (no
-switch/restart performed for this round).
+**Update**: this content was in fact committed as part of `f77c916` (whose message only names the
+lock/dpms/floating/theme-toggle bindings from Follow-up #11 item 1, but whose diff bundles this
+section's `setxkbmap`/volume/brightness/screenshot bindings too) — this section's "not yet
+committed" note was stale. Confirmed live in the current running session (2026-08-13):
+`crew/bspwm.nix` on disk has `setxkbmap`, `wpctl`/`brightnessctl`, and `maim`/`xclip` bindings, and
+`git status` is clean.
 
 ## Follow-up #11: build bspwm up to sway parity, as prep for eventually retiring sway+i3
 
@@ -844,7 +848,7 @@ Six commits landed this round, each `dry-build`-clean, none switched/live-tested
   `core/games.nix`) — user has confirmed this is the end goal, but explicitly wants it sequenced
   *after* live verification here, not bundled into this round.
 
-## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (staged, not committed)
+## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (committed `e3a7db2`, switched; fix confirmed for login shells, still likely broken via the actual `super+n` keybind — see update below)
 
 2026-08-13. `toggle-theme` (`crew/theming.nix`, bound `super+n` in both `crew/sway.nix` and the new
 `crew/bspwm.nix` per Follow-up #11) failed with `gsettings` reporting no schema installed
@@ -887,18 +891,29 @@ exactly as intended, correctly preserving any pre-existing `XDG_DATA_DIRS` via
 directly with only that one schema dir on `XDG_DATA_DIRS` (no other exports) — returned `'prefer-dark'`
 correctly, confirming the compiled schema there is valid and sufficient on its own.
 
-`dry-build` clean. **Not yet switched/live-tested as a real session-wide env var** — this fix only
-touches `home.sessionVariables`, which is exported via `/etc/profile.d/hm-session-vars.sh` (sourced
-by login shells, e.g. the zsh session the user tested `toggle-theme` from directly). Whether this
-same env var reaches `super+n` when triggered *through* sxhkd (not a login shell) is a separate,
-open question — sxhkd's environment comes from however bspwm/sway's own startup chain propagates
-env vars, not automatically from `/etc/profile.d`. If the keybind still fails after switch even
-though a fresh login-shell `gsettings get ...` works, that's the next thing to chase (likely another
-instance of the same "xinit-session env propagation" bug class as Follow-ups #6/#9, needing
-`dbus-update-activation-environment`/`systemctl --user import-environment` for `XDG_DATA_DIRS`
-specifically, the same way `bspwmrc`/sway already do for other vars).
+`dry-build` clean. **Update**: committed as `e3a7db2` and switched — current running system
+(`/run/current-system` = generation 230) has this fix active. Partially confirmed live
+(2026-08-13): a login shell (zsh in kitty, launched from inside the live bspwm session) has the
+`gsettings-desktop-schemas` path on `XDG_DATA_DIRS` and `gsettings get
+org.gnome.desktop.interface color-scheme` succeeds there.
 
-## Follow-up #13: sway/i3 deleted, bspwm made sole session (staged, not committed/switched)
+**But the specific open question this section raised was answered, and the answer is "it doesn't
+reach it"**: reading `/proc/<sxhkd_pid>/environ` directly (`sxhkd` is genuinely running, confirmed
+via `ps`) shows sxhkd's own `XDG_DATA_DIRS` does **not** include the `gsettings-desktop-schemas`
+path — it only has the standard set (`desktops` share dir, nix-profile, `/run/current-system/sw/share`,
+etc.), the same as before this fix. Since `home.sessionVariables` is exported via
+`/etc/profile.d/hm-session-vars.sh` (login-shell-only), and sxhkd is started from `bspwmrc`/the
+xinit `clientScript` rather than through a login shell, it never sources that file — so `super+n`
+→ `toggle-theme`, triggered *through the actual keybind*, almost certainly still fails with the
+original "no schema installed" error even though a plain login shell now works. **Not yet verified
+by literally pressing `super+n`** — this is inferred from the environment diff, not a live keypress
+test — but the mechanism is the same one already documented in Follow-ups #6/#9/#11 item 5 (things
+that assume login-shell or session-manager env propagation silently don't get it under these xinit
+sessions). Next step if this is confirmed: export `XDG_DATA_DIRS` explicitly in `bspwmrc` itself
+(same pattern as #11 item 5's `mako &`), or have `clientScript` run
+`dbus-update-activation-environment --systemd --all` after exporting it, so sxhkd inherits it.
+
+## Follow-up #13: sway/i3 deleted, bspwm made sole session (committed `192697a`, switched and confirmed live)
 
 2026-08-13. Per the Follow-up #11 end goal (bspwm at parity → retire sway/i3), and since the
 user confirmed the Follow-up #11 checklist already works live, jumped straight to deletion —
@@ -927,20 +942,26 @@ Removed:
   session — confirmed via `dry-build`'s derivation list, which now only shows
   `none+bspwm-xsession`/the bspwm xinit session, no i3/sway entries at all.
 
-`dry-build` clean (exit 0), 34 derivations, none of them i3/sway-related. **Not yet
-switched/live-tested** — per usual workflow, `nh os switch` + the Follow-up #6-established
-`sudo systemctl restart greetd` gotcha (session-list changes need it) are left for the user, as
-is the actual commit.
+`dry-build` clean (exit 0), 34 derivations, none of them i3/sway-related. **Update**: committed as
+`192697a` and switched. Confirmed live (2026-08-13): the current running system
+(`/run/current-system`, generation 230) has no `sway` binary at all, and `bspwm`/`sxhkd` are
+running as the live session (`SWAYSOCK` unset). Note the switch actually happened *before* the
+commit in wall-clock terms (generation 230 was built ~22:32, the commit landed ~23:29) — consistent
+with this repo's usual workflow of switching staged changes live first, then committing once
+confirmed, not a sign anything is out of sync.
 
 ### Next steps
-- `nh os switch` + `sudo systemctl restart greetd`, then confirm at tuigreet: only `bspwm
-  (xinit)` (+ the non-functional `none+bspwm`) show up, halley is still there, no `i3`/`sway`
-  entries remain anywhere in the list.
+- Confirmed at the process level: only `bspwm`/`sxhkd` are running, no `sway`/`i3`. Still worth an
+  explicit look at tuigreet's session list itself (not yet checked) to confirm `none+bspwm` is the
+  only other entry and no stale `i3`/`sway`/`none+i3`/`none+sway` cards remain.
 - Re-run the full Follow-up #11 live checklist once more post-deletion (lock, dpms, floating
   toggle, theme toggle, nitrogen, nwg-look, roulette, redshift, mouse-app bind, mako, F1/F2/F3)
-  to make sure removing the sway/i3 code paths didn't regress anything that was working.
-- Follow-up #12 (`XDG_DATA_DIRS` reaching `super+n` through sxhkd, not just a login shell) is
-  still open and independent of this — pick it back up whenever.
+  to make sure removing the sway/i3 code paths didn't regress anything that was working. Not done
+  as part of this doc-status pass.
+- Follow-up #12 (`XDG_DATA_DIRS` reaching `super+n` through sxhkd, not just a login shell): no
+  longer just an open question — `/proc/<sxhkd_pid>/environ` confirms the var is missing there, so
+  the keybind is almost certainly still broken. Needs an actual `super+n` keypress test to confirm,
+  then a fix (export in `bspwmrc`, same pattern as #11 item 5's `mako &`).
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
