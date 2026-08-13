@@ -7,6 +7,16 @@
   # Основна мова системи
   i18n.defaultLocale = "uk_UA.UTF-8";
 
+  # Дефолтний консольний (TTY) шрифт не містить кириличних гліфів, тож навіть
+  # з uk_UA-локаллю українські символи в голій консолі (nano/less/journalctl
+  # тощо на tty2) показувались би квадратиками. ter-v16n (Terminus) кириличні
+  # гліфи має; console.packages вже дефолтно містить terminus_font.
+  console.font = "ter-v16n";
+  # Перевикористовуємо ту саму xkb-розкладку (us,ua,de + alt+shift toggle),
+  # що й для X11/Wayland (services.xserver.xkb нижче), у самій консолі — щоб
+  # Alt+Shift перемикав на українську й там так само.
+  console.useXkbConfig = true;
+
   boot.extraModulePackages = [ config.boot.kernelPackages.v4l2loopback ];
   boot.kernelModules = [ "v4l2loopback" ];
   boot.extraModprobeConfig = ''
