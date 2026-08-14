@@ -68,6 +68,21 @@ let
       # той самий клас фіксу, що й DISPLAY/XDG_SESSION_TYPE вище.
       . /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh
 
+      # Follow-up #14: D-Bus-активовані user-сервіси (напр.
+      # xdg-desktop-portal-gtk.service, який реалізує org.freedesktop.portal.
+      # Settings — звідти GTK4/libadwaita-застосунки типу pavucontrol беруть
+      # color-scheme, бо GTK4, на відміну від GTK3, вже не читає
+      # org.gnome.desktop.interface напряму через gsettings) стартують не з
+      # цього скрипта, а через systemd --user manager. Той успадковує своє
+      # власне оточення окремо від тутешнього export DISPLAY=:1 вище — без
+      # явного import-environment у нього DISPLAY відсутній, сервіс падає з
+      # "cannot open display", ловить start-limit-hit і лишається в failed
+      # до кінця сесії. Той самий клас бага, що й XDG_DATA_DIRS/DISPLAY/
+      # XDG_SESSION_TYPE у Follow-up #6/#9/#12, лише інший споживач
+      # (dbus-activated user unit, не прямий child-процес).
+      systemctl --user import-environment DISPLAY XDG_SESSION_TYPE
+      ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd DISPLAY XDG_SESSION_TYPE
+
       ${pkgs.xorg-server}/bin/X -keeptty ${toString xserverArgs} :1 vt$XDG_VTNR &
       xpid=$!
       trap 'kill "$xpid" 2>/dev/null; wait "$xpid" 2>/dev/null' EXIT

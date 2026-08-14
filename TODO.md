@@ -848,7 +848,7 @@ Six commits landed this round, each `dry-build`-clean, none switched/live-tested
   `core/games.nix`) — user has confirmed this is the end goal, but explicitly wants it sequenced
   *after* live verification here, not bundled into this round.
 
-## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (committed `e3a7db2` + `70c5a95`; propagation mechanism confirmed, real `super+n` keypress still pending — see updates below)
+## Follow-up #12: `toggle-theme` broken under both sessions — real root cause was `XDG_DATA_DIRS`, not `dconf` (committed `e3a7db2` + `70c5a95`; confirmed live with a real `super+n` keypress 2026-08-14 — closed, see Follow-up #14's update)
 
 2026-08-13. `toggle-theme` (`crew/theming.nix`, bound `super+n` in both `crew/sway.nix` and the new
 `crew/bspwm.nix` per Follow-up #11) failed with `gsettings` reporting no schema installed
@@ -987,6 +987,180 @@ confirmed, not a sign anything is out of sync.
   staged in `core/x11-greetd-sessions.nix` (source `hm-session-vars.sh` in `clientScript`), verified
   by reading the built script, but not yet switched or confirmed with a real `super+n` keypress —
   do that together with the switch for this section.
+
+## Follow-up #14: `toggle-theme`/`super+n` still didn't apply to GTK4 apps (root-caused, fixed, confirmed live with a real keypress — closed)
+
+2026-08-14. User report: theme toggling still doesn't work for GTK4 apps (e.g. `pavucontrol`,
+which nixpkgs updated to link against `libgtk-4`) even after Follow-up #12's `XDG_DATA_DIRS` fix
+was switched and confirmed. This is a **new, separate** bug from #12 — that fix was about
+`gsettings`/`dconf` working at all (GTK3-era mechanism); this one is about GTK4 apps specifically.
+
+Root cause, confirmed live in the running session (not guessed):
+- GTK3 apps read `org.gnome.desktop.interface` via a built-in `GSettings` binding baked into
+  `GtkSettings` itself — this is why `gsettings set ... gtk-theme 'adw-gtk3-dark'` alone already
+  worked for GTK3 apps once #12 fixed schema visibility.
+- **GTK4 dropped that built-in binding.** GTK4 apps get light/dark preference from
+  `org.freedesktop.portal.Settings` (namespace `org.freedesktop.appearance`, key `color-scheme`)
+  instead, and — confirmed by `strace -f` on a live `pavucontrol` process, zero occurrences of
+  `settings.ini` anywhere in the trace — this particular GTK4 build (4.22.4) does **not** fall
+  back to reading `~/.config/gtk-4.0/settings.ini` at all in this setup, despite that file having
+  the correct `gtk-application-prefer-dark-theme=1` written to it. So the uncommitted
+  `write_gtk4_ini`/`GTK4_INI` logic already sitting in `crew/theming.nix` (not part of this
+  follow-up — pre-existing local changes) is confirmed dead code for at least this app: harmless,
+  but not what actually needs fixing.
+- `core/desktop.nix` already pairs halley's portal impl with `xdg-desktop-portal-gtk` for exactly
+  this class of interface (`config.common.default = [ "gtk" ]`), and `xdg-desktop-portal-gtk` does
+  implement `org.freedesktop.impl.portal.Settings`, reading from the same `org.gnome.desktop.interface`
+  gsettings/dconf keys `toggle-theme` already sets — so the wiring is conceptually right. But
+  `systemctl --user list-units` showed `xdg-desktop-portal-gtk.service` in a **permanently failed**
+  state, `journalctl --user` showing every start attempt (five, from 01:13 through 01:20) dying with
+  `cannot open display: ` and eventually `start-limit-hit`.
+- Traced further: `systemctl --user show-environment` had **no `DISPLAY` at all**, even deep into a
+  live, working bspwm session where `DISPLAY=:1` works fine in every interactive shell/child
+  process. `xdg-desktop-portal-gtk.service` is D-Bus-activated by the systemd `--user` manager, not
+  spawned as a direct child of `mkXinitSession`'s `clientScript` — and unlike direct children (which
+  inherit `export DISPLAY=:1` from the script's own environment), the systemd `--user` manager has
+  its *own* separate environment block that only picks up new variables via an explicit
+  `systemctl --user import-environment` (for future unit starts) or `dbus-update-activation-environment
+  --systemd` (for D-Bus-activated ones specifically). `clientScript` was never doing either — it does
+  `export DISPLAY=:1`/`export XDG_SESSION_TYPE=x11` for its own direct children only. Same *bug
+  class* as Follow-ups #6/#9/#12 (xinit-less session skips integration steps nixpkgs's generic
+  xsession wrapper would otherwise have done), but a **different consumer** (a D-Bus-activated user
+  unit, not a directly-launched child process) — so none of the three prior fixes touched it.
+
+Confirmed as the actual, complete root cause by reproducing and reversing it live, in-session:
+ran `systemctl --user import-environment DISPLAY XDG_SESSION_TYPE` +
+`dbus-update-activation-environment --systemd DISPLAY XDG_SESSION_TYPE` by hand, then
+`systemctl --user reset-failed xdg-desktop-portal-gtk.service && systemctl --user restart
+xdg-desktop-portal-gtk.service` — it came up `active (running)` on the first try (previously failed
+every time). Immediately after, `gdbus call ... org.freedesktop.portal.Settings.Read
+org.freedesktop.appearance color-scheme` returned `uint32 1` (prefer-dark), matching what
+`toggle-theme`'s `gsettings set ... color-scheme 'prefer-dark'` had already set — confirming the
+portal path itself is correct end-to-end once the service can actually start.
+
+Fix (staged, `core/x11-greetd-sessions.nix`, not yet switched): `clientScript` now runs
+`systemctl --user import-environment DISPLAY XDG_SESSION_TYPE` and
+`dbus-update-activation-environment --systemd DISPLAY XDG_SESSION_TYPE` right after sourcing
+`hm-session-vars.sh` (Follow-up #12's fix) and before starting Xorg — same general spot as the
+other environment-fixup lines. Verified by building the derivation directly
+(`nix-store --realise` on `bspwm-start.drv`, no switch) and reading the resulting script: both
+lines are present, in order, with `dbus-update-activation-environment` resolving to a real
+`pkgs.dbus` store path. `dry-build` and a full `system.build.toplevel` build both succeed — only
+the expected small set of derivations rebuild (`bspwm-start`, `-xinit-wrapper`, `-xsession-xinit`,
+`desktops`, top-level closure).
+
+**Switched and confirmed live 2026-08-14.** Post-switch read-only verification (no code changes,
+just inspection of the live session): `sxhkd`'s `/proc/<pid>/environ` had the correct `DISPLAY`,
+`XDG_SESSION_TYPE`, and `XDG_DATA_DIRS` (schemas path included); `xdg-desktop-portal-gtk.service`
+was `active (running)`, no longer `failed`; `gdbus call ... Settings.Read ... color-scheme`
+returned the correct live value. A simulated `xdotool key super+n` toggled `gsettings` correctly
+first — then the user pressed the **real physical** `super+n` twice from the actual keyboard and
+`gsettings get org.gnome.desktop.interface color-scheme` changed each time
+(`prefer-dark` → `prefer-light` → back), confirmed directly in a terminal. The whole chain
+(sxhkd → `toggle-theme` → `gsettings`/dconf → portal) is fully live-verified end to end, not just
+inferred from environment inspection.
+
+**Known limitation hit in practice, then superseded by a declarative fix (2026-08-14):**
+already-running GTK4 apps didn't repaint live when the theme toggled — not every GTK4 app
+subscribes to the portal's `SettingChanged` D-Bus signal, some only read `color-scheme` once at
+startup. Given the runtime toggle route (`toggle-theme` + manual per-app restarts) still felt
+unreliable in practice, the user asked to just fix the app color in code and stop iterating on
+live-toggle. `crew/default.nix`'s `gtk` block was declaring the **light** variant
+(`theme.name = "adw-gtk3"`, no `colorScheme` set at all) — the actual root cause of "GTK4 apps
+default to light" independent of anything `toggle-theme`/#12/#14 fixed. Changed to
+`theme.name = "adw-gtk3-dark"` and added `gtk.colorScheme = "dark";`. Home-manager's `gtk` module
+(`modules/misc/gtk/lib.nix`'s `mkGtkSettings`) turns that into `gtk-application-prefer-dark-theme
+= true` and (GTK4-only) `gtk-interface-color-scheme = 2` in both `gtk-3.0` and `gtk-4.0`
+`settings.ini`, **and** `dconf.settings."org/gnome/desktop/interface".color-scheme =
+"prefer-dark"` — the exact same dconf key the portal reads (confirmed working end-to-end in this
+same follow-up). Verified by building the two derivations directly (`nix-store --realise` on
+`hm_gtk4.0settings.ini.drv` and `hm-dconf.ini.drv`, no switch): generated `gtk-4.0/settings.ini`
+has `gtk-application-prefer-dark-theme=true`, `gtk-interface-color-scheme=2`,
+`gtk-theme-name=adw-gtk3-dark`; generated `dconf.ini` has `color-scheme='prefer-dark'`,
+`gtk-theme='adw-gtk3-dark'`. `dry-build` clean (exit 0), only the expected `gtk3.0`/`gtk4.0`
+`settings.ini`, `dconf`, and home-manager-generation derivations rebuild.
+
+This makes dark the HM-managed default applied on every `switch`, independent of `toggle-theme`/
+`super+n` — **closing this follow-up here** per explicit user decision, no further live-reload
+work planned. `toggle-theme` and its `super+n` bind are left in place untouched (not asked to
+remove); note for later: toggling away from dark at runtime will just get reasserted back to dark
+on the next `home-manager switch`, since the declarative default now wins.
+
+### Not done yet
+- The uncommitted `write_gtk4_ini`/GTK4 `settings.ini`-writing fallback still sitting in
+  `crew/theming.nix` remains confirmed dead code for `pavucontrol` (this GTK4 build doesn't read
+  `settings.ini` here) — still left in place untouched, still the user's own pre-existing local
+  change and still their call whether to keep it (harmless) or drop it later.
+
+## Follow-up #15: `pavucontrol` (and any non-libadwaita GTK4 app) stayed white/light despite every prior dark-theme fix (root-caused, fixed, confirmed live — closed)
+
+2026-08-14. User report: `pavucontrol` still white background with gray checkboxes, hurts the eyes,
+despite Follow-up #14 being closed as fully confirmed live. Re-investigated live rather than trusting
+the closed status.
+
+Findings, each confirmed directly on the running session, not guessed:
+- The actual *runtime* toggle state (`gsettings get org.gnome.desktop.interface color-scheme`) was
+  `'prefer-light'` — someone had pressed `super+n` since the last switch, and per Follow-up #14's own
+  documented "known limitation," a runtime toggle away from dark doesn't get reasserted until the next
+  `home-manager switch`. Reset live via `gsettings set ... 'prefer-dark'` — this alone did **not** fix
+  `pavucontrol` (confirmed both on the already-running window and a freshly relaunched one), so this
+  was a real, distinct, second bug, not just a stale toggle.
+- **Correction to Follow-up #14**: that section concluded "this GTK4 build does not read
+  `settings.ini`" from a `strace` that showed zero `settings.ini` occurrences. Re-traced live this
+  round (`strace -f -e trace=open,openat` on a real `pavucontrol` launch) and it clearly **does** open
+  `~/.config/gtk-4.0/settings.ini` *and* `~/.config/gtk-4.0/gtk.css` *and* the imported
+  `adw-gtk3-dark/gtk-4.0/{gtk,libadwaita,libadwaita-tweaks}.css` — likely a genuine behavior change
+  between whatever gtk4 version Follow-up #14 tested against and the current `4.22.4`
+  (nixpkgs-unstable), not a mistake in that trace at the time.
+- Root cause, confirmed via a live A/B screenshot test (`maim`) using an isolated `XDG_CONFIG_HOME`
+  sandbox to control exactly one variable at a time: home-manager's own generated
+  `~/.config/gtk-4.0/settings.ini` (from `modules/misc/gtk/lib.nix`'s `mkGtkSettings`) writes
+  `gtk-interface-color-scheme=2` — `2` being the numerically-correct value per GTK4's own published
+  enum (`Gtk.InterfaceColorScheme`: `DEFAULT=1`, `DARK=2`, `LIGHT=3`,
+  https://docs.gtk.org/gtk4/enum.InterfaceColorScheme.html) — but this exact gtk4 build's
+  `settings.ini` key-file loader rejects it outright:
+  ```
+  Gtk-WARNING **: Error setting gtk-interface-color-scheme in .../settings.ini: Key file contains key
+  "gtk-interface-color-scheme" which has a value that cannot be interpreted.
+  ```
+  reproduced reliably in the sandbox with *only* that one key set. Since this property is what
+  actually drives the `@media (prefers-color-scheme: dark)` blocks inside `adw-gtk3-dark`'s (and
+  libadwaita's) GTK4 CSS — confirmed by grepping the real `libgtk-4.so` strings table, which lists
+  `notify::gtk-interface-color-scheme` right next to the CSS engine's media-query machinery — a failed
+  parse means those blocks never activate: the app falls back to light colors even though
+  `gtk-application-prefer-dark-theme=true` is *also* set correctly right above it in the same file (that
+  older boolean key still parses fine, but no longer appears to independently drive the CSS in this
+  GTK version — `gtk-interface-color-scheme` is the one that matters now). Swapping the value to the
+  **string nickname** `"dark"` (same sandbox, same app, nothing else changed) parsed with zero warning
+  and rendered `pavucontrol` fully dark on the very next launch — conclusive, not inferred. This is a
+  real home-manager/gtk4-version mismatch (home-manager assumes the settings.ini loader accepts the
+  enum's raw integer; this gtk4 build's loader wants the nickname string instead), not anything wrong
+  in this repo's config, and not fixable by changing `gtk.colorScheme` (which only controls whether the
+  key is emitted at all, not its format — the integer-vs-string choice is hardcoded in home-manager's
+  `lib.nix`).
+- The GTK_THEME=Adwaita:dark env var (home.sessionVariables, `crew/theming.nix`) and the portal path
+  (`org.freedesktop.portal.Settings.Read` → confirmed returning the correct dark value throughout this
+  investigation) were both re-verified live and are fine — neither was the problem this round; the
+  broken `settings.ini` key was blocking the CSS media query regardless of what those two reported.
+
+Fix (staged, `crew/default.nix`): added
+```nix
+gtk4.extraConfig."gtk-interface-color-scheme" = "dark";
+```
+next to the existing `colorScheme = "dark";`. Home-manager's `gtk4.nix` builds `settings.ini` as
+`mkGtkSettings { ... } // cfg4.extraConfig` — a right-biased merge — so this cleanly overrides just
+the one broken key without touching `gtk.colorScheme` (still needed for the `gtk-application-prefer-dark-theme`
+key, GTK3's `settings.ini`, and the `dconf.settings`/portal value) or forking home-manager's module.
+Verified by building the `hm_gtk4.0settings.ini` derivation directly (`nix-store --realise`, no switch)
+and reading the output: `gtk-interface-color-scheme=dark` (string), rest of the file unchanged.
+`dry-build` clean — only the expected small set of derivations rebuild (`hm_gtk4.0settings.ini`,
+`home-manager-files`, `home-manager-generation`, the HM systemd unit, `etc`, `activate`, the top-level
+system closure).
+
+**Switched and confirmed live by the user 2026-08-14** — `pavucontrol` renders fully dark now. Closing
+this follow-up here. Still worth a spot-check on any other plain-GTK4 (non-libadwaita) app if a similar
+white/light-with-dark-accents symptom ever turns up — this bug would have affected all of them
+identically, not just `pavucontrol`.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
