@@ -1,8 +1,20 @@
 { pkgs, ... }:
 {
-  # X11-сесія для гри (PoE1 глючить і на sway, і на i3) — без композитора
+  # X11-сесія для гри (PoE1 глючив і на sway, і на i3) — без композитора
   # (заради продуктивності), але з повноцінним polybar (паритет з waybar
   # в crew/sway.nix), бо крок за кроком добудовується до заміни sway/i3.
+  #
+  # 2026-08-15 (TODO.md Follow-up #17): PoE1 знову перестала запускатись,
+  # падаючи з `err:vulkan:vkQueueSubmit Exception 0xc0000005` всередині
+  # winevulkan.so. Ні компоситор (пробував picom -- не допомогло), ні
+  # форсований Steam compat-тул (тимчасово підмінявся на GE-Proton10-29) не
+  # були причиною -- обидва відкидались A/B-тестами. Справжня причина:
+  # `programs.mangohud.enableSessionWide` (core/games.nix) форсує
+  # `vsync`/`gl_vsync` через LD_PRELOAD у кожен процес, включно з PoE1, що й
+  # конфліктувало з власним `Present mode = Immediate` гри. Підтверджено
+  # чистим A/B в обидва боки того самого вечора. Фікс -- на боці Steam, не
+  # тут: у PoE1 Launch Options стоїть `MANGOHUD=0 %command%`, mangohud-конфіг
+  # для решти ігор лишається без змін.
   xdg.configFile."bspwm/bspwmrc".source = pkgs.writeShellScript "bspwmrc" ''
     bspc monitor -d 1 2 3 4 5
 
@@ -147,6 +159,14 @@
       # Панель керування мишею Swiftpoint X1 — в sway.nix запускається
       # автостартом, тут — за біндом (той самий позасистемний бінарник).
       "super + shift + m" = ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
+
+      # Швидкий запуск дев-клієнта Ascension-мода (~/Projects/ascension-limitless-progression)
+      # у kitty, щоб бачити build/runtime лог; той самий `nix develop --command ./gradlew
+      # runClient`, що й уручну в терміналі. Гучність — pavucontrol, вже системний пакет
+      # (core/packages.nix), тут просто бінд для швидкого виклику GUI.
+      "super + shift + c" =
+        ''kitty --title "Ascension runClient" -e sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'';
+      "super + shift + v" = "${pkgs.pavucontrol}/bin/pavucontrol";
 
       # Режими роботи/навчання/гри — ті самі скрипти, що й у sway.nix
       # (crew/modes.nix), скрипти самі визначають bspwm vs sway в рантаймі.
