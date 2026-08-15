@@ -1298,11 +1298,26 @@ be dropped once nothing else needs a Wine trace; `MANGOHUD=0` should stay). **No
 needed** — this is a Steam-side per-game setting, doesn't touch this repo. Follow-up #17 closes
 here as root-caused and fixed.
 
-**Uncommitted state to be aware of**: `crew/bspwm.nix` currently also has two unrelated new
-keybindings from the same session (`super+shift+c` → launch the Ascension Minecraft mod's dev
-client in kitty, `super+shift+v` → `pavucontrol`) — legitimate, already `dry-build`-verified,
-should be kept/committed independently of this follow-up's outcome. `crew/default.nix`'s Follow-up
-#16 fix (above) is also still uncommitted.
+### Why this only broke now: MangoHud was configured since 08-11 but not actually active until 08-13
+
+Open question worth closing out: `programs.mangohud.enableSessionWide` has been in `core/games.nix`
+since commit `69bfd71` (2026-08-11), three days *before* Follow-up #9's confirmed-clean PoE1 run on
+2026-08-12 — so the setting alone can't explain why it worked then and broke now. `flake.lock`
+hasn't changed since before either date, so it isn't a MangoHud/GE-Proton version bump either (same
+Nix store paths both times).
+
+Reading the actual home-manager module (`programs/mangohud.nix`) resolves it: `enableSessionWide`
+doesn't set `LD_PRELOAD` directly — it sets `home.sessionVariables.MANGOHUD = 1` (MangoHud's
+always-loaded Vulkan implicit layer checks this env var to decide whether to activate at all).
+`home.sessionVariables` only reaches a process via `hm-session-vars.sh`, which only login shells
+source — and commit `70c5a95` (2026-08-13), landed *between* the two PoE1 tests, was the first time
+`core/x11-greetd-sessions.nix`'s `clientScript` sourced that file, for a completely unrelated
+reason (Follow-up #12, so the `toggle-theme` keybind could see `XDG_DATA_DIRS`). Side effect: that
+fix also propagated `MANGOHUD=1` into the bspwm/xinit session (and everything launched inside it,
+including Steam and PoE1) for the first time. So the 08-12 "confirmed working" run never actually
+had MangoHud active despite the config already being present — 08-15 was the first real PoE1 launch
+after MangoHud started genuinely engaging, which is why the crash looked like a sudden regression
+with no corresponding config change.
 
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
