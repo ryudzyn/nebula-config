@@ -1162,6 +1162,148 @@ this follow-up here. Still worth a spot-check on any other plain-GTK4 (non-libad
 white/light-with-dark-accents symptom ever turns up — this bug would have affected all of them
 identically, not just `pavucontrol`.
 
+## Follow-up #16: `nitrogen` (super+w) stayed white after Follow-ups #14/#15 — GTK2, not GTK4 (root-caused, fixed, not yet committed)
+
+2026-08-15. After #14/#15 fixed GTK4 dark mode, `nitrogen` (the wallpaper picker, `super+w` in
+`crew/bspwm.nix`) still rendered white. Root cause: `ldd` on the `nitrogen` binary shows it links
+against `libgtk-x11-2.0`, i.e. GTK2, not GTK3/4 — a toolkit generation `gtk.theme`/
+`gtk4.extraConfig` (both GTK3/4-only) never touch. `adw-gtk3` (used for `gtk.theme` everywhere else
+in this config) has no `gtk-2.0/` directory at all in the package, so `gtk.gtk2.theme` inheriting it
+by default silently found nothing and GTK2 fell back to its stock light theme.
+
+Fix (`crew/default.nix`, **uncommitted**): `gtk.gtk2.theme = { name = "Arc-Dark"; package =
+pkgs.arc-theme; }` — `arc-theme` genuinely ships `gtk-2.0/gtk-3.0/gtk-4.0` in one package (checked
+on disk), so `Arc-Dark` is used for GTK2 only, `adw-gtk3-dark` stays for GTK3/4 elsewhere (closer
+visual match to the rest of the theme). Also added `gtk-engine-murrine` to `home.packages` —
+Arc-Dark's `.gtkrc` references the `murrine` render engine by name, and without the engine package
+present GTK2 logs "Unable to locate theme engine in module_path: murrine" and silently renders
+unstyled. **Confirmed live** via a real `nitrogen` launch + screenshot: background went from white
+to `#404552` (dark) after `GTK_PATH` picked up `libmurrine.so`.
+
+## Follow-up #17: PoE1 wouldn't launch again — three different crash signatures chased, root-caused to session-wide MangoHud forced vsync (confirmed, fix not yet applied to .nix)
+
+2026-08-15, later the same evening as #16. User report: "PoE1 знову не вмикається" (again won't
+launch), despite Follow-up #9's 2026-08-12 confirmation that it worked cleanly. Chased through
+three distinct-looking failure modes live (`~/.local/share/Steam/logs/{gameprocess,compat}_log.txt`,
+the game's own `Path of Exile/logs/{Latest,}Client.txt`, and `PROTON_LOG=1` Wine traces in
+`~/steam-<appid>.log`) before landing on the real, still-open question:
+
+1. **First hypothesis (wrong): no compositor.** `bspwmrc` runs bspwm deliberately without a
+   compositor (see the file's own comment). First launches showed the game's own watchdog firing
+   `[CRIT] Deadlock detected with timeout 10000ms; running graph nodes: Present` ~10-20s after
+   `[VULKAN] Present mode = Immediate` — a pattern that does match "X11 never confirms a
+   non-vsync'd direct present without a compositor" on RADV. Tried adding a minimal `picom`
+   (glx backend, `unredirect-fullscreen-windows = false` so it wouldn't disable itself exactly
+   when the game goes fullscreen) — **did not fix it**, same deadlock with picom running. Reverted
+   fully (no trace left in current `crew/bspwm.nix` diff).
+2. **Second hypothesis (real correlation, not causation): forced Proton tool.**
+   `compat_log.txt` showed Steam silently switching PoE1's compat tool from the client default
+   (`"GE-Proton"` → `GE-Proton11-1` via the newer `SteamLinuxRuntime_4`) to a forced
+   `GE-Proton10-29` (via the older `SteamLinuxRuntime_sniper`) at the exact moment Properties was
+   opened to add `PROTON_LOG=1 %command%` for diagnostics. User reverted the compat-tool override
+   back to default and did a real `nh os switch` + reboot-equivalent. **Still crashed** — but
+   differently: `err:vulkan:vkQueueSubmit Exception 0xc0000005 in Unix call.` (a genuine access
+   violation inside `winevulkan.so`'s Unix-call thunk), consistently reproducible on every relaunch
+   with the corrected default tool.
+3. **Key finding that invalidated both hypotheses above**: re-reading `Client.txt`'s full history
+   (not just the last attempt) showed **every single launch all evening** — including the ones
+   before the compat-tool got force-switched, which looked "successful" only because nothing
+   crashed loudly — stopped dead right after `[STARTUP] Loading in ...`, with the log jumping
+   straight to `***** LOG FILE OPENING *****` for the next attempt and nothing logged in between.
+   So neither the missing compositor nor the forced Proton tool was ever the actual root cause;
+   they just changed *how* an already-broken launch failed (silent stall → present deadlock →
+   hard access violation), not *whether* it failed.
+
+**Current best hypothesis, unconfirmed**: earlier the same evening, a lot of `kill -9` was used to
+tear down repeated `./gradlew runClient` (Minecraft/LWJGL, OpenGL) sessions on this same GPU while
+iterating on an unrelated project — a forcefully-killed GL/Vulkan client doesn't always cleanly
+release its GPU context, and could plausibly leave AMDGPU/RADV in a bad state for the rest of the
+X session (not the whole system — `nixos-rebuild list-generations` confirms no Mesa/kernel change
+across the last several days, ruling out a driver *version* regression). No `sudo` available in
+this session to check `dmesg` for GPU reset/hang messages and confirm directly.
+
+**Next step, not yet done**: user is doing a real reboot (not just logout) to get a clean GPU/DRM
+state and re-test. If PoE1 launches cleanly after that, the GPU-wedge theory is confirmed and this
+follow-up closes as "environmental, not a config bug." If it still crashes identically after a full
+reboot, the `vkQueueSubmit` access violation needs a real Wine/Mesa-level investigation (try a
+different/newer GE-Proton build via Steam's Compatibility tab, or `PROTON_USE_WINED3D=1` to route
+around `winevulkan` entirely as a diagnostic).
+
+### Round 4 (2026-08-15, post-reboot re-test): GPU-wedge theory disproven — identical crash on a clean boot
+
+Reboot happened; PoE1 was relaunched with the correct default compat tool in effect
+(`compat_log.txt` confirms `Tool 0 "GE-Proton"` → `GE-Proton11-1` via `SteamLinuxRuntime_4`, no
+forced override this time). Still didn't launch. Read the fresh logs directly
+(`~/.local/share/Steam/logs/{compat,gameprocess}_log.txt`, the game's own `Client.txt`, and
+`~/steam-238960.log`) rather than relying on the user's description, since the three failure modes
+from earlier in the same evening look different from outside but weren't:
+
+- `gameprocess_log.txt`: process launched 22:50:26, all children reaped by 22:50:42 — a ~16s
+  lifetime, consistent with a crash rather than a clean exit.
+- `Client.txt`: identical happy-path startup to every prior attempt — Vulkan device + swapchain
+  created (`2560x1440`, `Present mode = Immediate`), `[STARTUP] Loading in 0.038758 seconds` is the
+  last line logged.
+- `~/steam-238960.log`: **the exact same crash signature as before the reboot** —
+  `err:vulkan:vkQueueSubmit Exception 0xc0000005 in Unix call`, backtrace through
+  `winevulkan.so + 0x691c7` → `win32u.so + 0x13ecce` via `__wine_unix_call_dispatcher`, happening
+  right after startup, before any real frame renders. Byte-for-byte the same crash class as the
+  pre-reboot attempts in item 2 above.
+
+**This rules out the GPU-wedge theory outright** — a clean boot with no prior `kill -9`'d GL/Vulkan
+clients reproduces the identical crash, so whatever's wrong survives a full reboot and isn't
+leftover AMDGPU/RADV state. This is a real, deterministic bug (in this Wine/Proton build, this
+game's Vulkan renderer, or something in the session it's launched from), not an environmental
+fluke.
+
+**New candidate, not yet tested for this specific crash**: `core/games.nix` enables MangoHud
+**session-wide** (`programs.mangohud.enableSessionWide = true`) with a forced `vsync = 2` /
+`gl_vsync = 1` — an `LD_PRELOAD` hook injected into every process on the system, including this one,
+overriding the swapchain's own vsync/present behavior on top of what the game explicitly requested
+(`Present mode = Immediate`, logged just before the crash). MangoHud was already ruled out for the
+unrelated Follow-up #8 Discord bug (`MANGOHUD=0 discordcanary` reproduced that bug identically), but
+that test was never run for *this* PoE1 crash specifically — different symptom, different
+process, not yet eliminated here.
+
+**Next step (user-run, requires the Steam GUI)**: add `MANGOHUD=0 %command%` to PoE1's Launch
+Options (Properties → General in Steam) and relaunch. If the crash disappears, MangoHud's
+session-wide vsync override is confirmed as the cause and the fix becomes either an app-id
+exclusion in `core/games.nix`'s MangoHud config or a permanent `MANGOHUD=0` launch option for this
+game. If the identical `vkQueueSubmit` crash still happens with MangoHud disabled, that's
+eliminated too and the next lever is trying a different compat tool build (plain `Proton 11.0` or
+`Proton Experimental`, not another GE build, to isolate GE's own patch set as a variable) via
+Steam's Compatibility tab.
+
+### Root cause confirmed: MangoHud's session-wide `vsync`/`gl_vsync` override, clean A/B test both directions
+
+- **Run with `MANGOHUD=0 PROTON_LOG=1 %command%`**: game launched and ran normally — no crash.
+  `Client.txt` progressed well past startup into real gameplay (font loading, effect-graph
+  warnings, `[WINDOW] Lost focus`/`Gained focus` events over several minutes), something no prior
+  attempt this evening reached.
+- **Control re-test, same session, `MANGOHUD=0` removed** (`PROTON_LOG=1 %command%` only, user's
+  idea, to rule out any other variable changing between runs — e.g. a stale shader cache or the
+  reboot itself): crashed again, **identical signature**, confirmed byte-for-byte in
+  `~/steam-238960.log` — same `win32u.so + 0x13ecce` offset, same
+  `err:vulkan:vkQueueSubmit Exception 0xc0000005 in Unix call.`
+- Clean A/B in both directions on the same boot, same compat tool, same everything else changing
+  only the one variable: **MangoHud's session-wide `vsync = 2` / `gl_vsync = 1` LD_PRELOAD override
+  (`core/games.nix`) is the confirmed root cause.** Not a GPU-wedge, not the compat tool, not the
+  missing compositor — those were all real observations earlier in this follow-up but red herrings
+  correlated with, not causing, the crash.
+
+**Fix decision (user, 2026-08-15)**: keep `programs.mangohud.enableSessionWide` and its
+`vsync`/`gl_vsync` settings in `core/games.nix` untouched (other games rely on it) — apply the fix
+at the Steam level instead: PoE1's Launch Options permanently set to
+`MANGOHUD=0 PROTON_LOG=1 %command%` (the `PROTON_LOG=1` half is this follow-up's diagnostic and can
+be dropped once nothing else needs a Wine trace; `MANGOHUD=0` should stay). **No `.nix` change
+needed** — this is a Steam-side per-game setting, doesn't touch this repo. Follow-up #17 closes
+here as root-caused and fixed.
+
+**Uncommitted state to be aware of**: `crew/bspwm.nix` currently also has two unrelated new
+keybindings from the same session (`super+shift+c` → launch the Ascension Minecraft mod's dev
+client in kitty, `super+shift+v` → `pavucontrol`) — legitimate, already `dry-build`-verified,
+should be kept/committed independently of this follow-up's outcome. `crew/default.nix`'s Follow-up
+#16 fix (above) is also still uncommitted.
+
 ## Critical files
 - `core/security.nix`, `hosts/earth/default.nix` — hardening module + wiring
 - `core/system.nix` — drop insecure-package allowance
