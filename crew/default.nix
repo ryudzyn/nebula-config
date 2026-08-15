@@ -51,12 +51,34 @@
       # число з colorScheme вище.
       "gtk-interface-color-scheme" = "dark";
     };
+    # Follow-up #16: `super+w` (nitrogen, crew/bspwm.nix) лишався білим після
+    # #14/#15 — виявилось, nitrogen лінкується проти GTK2 (libgtk-x11-2.0),
+    # не GTK3/4 (підтверджено `ldd`). adw-gtk3 — реплікант виключно для
+    # GTK3/GTK4 (пакет узагалі не має директорії gtk-2.0), тож
+    # gtk.gtk2.theme, який без цього успадкував би той самий "adw-gtk3-dark"
+    # від gtk.theme, не знаходив тему і GTK2 тихо відкочувався на дефолтну
+    # світлу. arc-theme реально несе gtk-2.0/gtk-3.0/gtk-4.0 в одному пакеті
+    # (перевірено на диску), тож "Arc-Dark" узято лише для gtk2 — GTK3/4
+    # лишаються на adw-gtk3-dark, який виглядає ближче до системної теми.
+    gtk2.theme = {
+      name = "Arc-Dark";
+      package = pkgs.arc-theme;
+    };
   };
 
   # Дані головного пілота
   home.username = "ryudzyn";
   home.homeDirectory = "/home/ryudzyn";
-  home.packages = with pkgs; [ 
+  home.packages = with pkgs; [
+    # Arc-Dark (gtk.gtk2.theme вище) рендериться через рушій "murrine"
+    # (посилання за назвою в кожному .rc теми, не абсолютний шлях) — без
+    # цього пакета в профілі GTK2 сипле "Unable to locate theme engine in
+    # module_path: murrine" і мовчки лишається без стилю. Підтверджено живим
+    # тестом nitrogen (GTK_PATH з libmurrine.so → фон реально потемнів,
+    # #404552 замість білого). gtk.gtk2.theme.package (arc-theme) на
+    # відміну від цього автоматично потрапляє в home.packages через
+    # home-manager's collectGtkPackages, тому окремо не додається тут.
+    gtk-engine-murrine
     kando 
     fuzzel
     nerd-fonts.jetbrains-mono
