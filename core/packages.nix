@@ -51,6 +51,7 @@
     pciutils
     usbutils
     v4l-utils
+    ethtool
     wget
     ncdu
     lact

@@ -2,6 +2,11 @@
 {
   networking.networkmanager.enable = true;
 
+  # Wake-on-LAN (магічний пакет). Прошите через systemd-udevd .link-файл — діє на рівні
+  # мережевої карти незалежно від NetworkManager, тому вмикається без конфліктів.
+  # Передумова в BIOS: "Resume By PCI-E Device" має бути увімкнено.
+  networking.interfaces.enp5s0.wakeOnLan.enable = true;
+
   services.openssh = {
     enable = true;
     settings = {

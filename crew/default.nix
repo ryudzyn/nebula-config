@@ -10,6 +10,7 @@
     ./theming.nix
     ./modes.nix
     ./bspwm.nix
+    ./remote-control.nix
 
     # Ці файли ми напишемо трохи згодом, тому поки вони закоментовані (#)
     # ./terminal/kitty.nix
