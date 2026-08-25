@@ -10,6 +10,7 @@
     ./theming.nix
     ./modes.nix
     ./bspwm.nix
+    ./poe-price-check.nix
     ./remote-control.nix
 
     # Ці файли ми напишемо трохи згодом, тому поки вони закоментовані (#)

@@ -1342,3 +1342,107 @@ with no corresponding config change.
 - If a session still bounces back to login: capture `journalctl -b 0 --since <attempt time>`
   immediately after and look for `Xorg`/`xserver-wrapper` output — this time an actual X server
   process should show up in the log; if it doesn't, or it errors, that log points at the next fix.
+
+## Follow-up #18 (2026-08-26): `awakened-poe-trade` was unreliable — built `poe-price-check` as a non-Electron replacement
+
+Context: `crew/bspwm.nix` had `awakened-poe-trade` installed (Electron overlay) with `picom` kept
+running specifically for its transparent window and a `bspc rule` to force it floating. User
+reported it "works maybe half the time" and asked for an independently-built alternative overnight
+(no live back-and-forth). Decisions locked in upfront by the user: build a real floating overlay
+window (not a plain notification), remove `awakened-poe-trade` immediately rather than keep both,
+and for rare items accept a "base-type floor price" fallback instead of reimplementing full
+mod-weighted pricing (which is most of what makes Awakened valuable in the first place, and isn't
+realistically buildable/verifiable unsupervised in one night).
+
+**Design**: same official `pathofexile.com/api/trade` backend Awakened itself uses (so the data
+source isn't the thing being replaced) — the theory is the *Electron client* is the unreliable
+part (global hotkey capture, overlay window focus/compositing interactions), not the API. New
+client is stdlib-only Python (`urllib` + `tkinter`) plus `xclip`/`xdotool` as external binaries —
+no Electron, no npm dependency tree.
+
+- `crew/poe-price-check/price_check.py`: hotkey handler. Simulates `xdotool key ctrl+c` (so the
+  user just hovers an item and presses one hotkey, same UX as Awakened, instead of manually
+  copying first), reads `xclip -selection clipboard -o`, parses the PoE item-text format
+  (`Rarity:` line locates name/base-type lines; `Sockets:` parsed for max link count; `Stack
+  Size:` for currency quantity; `Corrupted` flag).
+- Pricing, by rarity:
+  - **Currency / Divination Card**: `/api/trade/data/static` (cached 24h in
+    `~/.cache/poe-price-check/`) maps display name → API id, restricted to the `Currency` and
+    `Fragments` categories specifically — confirmed by live testing that other categories (e.g.
+    `Cards`) *do* appear in the static data but return a malformed/empty result shape from
+    `/api/trade/exchange` (not a clean error), which crashed the first draft on `The Doctor`. Cards
+    and anything else outside those two categories fall through to the item-search path below.
+    Known id resolves to `POST /api/trade/exchange/<league>` (`have`/`want` bulk-exchange query,
+    confirmed live: response embeds full listings inline, no separate fetch call needed), median
+    of up to 20 listings' ratios reported in chaos, multiplied by the copied stack's current count.
+  - **Unique**: `/api/trade/search/<league>` filtered by `name` + `type` (+ `links` filter when
+    the copied item has 5+ links, with an automatic retry without the link filter if that returns
+    zero results), then `/api/trade/fetch/<ids>` for the top listings' raw price+currency.
+  - **Rare**: same search/fetch path filtered by `type` + `rarity:rare` only — reports the
+    cheapest listings for that base type as an honest floor price, explicitly not accounting for
+    the item's actual mods (this was the user's own call, see Context above).
+  - **Gem**: search/fetch by name, no rarity filter.
+  - **Magic**: explicitly unsupported (single combined name+base line, no reliable way to recover
+    the base type without an affix dictionary) — reports a plain "not supported" line rather than
+    guessing.
+  - League auto-detected from `/api/trade/data/leagues` (cached 1h): first `realm:"pc"` entry
+    that isn't `Standard`/`Hardcore`/`Ruthless`, which is GGG's own consistent ordering for "current
+    softcore trade league" (confirmed live — currently resolves to `Allflame`). No hardcoded
+    league name to go stale at the next 3-month league launch.
+  - All HTTP calls send an identifying `User-Agent` (contact email) per GGG's request for
+    third-party trade tools; 429s and network errors surface as a friendly overlay message instead
+    of a crash/silent hang.
+- Overlay window: `tkinter`, `overrideredirect(True)` + `-topmost` + `-alpha 0.92`, positioned
+  top-right, auto-closes after 7s or on click/Escape. **Deliberately not a normal managed window**:
+  because it's override-redirect, `bspwm` never sees it at all (confirmed live via `xwininfo -tree`
+  — it doesn't appear in bspwm's window count, doesn't get tiled), so unlike Awakened this needs
+  **no floating rule** in `crew/bspwm.nix`. `picom` stays (comment updated) — still needed for the
+  same reason it was before, real alpha blending for this window's transparency over a fullscreen
+  game, just for a different client now.
+- `crew/poe-price-check.nix` (new HM module, added to `crew/default.nix`): packages the script via
+  `pkgs.writers.writePython3Bin` with `libraries = [ pkgs.python3Packages.tkinter ]` (confirmed this
+  is a distinct package that has to be added via `withPackages`, not something `pkgs.python3` ships
+  by default), adds `pkgs.xdotool` (`xclip` already comes from `crew/bspwm.nix`), and binds
+  `super + p` in `services.sxhkd.keybindings` — a free combo, deliberately *not* Awakened's
+  usual `ctrl+d` default, since `sxhkd` grabbing that combo globally would have swallowed normal
+  terminal EOF (`ctrl+d`) everywhere, not just in-game.
+- `crew/bspwm.nix`: removed `awakened-poe-trade` from `home.packages` and its `bspc rule` floating
+  rule; updated the `picom`/`picom.conf` comments to explain the compositor is now kept for
+  `poe-price-check` instead.
+
+**Verification actually done** (this was built and tested live against the real API and the real
+running `earth` desktop session in this same environment — not just eval-checked):
+- Parser + pricing logic exercised via `--stdin --no-gui` against hand-written sample item text for
+  every rarity (Chaos Orb incl. the degenerate chaos-priced-in-chaos case, Divine Orb, a
+  Divination Card, a Gem, a Unique, a 4-link and a 6-link Rare, a Magic item, truncated/garbage/
+  empty clipboard input) — all returned sane output or a clean local error, no crashes, against
+  the live trade API (league resolved to `Allflame`).
+- The actual overlay window was rendered on the real `earth` X session (`bspwm`/`picom`/`polybar`
+  all confirmed live via `xwininfo -tree`) and captured with `xwd` (plain `maim` screenshots of it
+  came out corrupted — solid-color block, a known `maim`+`picom`-glx capture interaction, *not* a
+  bug in the window itself; `xwd` reads the X server directly and showed the window rendering
+  correctly: purple-accented title, dark background, listing lines, positioned top-right as coded).
+- Packaged derivation built clean via `nix-store --realise` on the actual `.drv`
+  (`pkgs.writers.writePython3Bin` runs `flake8` at build time — this caught and required fixing an
+  accidental double shebang, three `E741` ambiguous-variable-name `l` findings, and needed
+  `flakeIgnore = [ "E501" "W503" ]` for long query-dict lines and PEP8-correct line breaks before
+  `and`/`or`).
+- Full `nixos-rebuild dry-build --flake .#earth` succeeds with the new module wired in and
+  `awakened-poe-trade` removed.
+
+**2026-08-26, confirmed live in-game by the user** (after `nh os switch`, without a session
+restart — `pkill -USR1 -x sxhkd` to reload the new `super + p` binding was enough; the existing
+`picom` process from the running session already picked up the new minimal `picom.conf` on its
+own, since it rereads that file path, no manual composite-manager restart needed):
+- `super + p` alone (no manual `Ctrl+C` first) correctly triggers `xdotool`'s simulated `ctrl+c`,
+  reaches the PoE1 window, and the clipboard ends up with real item text — the earlier open
+  question about `xdotool` timing/focus under Wine/Proton was unfounded, no fix needed.
+- The item-text format assumption (`Rarity:` line, etc.) matches the live game's actual clipboard
+  output — a real in-game item (a currency stack) parsed correctly and the overlay showed 3 real
+  trade listings at 1 chaos each.
+- `super + p` has no conflict with PoE1's own keybinds in practice.
+
+**Not done / still open**: only extended real-use reliability (does it stay this solid over many
+hovers/sessions, does the overlay ever steal focus in an annoying way) and, if it proves solid,
+whether it's worth extending pricing accuracy (chaos-normalization across currencies, an affix
+dictionary for Magic items) — no urgency, purely follow-on polish if desired later.

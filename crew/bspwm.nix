@@ -40,6 +40,19 @@
     ${pkgs.feh}/bin/feh --bg-fill ${../assets/wallpaper/wallpaper.jpg}
     ${pkgs.polybar}/bin/polybar -c "$HOME/.config/polybar/config.ini" mybar &
 
+    # Композитор — раніше тримався заради Awakened PoE Trade (видалений,
+    # Follow-up #18 в TODO.md), тепер потрібен для напівпрозорого
+    # оверлей-вікна crew/poe-price-check.nix (tkinter -alpha), яке так само
+    # без композитора рендерилось би суцільним непрозорим прямокутником
+    # замість "скла" поверх гри. Це не той самий picom, який відкидався в
+    # Follow-up #17 (TODO.md) при пошуку причини краху PoE1 — там і сам
+    # компоситор не допоміг, і справжньою причиною виявився
+    # `mangohud.enableSessionWide` (core/games.nix), вже пофіксений на боці
+    # Steam Launch Options. unredirect-fullscreen-windows=false — щоб picom
+    # не вимикав композитинг саме тоді, коли гра розгортається в fullscreen
+    # (тоді оверлей і потрібен).
+    ${pkgs.picom}/bin/picom --config "$HOME/.config/picom.conf" &
+
     # mako (сповіщення) в sway реально стартує лише тому, що sway явно
     # запускає sway-session.target/graphical-session.target; наша xinit-сесія
     # (core/x11-greetd-sessions.nix) цього не робить, тож без явного запуску
@@ -49,6 +62,18 @@
     # Нічний фільтр — X11-еквівалент wlsunset з crew/sway.nix (той самий
     # розклад/температури), налаштування розкладу в ~/.config/redshift.conf.
     ${pkgs.redshift}/bin/redshift &
+  '';
+
+  # Мінімальний конфіг picom — лише те, що потрібно для коректного
+  # альфа-композитингу оверлей-вікна poe-price-check поверх fullscreen-гри
+  # (раніше — заради Awakened PoE Trade, видаленого в Follow-up #18).
+  # glx-backend і unredirect-fullscreen-windows=false — та сама комбінація,
+  # яку вже пробували в Follow-up #17 (TODO.md) як A/B-тест на причину краху
+  # PoE1 (сам компоситор тоді ні до чого не був — див. коментар в bspwmrc).
+  xdg.configFile."picom.conf".text = ''
+    backend = "glx";
+    vsync = false;
+    unredirect-fullscreen-windows = false;
   '';
 
   # dawn-time/dusk-time дозволяють задати фіксовані години переходу без
@@ -218,5 +243,9 @@
     i3lock-color
     nitrogen
     redshift
+
+    # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
+    # непрацював стабільно (Follow-up #18, TODO.md); замінено власним
+    # crew/poe-price-check.nix (той самий офіційний trade API, без Electron).
   ];
 }
