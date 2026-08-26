@@ -1446,3 +1446,78 @@ own, since it rereads that file path, no manual composite-manager restart needed
 hovers/sessions, does the overlay ever steal focus in an annoying way) and, if it proves solid,
 whether it's worth extending pricing accuracy (chaos-normalization across currencies, an affix
 dictionary for Magic items) — no urgency, purely follow-on polish if desired later.
+
+## Follow-up #19 (2026-08-26): `poe-price-check` gained real mod-based pricing for Rare/Unique (closed the Follow-up #18 "affix dictionary" deferral, confirmed live)
+
+Context: a friend told the user real price-checking tools narrow by the item's actual affixes, not
+just base type — exactly the "mod-weighted pricing" Follow-up #18 explicitly deferred as "most of
+what makes Awakened valuable... not realistically buildable/verifiable unsupervised in one night".
+This time it was built with the user live-testing each round in-game, which is what made it
+tractable: mirrors Awakened PoE Trade's actual approach (map each mod line to a `pathofexile.com`
+trade `stat_id`, offer it as a checkbox + editable min-roll filter, let the user pick which mods to
+search on) rather than a hardcoded floor-price fallback.
+
+**Design** (`crew/poe-price-check/price_check.py`):
+- `/api/trade/data/stats` (cached 24h alongside the existing `static.json`/`league.json`) gives
+  every mod's text template with `#` placeholders (e.g. `"+# to maximum Life"`). Each template is
+  turned into a regex (`re.escape` the template, then swap the escaped `#` for a numeric capture
+  group) and matched full-line against the item's copied mod text — same fundamental approach
+  Awakened itself uses via its RePoE mod database, just resolved directly against the live trade
+  API instead of a bundled copy.
+- For Rare/Unique items in GUI mode, `super+p` now opens an interactive overlay: each recognized
+  mod gets a checkbox (min-roll value editable) instead of the old silent base-type-only floor
+  search; unchecked by default, an immediate auto-search runs with zero mods checked (equivalent to
+  the old floor price) so the overlay is never a blank "searching..." with nothing to look at, and
+  a "Оновити пошук" button re-queries after the user ticks specific mods.
+- Two-number mods (`"Adds # to # Fire Damage"`) are still shown for visibility but can't be turned
+  into a `stat_filters` entry (no clear single "min" semantic) — checkbox stays disabled.
+
+**Three real parsing bugs found only by testing against the user's actual live clipboard output**
+(the user has "Advanced Mod Descriptions" enabled in-game, which changes the copied text format in
+ways no hand-written sample text had covered):
+1. Advanced mode renders `+20(20-30)% to Lightning Resistance` — the roll range in parens right
+   after the value — which broke every single regex match (template has no parens at all). Fixed
+   by stripping a `\(-?[\d.]+--?[\d.]+\)` pattern before matching, while keeping the *original*
+   line (with the range) for display in the overlay.
+2. Advanced mode also emits standalone `{ Unique Modifier — Attribute }`-style category-annotation
+   lines and appends `— Unscalable Value` to mods with no numeric value at all (e.g. "Herald of
+   Thunder also creates a storm...") — both needed explicit stripping/skipping.
+3. Separately (not an Advanced-mode artifact): mods with **zero** `#` placeholders — the
+   "Unscalable Value" ones themselves, like the Herald of Thunder line above — were being silently
+   dropped by the stat-index builder (`if "#" not in text: continue`), even though the trade API
+   does support filtering on them (just without a `"value"` key). Fixed by indexing them too and
+   giving them a checkbox with no entry field.
+4. Also handled `#% increased X` vs `#% reduced X`: some stats (e.g. Attribute Requirements) only
+   have an `increased` template in trade's stat data — `reduced` is the same stat with a negative
+   value, no separate template — so a failed match now retries with `increased`/`reduced` swapped
+   and negates the parsed value on success.
+
+**UX correction after first live test**: the very first version defaulted *all* recognized mods to
+checked. The user reported it then always returned "Лотів не знайдено" — checking 6-7 mods
+simultaneously at their exact rolled value is such a narrow AND-filter that almost nothing on the
+market satisfies all of them at once. Changed the default to all-unchecked (see Design above);
+user confirmed this is the right default ("так зручніше").
+
+**Then added, per user request**: a `tk.Scale` slider next to each mod's min-value entry, two-way
+bound to the same value (moving the slider updates the entry text and vice versa, via a
+`trace_add("write", ...)` on the entry's `StringVar` with a tolerance check to avoid feedback
+loops). The slider's min/max come from the same `(min-max)` roll-range text Advanced Mod
+Descriptions already exposes (parsed by a new `extract_roll_range()`, matching the specific
+rolled value's parenthesized range in the *original* uncleaned line) — so it only appears when
+that range is actually known from the copied text; fixed/implicit-with-no-shown-range mods still
+get just the plain entry field.
+
+**Verification**: read the user's actual clipboard via `xclip` mid-session (twice, for two
+different real items they had hovered — a Unique ring and a Rare sword) to get ground-truth item
+text instead of guessing the Advanced-mode format, and ran the parsing/matching/`extract_roll_range`
+functions standalone against both (loaded via `importlib` from the built derivation's own bundled
+Python interpreter, not a separate devshell python) before shipping each fix — 7 of 8 real mod
+lines matched correctly on both test items after the fixes (the two "misses" were correctly-ignored
+non-mod lines: a weapon-class label and item flavor text). User then confirmed all three rounds
+(base matching, default-unchecked, sliders) live in-game after their own `nh os switch` each time.
+
+## Critical files (poe-price-check mod pricing)
+- `crew/poe-price-check/price_check.py` — `build_stat_index`/`match_item_mods`/
+  `normalize_mod_line`/`extract_roll_range` (Advanced Mod Descriptions text handling),
+  `show_stat_overlay` (interactive checkbox+slider overlay), `item_search_stats` (the
+  `stat_filters`-aware search query, alongside the older `item_search_floor`).
