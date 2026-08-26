@@ -1521,3 +1521,374 @@ non-mod lines: a weapon-class label and item flavor text). User then confirmed a
   `normalize_mod_line`/`extract_roll_range` (Advanced Mod Descriptions text handling),
   `show_stat_overlay` (interactive checkbox+slider overlay), `item_search_stats` (the
   `stat_filters`-aware search query, alongside the older `item_search_floor`).
+
+## Follow-up #20 (2026-08-26): `poe-price-check` — whisper button, divine conversion, exchange-rate caching, Magic-item support
+
+Context: asked what to add next to `poe-price-check` (Follow-ups #18/#19). Picked four independent
+improvements in one pass; user selected all four via a quick multi-select rather than one at a
+time. Each was verified live against the real trade API and, for the GUI pieces, the real `earth`
+X session (`bspwm` running, `DISPLAY=:1`) in this same environment — not just `--stdin --no-gui`.
+
+**Design** (`crew/poe-price-check/price_check.py`):
+- **Whisper button**: `/api/trade/fetch` listings already include a ready-to-send `listing.whisper`
+  string (confirmed live via `curl` against a real Fireball search — full sentence, seller name,
+  stash tab, position, no placeholder substitution needed). `_top_listings()` (renamed from
+  `_top_listing_lines`) now returns `{"line", "whisper"}` per lot instead of bare strings;
+  `item_search_floor`/`item_search_stats` surface the top lot's whisper as `result["whisper"]`.
+  Deliberately **not** added for `price_currency` (the bulk `/exchange` endpoint's `listing.whisper`
+  is a template with `{0}`/`{1}` placeholders meant to be filled from the *buyer's chosen quantity*,
+  which this tool doesn't collect — guessing the substitution order was judged too fragile for a
+  price-check tool, confirmed by inspecting a real `/exchange` response's shape live).
+  `show_overlay()` gained a `whisper=` param: when set, it swaps the old "click anywhere closes"
+  behavior for an explicit "Скопіювати whisper" + "Закрити" button pair, because a click on a
+  `tk.Button` fires the root's `<Button-1>` binding on **press** (before the button's own
+  `<ButtonRelease-1>`-triggered command runs) — confirmed by reasoning through Tk's bindtag
+  propagation order, not by hitting the bug live, so worth double-checking if this code is touched
+  again. `show_stat_overlay()` (Rare/Unique/Magic) got a third "Whisper" button next to the
+  existing "Оновити пошук"/"Закрити", disabled until a search actually returns a lot with a
+  whisper, re-toggled on every `run_search()`. Live-tested by clicking the real button via
+  `xdotool mousemove --window <id> ... click 1` at the button's actual on-screen coordinates and
+  checking `xclip -o` picked up the whisper text — worked in both the simple and interactive
+  overlay.
+- **Divine conversion**: `get_divine_rate(league)` reads the `divine`→`chaos` median ratio
+  (currently ~180-195 depending on the moment, confirmed live) via the same exchange-median path as
+  currency pricing. `format_with_divine(chaos_amount, league)` appends a `"(~X divine)"` line once
+  the amount clears `DIVINE_THRESHOLD = 150` chaos — wired into `price_currency` (stack totals) and
+  into search/fetch floor prices (`_floor_line()`) when the top listing happens to be chaos-priced.
+  Deliberately **not** attempted for listings priced in other currencies (exalted, etc.) — would
+  need a full N×N currency-rate table, out of scope for a "nice to have" conversion.
+- **Exchange-rate caching**: the old `price_currency` hit `/api/trade/exchange` live on every
+  single call. Extracted `get_exchange_median(have_id, want_id, league)`, cached
+  `EXCHANGE_TTL = 300`s per currency pair under `~/.cache/poe-price-check/exchange_<have>_<want>.json`
+  — courses move slowly enough that 5 minutes of staleness is a non-issue, and it also backs
+  `get_divine_rate`, so a Currency price-check and a big-number Rare price-check within the same 5
+  minutes share one cached divine rate instead of two live hits. **Correctness note for future
+  edits**: a "no active lots" result caches as `[]` (empty list), not `None` — `_read_cache` can't
+  distinguish a cached `None` from a genuine cache-miss (both come back as Python `None`), so `[]`
+  is the actual "negative cache" sentinel here. Don't change this back to caching `None`.
+- **Magic-item support**: closes the "no reliable way to recover the base type" gap Follow-up #18
+  explicitly punted on. `get_base_type_index()` fetches `/api/trade/data/items` (cached 24h
+  alongside `static.json`/`stats.json`) and flattens every category's `entries[].type` into one set,
+  sorted longest-first. `resolve_magic_base_type(name_line, base_types)` finds the longest base type
+  that appears in the combined "Prefix Base of Suffix" name line with correct word boundaries
+  (start-of-string-or-space before, end-of-string-or-`" of "` after) — confirmed live against a real
+  base-type list fetch (`/data/items` returns categories like `{"label": "Accessories", "entries":
+  [{"type": "Blue Pearl Amulet"}, ...]}`, no display-text field, just the base type strings
+  themselves). Confirmed the trade API's `rarity` filter accepts `"magic"` as a valid `type_filters`
+  option (checked live via `/api/trade/data/filters`). `price_item`'s Magic branch and `main()`'s
+  GUI dispatch (extended from `("Rare", "Unique")` to `("Rare", "Unique", "Magic")`) both resolve
+  the base type first and swap it into a copy of `item` before reusing the existing
+  `item_search_floor`/`item_search_stats`/`show_stat_overlay` machinery unchanged — no separate
+  code path needed once the base type is known. `RARITY_OPTIONS` dict replaces the old
+  `"unique" if ... else "rare"` ternary in `item_search_stats` to add the third case.
+  Live-verified end to end with a synthetic "Sturdy Leather Belt of the Whale" item (resolved to
+  base type "Leather Belt", floor price found with 10 lots, both mod lines recognized and shown as
+  checkboxes with editable values, Whisper button enabled and copied a real listing's whisper) —
+  synthetic text, not a real hovered in-game item, since Advanced Mod Descriptions' exact effect on
+  Magic-item mod-line formatting specifically hasn't been confirmed against the user's own live
+  clipboard the way Rare/Unique was in Follow-up #19. **Not yet confirmed against a real in-game
+  Magic item — flag for live testing next time the user is actually playing.**
+
+**Verification actually done**: `flake8` clean (`nix-store --realise` on the built `.drv`, same as
+prior follow-ups); `nixos-rebuild dry-build --flake .#earth` succeeds; `--stdin --no-gui` exercised
+for a Chaos Orb stack (divine line appears), a Divine Orb itself (self-consistent ~1.00 divine),
+Fireball (whisper line printed), and the Magic belt (base type resolved, floor price shown); real
+GUI overlay rendered on the live `earth` X session and captured via `import -window <id>` (plain
+`maim` came back with nothing capturable for override-redirect windows in this headless-viewer
+setup — same family of capture quirk as the `maim`+picom-glx issue noted in Follow-up #18, worked
+around the same way, by targeting the specific window ID instead of the whole screen) for both the
+simple Gem overlay and the interactive Magic overlay; whisper button clicked via `xdotool` in both
+overlay types and `xclip -o` confirmed the real whisper text landed on the clipboard.
+
+**Not yet done**: no `nh os switch` (per standing instruction — user applies switches themselves);
+Magic-item mod parsing not yet confirmed against a real hovered in-game item with Advanced Mod
+Descriptions on, unlike Rare/Unique which got that treatment in Follow-up #19.
+
+## Follow-up #21 (2026-08-26): `poe-price-check` — poe.ninja as primary source for Currency/Divination Card, reference price for Unique
+
+Context: asked to look at how `awakened-poe-trade` itself is built (github.com/SnosMe/awakened-poe-trade)
+instead of guessing at more features. Its `renderer/src/web/` splits into `item-check` (this tool's
+whole scope so far), plus `item-search`, `map-check`, `stash-search`, `stopwatch`, `client-log` —
+each a genuinely different tool bolted onto the same overlay app (stash-tab search-highlighting,
+map-mod danger warnings, a run-timer, a Client.txt-log watcher for trade/zone events). Deliberately
+**did not** port any of those — out of scope for a price checker specifically, would roughly triple
+the tool's surface for a different job. What *is* in scope: `awakened`'s `price-check/` submodule
+uses **poe.ninja** (`usePoeninja`/`Prices.ts`) as its primary price source for Currency/Divination
+Card/Unique, with the live official-trade-API search only for exact Rare/Unique mod-based queries —
+the opposite of this tool's original design, which only ever used the live trade API. Ported that
+pattern; skipped `awakened`'s other price-check sub-feature, `poeprices.info` ML-based Rare price
+prediction (`price-prediction/poeprices.ts`) — this tool already has real mod-filter search for
+Rares (Follow-up #19), which is more accurate than a third-party ML guess, so layering a prediction
+on top was judged lower value than the poe.ninja work; noted here as a candidate if wanted later.
+
+**Design** (`crew/poe-price-check/price_check.py`):
+- poe.ninja moved its public API since Follow-up #18/#19 were written — confirmed live (via
+  `curl` and the current `poe.ninja/docs/api` page, not from training-data memory of the old API
+  shape) that it's now `poe.ninja/poe1/api/economy/stash/current/{currency,item}/overview` (the
+  old `poe.ninja/api/data/...` paths 404). Three new cached lookups, `NINJA_TTL = 900`s (poe.ninja
+  itself refreshes on a similar cadence):
+  - `get_ninja_currency(league)`: `currency/overview` for both `type=Currency` and `type=Fragment`,
+    keyed by `currencyTypeName` (confirmed this matches `/data/static`'s display-name keys exactly,
+    e.g. "Divine Orb") → `{chaos: chaosEquivalent, trend: receiveSparkLine.totalChange}`.
+  - `get_ninja_divcards(league)`: `item/overview?type=DivinationCard`, same shape via `chaosValue`/
+    `sparkLine.totalChange`. Confirmed live this can legitimately return zero lines this early in a
+    fresh league (`Allflame` had no Divination Card data yet at test time) — the existing
+    live-search fallback path handles that same as a missing-currency case.
+  - `get_ninja_uniques(league)`: fetches all six `Unique{Weapon,Armour,Accessory,Flask,Jewel,Map}`
+    categories and merges into one `name → [{chaos, links, trend}, ...]` dict (unique names are
+    globally unique across categories, so no need to know an item's class up front).
+    `ninja_unique_match()` picks the highest-`links` entry that doesn't exceed the copied item's
+    own link count (a 6-link chaos value is a bad reference for a player's unlinked item).
+- `price_currency`: for Currency (non-chaos, non-Divination-Card), `get_ninja_currency` is now
+  checked *before* the live `/exchange` call; `get_exchange_median` only runs if poe.ninja has no
+  entry for that name. Divination Card got its own branch ahead of the old `currency_map` lookup
+  (cards were never in that map, previously always fell straight to `item_search_floor`) trying
+  `get_ninja_divcards` first, same fallback. `get_divine_rate` (used by the existing
+  `format_with_divine` divine-conversion from Follow-up #20) also now checks
+  `get_ninja_currency(...)["Divine Orb"]` before falling back to its own live exchange-median call
+  — one fewer live API hit in the common case where a currency price-check also triggers a divine
+  conversion.
+- `price_item`'s Unique branch and `main()`'s interactive-overlay dispatch both now also call
+  `ninja_unique_line()`/`ninja_unique_match()` and prepend a `"poe.ninja: ~X chaos, ↑Y%"` reference
+  line — in the plain overlay it's the first line above the live floor search; in the interactive
+  mod-filter overlay (`show_stat_overlay`, gained a `ninja_line=` param) it renders as a muted line
+  under the item name, above the mod checkboxes. This is deliberately a *second* number next to the
+  existing live search, not a replacement — poe.ninja averages across all rolls on the market,
+  while the live mod-filter search (Follow-up #19) narrows to the player's actual rolled item, and
+  `awakened` itself shows both for the same reason.
+- All three `get_ninja_*` calls are wrapped in `try/except (ApiError, RateLimited): ninja = None`
+  everywhere they're used — poe.ninja being slow/down degrades silently to the pre-existing live
+  trade-API path, same non-critical-info philosophy as `get_divine_rate` from Follow-up #20.
+- `trend_suffix(pct)` — shared `", ↑12%"`/`", ↓5%"` formatting, empty string for a flat/unknown
+  trend (`0` or missing `totalChange`), used by all three price lines above.
+
+**Verification actually done**: live `curl` against the real (new-shape) poe.ninja endpoints first,
+to nail down exact field names (`chaosEquivalent` vs `chaosValue`, `receiveSparkLine.totalChange`
+vs `sparkLine.totalChange` — currency and item endpoints use different field names for the same
+concept) before writing any code, rather than guessing from the old API or training-data memory.
+`flake8` clean and `nix-store --realise` on the built `.drv` succeeded (same as every prior
+follow-up). `--stdin --no-gui`: a Divine Orb resolved via poe.ninja (`~195.1 chaos (poe.ninja,
+↑1%)`, matching the live `curl` reference value from the same session); a Divination Card (`The
+Doctor`) correctly fell back to live search (ninja had no card data yet in this fresh league); a
+Unique (`Tabula Rasa`) showed `poe.ninja: ~3 chaos` above the live floor-search lines. Full GUI
+render on the live `earth` X session (same `import -window <id>` capture technique as Follow-ups
+#18/#20) confirmed the `Tabula Rasa` interactive overlay: `poe.ninja: ~3 chaos` muted line under
+the title, live floor price + whisper button below, mods correctly reported as "not recognized"
+(Tabula Rasa genuinely has none).
+
+**Not yet done**: no `nh os switch`. Gem pricing wasn't given a poe.ninja path — poe.ninja
+differentiates gem prices by level/quality/corrupted variant (confirmed live, e.g. Fireball 21/23c
+corrupted vs 21/20c corrupted are ~18x apart in price), and this tool doesn't currently parse those
+fields off the copied item text, so there's no reliable way to pick the right variant; the existing
+plain-name live search (which just returns the cheapest listing regardless of level/quality) is
+unchanged and has the same accuracy limitation it always had. `poeprices.info` Rare ML-prediction
+integration intentionally skipped this round (see Context above) — worth reconsidering if the
+manual mod-filter search ever feels like too much friction for a quick check.
+
+## Follow-up #22 (2026-08-26): fixed a real pricing bug — stack-listing price shown as per-unit price (reported via a screenshot of "The Sephirot")
+
+Context: user's friends flagged the price shown for a Divination Card ("The Sephirot", reward 10x
+Divine Orb, stack of 11 needed) as wrong. `Allflame` is a brand-new league and poe.ninja genuinely
+has zero Divination Card data yet (confirmed live, still true days after Follow-up #21 first found
+this) — confirmed the *reported* card fell through to the pre-existing live-search fallback path
+(`item_search_floor`), not the new poe.ninja path, so this was a bug in code that predates Follow-up
+#21, just newly visible because #21 made poe.ninja the *first* thing tried and this specific item
+had nothing there.
+
+**Root cause** (found via live `curl` against `/api/trade/fetch` for a real `type=The Sephirot`
+search, not from reasoning about the schema): individual listings for stackable items (Divination
+Cards, and any stackable currency that isn't in `currency_map` and falls back to this same search
+path) can be for a **bundle** of N copies at one total price — `item.stackSize` in the `/fetch`
+response, e.g. a real live listing was `"~b/o 1 chaos"` for a stack of 3 cards, not 1 chaos per
+card. `_top_listings()` only ever read `listing.price.amount`/`.currency` and never looked at
+`item.stackSize`, so a 3-for-1-chaos bundle displayed as `floor: 1 chaos` — exactly what looked
+wrong to the user's friends, since the real per-card price implied by that listing is closer to
+0.33 chaos, and other listings on the same card were far more (2.50-3.33 chaos/card), i.e. the
+*card itself* isn't mispriced, the tool was silently treating a 3-pack's total as a single unit's
+price.
+
+**Fix** (`crew/poe-price-check/price_check.py`): `_top_listings()` now divides
+`price.amount` by `item.stackSize` (defaulting to 1 for non-stackable Gem/Unique/Rare listings,
+where this is a no-op) and returns structured `{"amount", "currency", "stack_size", "whisper"}`
+per lot instead of a pre-formatted string — the old design baked `"{amount} {currency}"` into a
+`"line"` field that `_floor_line()` then re-parsed with `.partition(" ")` to pull the currency back
+out for the divine-conversion check (Follow-up #20); that round-trip is exactly the kind of thing
+that breaks silently when the display format changes, so it's gone now in favor of formatting only
+at render time via the new `_format_listing()`/`format_price()` helpers. Also: since the official
+trade API sorts `/search` results by each listing's *raw* stated price, not a per-unit price, a
+cheap-looking bundle listing can rank first even though its real per-unit price is unremarkable (or
+in the other direction, mask a genuinely cheap single-unit listing further down the raw-sorted
+list) — `_top_listings()` now re-sorts by the *normalized* per-unit amount across the whole fetched
+batch (up to `MAX_FETCH_IDS = 10`, the API's own per-`/fetch`-call cap) before taking the top 5,
+instead of trusting the API's raw-price order. Listings with `stack_size > 1` now show that fact
+explicitly (`"0.33 chaos (за 1, стек 3)"`) so a normalized-but-still-suspiciously-cheap price reads
+as "bulk/bait listing," not as a trustworthy floor.
+
+**Residual, not a code bug**: even after the fix, `The Sephirot`'s displayed floor price is still
+very low (~0.33-0.50 chaos) relative to its ~10-divine reward, because the public trade-search
+"cheapest first" listings for assembly-type cards (need 11 copies) are frequently bait/troll
+buyout-price listings, not real market value — this is a known, general limitation of "floor =
+cheapest live listing" pricing for any high-effort-to-assemble stackable, not something this fix
+(or arguably any client-side code) can fully correct. The actual reliable fix is exactly what
+poe.ninja's aggregated-market data is for (Follow-up #21's primary path); it's just not populated
+for Divination Cards yet this early in `Allflame` and should self-correct as poe.ninja indexes more
+of the league's economy.
+
+**Verification actually done**: root-caused via live `curl` against the real `/fetch` response for
+a `The Sephirot` search (confirmed `item.stackSize` was the missing field, not a guess); `flake8`
+clean and `nix-store --realise` on the built `.drv` succeeded; `--stdin --no-gui` re-run against a
+synthetic "The Sephirot" clipboard text now shows `floor: 0.33 chaos (за 1, стек 3)` instead of the
+old misleading `floor: 1 chaos`; full GUI overlay re-rendered on the live `earth` X session (same
+`import -window <id>` technique as prior follow-ups) and visually confirmed the stack-size
+annotation renders correctly in the actual overlay window, not just in text output.
+
+## Follow-up #23 (2026-08-26): asked for a "recently sold" price list to dodge troll listings — not available from the API, built a median-with-skip fallback instead
+
+Context: after Follow-up #22's fix, the user (via their friends) still saw an unrealistically low
+price for a Divination Card and asked for a list of *recently sold* items to sidestep troll/bait
+listings, since the raw floor price was still off by roughly two orders of magnitude from the real
+~100 chaos/copy the friends knew.
+
+**Why "recently sold" isn't buildable**: `pathofexile.com/api/trade` (the only official, ToS-legal
+data source this tool uses) exposes exclusively *currently active listings* — there is no
+completed-sale/transaction-history endpoint anywhere in the public trade API. GGG's own trade site
+doesn't track completed sales either (trades happen player-to-player via whisper, off-API). Said
+this plainly rather than half-implementing something that only looks like sale history.
+
+**What was built instead** (`crew/poe-price-check/price_check.py`, `robust_stackable_price()`):
+closest honest substitute for the specific failure mode actually observed — expensive
+bulk-assembly Divination Cards routinely get "~b/o 1 chaos" bait listings sitting at the very top
+of the price-ascending sort (a seller posts an unrealistic price to appear first, then negotiates
+manually in whispers; this is a known, common PoE trade pattern, not specific to this card). Since
+`/search` already returns the *entire* price-sorted id list in one response, skipping the front of
+that list before choosing which ids to `/fetch` costs nothing extra (still one `/fetch` call) —
+`skip = min(len(ids_all) // 4, 20)`, then `statistics.median()` (not the naive minimum) over the
+next batch's dominant currency group. The absolute cheapest lot from that sample is still shown
+as a labeled secondary line (`"найдешевший лот: ... -- можливо помилка/бейт"`) when it's less than
+half the median, for transparency rather than hiding data.
+- Wired into all three of `price_currency`'s existing `item_search_floor` fallback call sites
+  (Divination Card without poe.ninja data, an unrecognized Currency-rarity name, and an `/exchange`
+  API error) — replaced with `robust_stackable_price()`. Deliberately **not** applied to
+  Gem/Unique/Rare pricing (`item_search_floor` itself, used by `price_item`/`item_search_stats`) —
+  for gear, the cheapest live listing genuinely is the number a player wants (real sellers actually
+  compete on price there), so skipping the front of that list would make gear prices *worse*, not
+  better. Bait-listing skipping is specifically a bulk-stackable-currency/card phenomenon.
+
+**Honest limitation, confirmed live, not glossed over**: for `The Sephirot` specifically, the
+median-with-skip result (`~0.25 divine`, ≈49 chaos) is a large improvement over the pre-fix number
+(`0.33 chaos` — off by ~150x) but still measurably below the ~100 chaos/copy the user's friends
+report from community knowledge, and the result was observed to vary noticeably between runs
+(chaos-denominated median one run, divine-denominated the next) because the *entire* live market
+for this card is thin and bait-heavy right now (only ~30 total active listings site-wide at test
+time, confirmed via `curl`) — skipping past 20% of a thin, mostly-bait list still leaves a small,
+noisy sample. This is a data-scarcity problem in a brand-new league (`Allflame`), not a bug in the
+sampling logic; poe.ninja (Follow-up #21's primary path, still confirmed empty for Divination Cards
+at time of this fix) is the actual long-term fix once it has enough real stash-scan data to
+aggregate, and will silently take over as soon as it does (no code change needed — `price_currency`
+already tries poe.ninja first).
+
+**Verification actually done**: live `curl` re-confirmed the API genuinely has no completed-sale
+endpoint (not from memory); `flake8` clean, `nix-store --realise` succeeded; `--stdin --no-gui`
+against the same synthetic "The Sephirot" text from Follow-up #22 showed the new median-based line
+plus the flagged-cheapest-lot secondary line; full GUI overlay re-rendered and screenshotted on the
+live `earth` X session showing both lines correctly formatted in the actual window.
+
+## Follow-up #24 (2026-08-26): troll listings aren't just a Divination Card problem — user sent a real in-game screenshot of a Unique with the same issue, added a warning instead of re-scoping the whole fix
+
+Context: user sent a screenshot of a real hovered item (`Tecrod's Gaze`, a Murderous Eye Jewel) with
+the overlay open. Its own in-game tooltip showed the seller's real listed price, `b/o 130 chaos`,
+matching this tool's `poe.ninja: ~130 chaos` line almost exactly — but the `floor:` line right below
+it showed `10 chaos` from a live `/search` hit, with the next real listings jumping straight to 30,
+99, 100 chaos. Follow-up #23 deliberately did *not* apply troll-listing defenses to Gem/Unique/Rare
+searches, reasoning "gear sellers actually compete on price, cheapest-first is what the number
+should be" — this screenshot is direct evidence that reasoning doesn't universally hold; bait/bad
+listings happen on uniques too, not just bulk-assembly Divination Cards.
+
+**Design decision**: did *not* revert to Follow-up #23's skip-the-front-quartile/median approach for
+gear — for the common case (no bait), the true cheapest listing genuinely is the answer a player
+checking gear price wants, and blindly skipping it would make the normal case worse to fix an
+uncommon one. Instead, since a poe.ninja reference number was already being shown right next to the
+live floor price for Uniques (Follow-up #21), the fix is to **compare the two already-displayed
+numbers** and flag the floor when it diverges too far, rather than changing what floor search
+returns.
+
+**Design** (`crew/poe-price-check/price_check.py`):
+- `_floor_line()` gained a `reference_chaos=None` param; when the floor listing is chaos-priced and
+  under `TROLL_LISTING_RATIO = 0.5` (same threshold Follow-up #23's `robust_stackable_price` already
+  uses) of `reference_chaos`, appends `" ⚠ можливо тролль-лот"` right on the floor line — the
+  observed real case (10 vs 130 chaos, ratio ≈0.077) trips this by a wide margin, so 0.5 has real
+  headroom without being trigger-happy on ordinary price variance.
+- `item_search_floor()` and `item_search_stats()` both gained the same `reference_chaos=None`
+  passthrough param, threaded down to `_floor_line()`. No behavior change when it's omitted (Rare,
+  Gem, and any Unique poe.ninja doesn't know about) — this is additive, not a default-on filter.
+- Refactored `ninja_unique_line()` into `ninja_unique_lookup(item, league)` (returns the raw
+  `{chaos, links, trend}` match or `None`) plus a separate `format_ninja_unique_line(match)` —
+  needed the raw chaos number in two places now (the display line *and* as `reference_chaos`), where
+  before only the formatted string was ever produced.
+- `price_item`'s Unique branch and `main()`'s interactive dispatch both now call
+  `ninja_unique_lookup()` once, feed `reference_chaos` into `item_search_floor`/`item_search_stats`
+  (the latter via a new `show_stat_overlay(..., reference_chaos=...)` param threaded through to its
+  internal `run_search()`), and still separately format the poe.ninja headline line as before.
+
+**Verification actually done**: reproduced the user's exact item — same name, base type (found via
+the existing `get_base_type_index()`/`/data/items` cache), and mods — via `--stdin --no-gui`, and it
+independently landed on the same shape as the screenshot (poe.ninja ~130 chaos ↓35%, live floor 10
+chaos with the next real listings at 99/100/100 chaos) confirming this isn't a one-off; the new
+`⚠ можливо тролль-лот` tag appeared correctly on the 10-chaos line. `flake8` clean, `nix-store
+--realise` on the built `.drv` succeeded. Full GUI overlay re-rendered and screenshotted on the live
+`earth` X session (same `import -window <id>` technique as prior follow-ups) showing the warning
+rendered correctly inline in the actual window, matching the text output.
+
+**Scope note for later**: the same divergence-flagging idea could extend to Rare items if a
+poe.ninja-equivalent reference ever exists for them (it doesn't currently — Follow-up #21 explicitly
+skipped `poeprices.info` ML prediction) or to Gems once/if gem-variant matching (level/quality/
+corrupted) gets built (Follow-up #21's noted gap).
+
+## Follow-up #25 (2026-08-26): the real ask behind Follow-up #24's screenshot was mod recognition, not price — two of `Tecrod's Gaze`'s three explicit mods were silently invisible to the overlay
+
+Context: user clarified Follow-up #24's screenshot wasn't actually about the price warning — the
+real complaint was that the interactive overlay only showed a checkbox for `+17 to Strength`, even
+though the item clearly has two more explicit mods visible in its tooltip (`...Main Hand Critical
+Strike Chance per Murderous Eye Jewel...` and `...Off Hand Critical Strike Multiplier per Murderous
+Eye Jewel...`). Not degraded-but-visible like the existing two-number-mod handling (Follow-up #19)
+— these two mods were completely absent from the list, silently dropped.
+
+**Root cause** (found via live `curl` against `/api/trade/data/stats`, not guessed): these two mod
+templates contain a **literal embedded newline** in the stat text itself —
+`jq -c` on the raw JSON showed `"+#% to Off Hand Critical Strike Multiplier per\nMurderous Eye
+Jewel affecting you, up to a maximum of +100%"` (a real `\n` byte, not two JSON lines or a display
+artifact). This is a known GGG data quirk specific to the "per-Eye-Jewel-affecting-you" family of
+abyssal-unique mods (Murderous/Ghastly/Hypnotic/Searching Eye Jewel) — several other unrelated stats
+matched the same `grep`-for-"affecting you" query with the identical wrap point (`Hypnotic Eye Jewel
+affecting you`, `Ghastly Eye Jewel affecting you`, `Searching Eye Jewel affecting you`), confirming
+it's a whole mod family, not a one-off. `match_item_mods()` (Follow-up #19) always matched exactly
+one copied-text *line* against the stat index at a time; since the in-game clipboard export mirrors
+this same embedded line break (the tooltip in the user's screenshot visibly wraps at the identical
+point — "...Critical Strike Chance per" / "Murderous Eye Jewel affecting you..." — strong
+circumstantial evidence, though not a live clipboard read, that the copied text splits there too),
+neither of the two resulting single lines can ever `fullmatch` a template that spans both.
+
+**Fix** (`crew/poe-price-check/price_check.py`): `match_item_mods()` changed from a flat
+one-line-at-a-time loop to an index-based `while` loop. When a candidate line fails to match on its
+own and a next line exists, it retries by joining `line + "\n" + next_line` (matching the API
+template's own literal separator) and matching that as one unit; on success it consumes both lines,
+records a space-joined version as the display text (`"line + ' ' + next_line"`, more natural to read
+in a single-row checkbox than an embedded newline would be), and continues. `re.escape()` doesn't
+touch `\n` (it's not a regex metacharacter) and `.fullmatch()` has no issue with an embedded literal
+newline in either the pattern or the subject — confirmed this holds by direct testing (see below),
+not just by reasoning about the regex engine. Extracted the existing single-line match logic into a
+small `_match_candidate()` helper shared by both the direct and joined-line attempts, to avoid
+duplicating the `normalize_mod_line` + `match_stat_any` (explicit-then-implicit) sequence.
+
+**Verification actually done**: confirmed the exact stat templates and their embedded `\n` live via
+`curl` + `jq -c` against `/api/trade/data/stats` (not from memory of the schema); called
+`match_item_mods()` directly (via a throwaway script importing the module, not just end-to-end
+through the CLI) against a synthetic two-line-per-mod item text built to match the confirmed API
+template shape, and got all three mods back correctly matched, including both previously-invisible
+ones, with sane `id`/`values`. Full GUI overlay re-rendered and screenshotted on the live `earth` X
+session (same `import -window <id>` technique as prior follow-ups): all three mods now appear as
+checkboxes with correct min-roll values (17, 40, 20) and full readable text, matching the item from
+the user's original screenshot. **Not yet confirmed against the user's own live clipboard** with
+this exact item — the embedded-newline theory rests on the trade API data plus the screenshot's
+visual wrap point lining up, not on having read the real copied text byte-for-byte; worth a quick
+live re-check next time this or a sibling Eye Jewel is actually hovered in-game.
