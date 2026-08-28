@@ -1892,3 +1892,27 @@ the user's original screenshot. **Not yet confirmed against the user's own live 
 this exact item — the embedded-newline theory rests on the trade API data plus the screenshot's
 visual wrap point lining up, not on having read the real copied text byte-for-byte; worth a quick
 live re-check next time this or a sibling Eye Jewel is actually hovered in-game.
+
+## Follow-up #26 (2026-08-29): `super+shift+e` (bspwm) stopped doing anything after swapping `bspc quit` for a power-menu
+
+Context: an earlier change to `crew/bspwm.nix` replaced the bare `bspc quit` on `super+shift+e`
+with a new `power-menu` script (rofi `-dmenu` with Заблокувати/Вийти/Перезавантажити/Вимкнути/
+Призупинити options, same styling as the existing `super+d` drun bind). User reported the bind now
+does nothing at all.
+
+**Root cause**: `power-menu` is defined via `pkgs.writeShellScriptBin` in the file's `let` block,
+same pattern as `mode-work`/`mode-study`/`mode-play` (`crew/modes.nix`) and `toggle-theme`
+(`crew/theming.nix`) — but unlike those, it was never added to `home.packages`. sxhkd's keybinding
+just calls the bare command name (matching how `bspc quit`, `toggle-theme`, `nwg-look`, `mode-work`
+etc. are all invoked elsewhere in the same file), which only resolves if the package is actually on
+`PATH` via the home-manager profile. Since it wasn't, sxhkd silently failed to find the binary — no
+error, no fallback, just nothing happening on keypress.
+
+**Fix**: added `power-menu` to `home.packages` in `crew/bspwm.nix`, matching the existing
+mode-*/toggle-theme convention exactly (one-line addition, no other changes needed).
+
+**Verification actually done**: `nixos-rebuild dry-build --flake .#earth` succeeded (exit 0,
+`power-menu.drv` builds cleanly). Confirmed against the working convention already in the file
+(`mode-work`/`mode-study`/`mode-play` and `toggle-theme` both follow the identical
+writeShellScriptBin-then-home.packages pattern) rather than guessing. User confirmed live on `earth`
+that `super+shift+e` now opens the power menu as expected.
