@@ -1,4 +1,21 @@
 { pkgs, ... }:
+let
+  # Повноцінне меню живлення на super+shift+e замість голого "bspc quit" —
+  # той самий rofi -dmenu, що й на super+d (drun), лише в текстовому режимі.
+  # systemctl reboot/poweroff/suspend без sudo працюють завдяки дефолтним
+  # polkit-правилам logind для активної локальної сесії (не потребують
+  # окремого налаштування в core/).
+  power-menu = pkgs.writeShellScriptBin "power-menu" ''
+    choice=$(printf 'Заблокувати\nВийти\nПерезавантажити\nВимкнути\nПризупинити' | ${pkgs.rofi}/bin/rofi -dmenu -p "Живлення")
+    case "$choice" in
+      "Заблокувати") ${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e ;;
+      "Вийти") bspc quit ;;
+      "Перезавантажити") systemctl reboot ;;
+      "Вимкнути") systemctl poweroff ;;
+      "Призупинити") systemctl suspend ;;
+    esac
+  '';
+in
 {
   # X11-сесія для гри (PoE1 глючив і на sway, і на i3) — без композитора
   # (заради продуктивності), але з повноцінним polybar (паритет з waybar
@@ -166,7 +183,7 @@
       "super + Return" = "kitty";
       "super + shift + q" = "bspc node -c";
       "super + d" = "${pkgs.rofi}/bin/rofi -show drun";
-      "super + shift + e" = "bspc quit";
+      "super + shift + e" = "power-menu";
 
       # Блокування/екран/тема — перенесено з crew/i3.nix (той самий колір і
       # той самий xset), theme toggle — з crew/sway.nix (portable-скрипт).
@@ -243,6 +260,7 @@
     i3lock-color
     nitrogen
     redshift
+    power-menu
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
     # непрацював стабільно (Follow-up #18, TODO.md); замінено власним
