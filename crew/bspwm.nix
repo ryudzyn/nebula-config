@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 let
   # Дефолтний pkgs.tesseract тягне tessdata "all" (~470 МіБ усіх мов) —
   # звужено до укр/eng, більше нам для OCR тут не треба.
@@ -85,6 +85,225 @@ let
     if [ -n "$color" ]; then
       ${pkgs.libnotify}/bin/notify-send -t 2000 "Color picker → буфер" "$color"
     fi
+  '';
+
+  # Єдине джерело правди для біндингів: список (не attrset — Nix сортує
+  # ключі attrset-а алфавітно, це зламало б логічне групування нижче),
+  # кожен запис одразу несе короткий опис для nebula-keybind-help. Звідси ж
+  # генерується і services.sxhkd.keybindings (мапа key->cmd), щоб опис і
+  # реальний бінд ніколи не розійшлись.
+  keybinds = [
+    {
+      key = "super + Return";
+      cmd = "kitty";
+      desc = "Термінал";
+    }
+    {
+      key = "super + shift + q";
+      cmd = "bspc node -c";
+      desc = "Закрити вікно";
+    }
+    {
+      key = "super + d";
+      cmd = "${pkgs.rofi}/bin/rofi -show drun";
+      desc = "Запуск застосунків (rofi)";
+    }
+    {
+      key = "super + shift + e";
+      cmd = "power-menu";
+      desc = "Меню живлення (блок / вихід / перезавантаження / вимкнення / сон)";
+    }
+    {
+      key = "super + Escape";
+      cmd = "${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e";
+      desc = "Заблокувати екран";
+    }
+    {
+      key = "super + shift + Escape";
+      cmd = "xset dpms force off";
+      desc = "Вимкнути монітор";
+    }
+    {
+      key = "super + n";
+      cmd = "toggle-theme";
+      desc = "Перемкнути світлу/темну тему";
+    }
+    {
+      key = "super + w";
+      cmd = "${pkgs.nitrogen}/bin/nitrogen";
+      desc = "Вибір шпалер (nitrogen)";
+    }
+    {
+      key = "super + shift + t";
+      cmd = "nwg-look";
+      desc = "Налаштування GTK-теми (nwg-look)";
+    }
+    {
+      key = "super + shift + r";
+      cmd = "xdg-open file://${../assets/cprogram/roulette.html}";
+      desc = "Рулетка (жарт-застосунок)";
+    }
+    {
+      key = "super + shift + m";
+      cmd = ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
+      desc = "Панель керування мишею Swiftpoint X1";
+    }
+    {
+      key = "super + shift + c";
+      cmd = ''kitty --title "Ascension runClient" -e sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'';
+      desc = "Запуск Ascension-мода (dev-клієнт у kitty)";
+    }
+    {
+      key = "super + shift + v";
+      cmd = "${pkgs.pavucontrol}/bin/pavucontrol";
+      desc = "Мікшер гучності (pavucontrol)";
+    }
+    {
+      key = "super + equal";
+      cmd = ''${pkgs.rofi}/bin/rofi -modi calc -show calc -plugin-path ${pkgs.rofi-calc}/lib/rofi -no-show-match -no-sort -calc-command "echo -n '{result}' | ${pkgs.xclip}/bin/xclip -selection clipboard"'';
+      desc = "Калькулятор (rofi), результат у буфер";
+    }
+    {
+      key = "super + shift + a";
+      cmd = "nebula-awake";
+      desc = "Keep-awake — тумблер, блокує сон/lid, доки не перемкнеш знову";
+    }
+    {
+      key = "super + shift + o";
+      cmd = "nebula-ocr";
+      desc = "OCR виділеної ділянки екрана → буфер";
+    }
+    {
+      key = "super + shift + p";
+      cmd = "nebula-always-on-top";
+      desc = "Always on top для активного вікна";
+    }
+    {
+      key = "super + shift + x";
+      cmd = "nebula-color-picker";
+      desc = "Піпетка кольору → hex у буфер";
+    }
+    {
+      key = "super + shift + slash";
+      cmd = "nebula-keybind-help";
+      desc = "Цей список комбінацій";
+    }
+    {
+      key = "super + v";
+      cmd = "CM_LAUNCHER=rofi ${pkgs.clipmenu}/bin/clipmenu";
+      desc = "Історія буфера обміну";
+    }
+    {
+      key = "super + Tab";
+      cmd = "${pkgs.rofi}/bin/rofi -show window";
+      desc = "Список відкритих вікон";
+    }
+    {
+      key = "super + F1";
+      cmd = "mode-work";
+      desc = "Режим \"робота\"";
+    }
+    {
+      key = "super + F2";
+      cmd = "mode-study";
+      desc = "Режим \"навчання\"";
+    }
+    {
+      key = "super + F3";
+      cmd = "mode-play";
+      desc = "Режим \"гра\"";
+    }
+    {
+      key = "super + shift + space";
+      cmd = "bspc node -t ~floating";
+      desc = "Toggle floating для вікна";
+    }
+    {
+      key = "super + {h,j,k,l}";
+      cmd = "bspc node -f {west,south,north,east}";
+      desc = "Фокус на вікно (vim-стиль)";
+    }
+    {
+      key = "super + {Left,Down,Up,Right}";
+      cmd = "bspc node -f {west,south,north,east}";
+      desc = "Фокус на вікно (стрілки)";
+    }
+    {
+      key = "super + {1-5}";
+      cmd = "bspc desktop -f '^{1-5}'";
+      desc = "Перемкнутись на робочий простір 1-5";
+    }
+    {
+      key = "super + shift + {1-5}";
+      cmd = "bspc node -d '^{1-5}' --follow";
+      desc = "Перекинути вікно на робочий простір 1-5";
+    }
+    {
+      key = "super + m";
+      cmd = "bspc desktop -l next";
+      desc = "Перемкнути layout (tiled/monocle)";
+    }
+    {
+      key = "super + f";
+      cmd = "bspc node -t ~fullscreen";
+      desc = "Fullscreen для вікна";
+    }
+    {
+      key = "super + shift + {h,j,k,l}";
+      cmd = "bspc node -s {west,south,north,east}";
+      desc = "Поміняти вікна місцями (vim-стиль)";
+    }
+    {
+      key = "super + ctrl + {h,j,k,l}";
+      cmd = "bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}";
+      desc = "Змінити розмір вікна";
+    }
+    {
+      key = "XF86AudioRaiseVolume";
+      cmd = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+";
+      desc = "Гучність +5%";
+    }
+    {
+      key = "XF86AudioLowerVolume";
+      cmd = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-";
+      desc = "Гучність -5%";
+    }
+    {
+      key = "XF86AudioMute";
+      cmd = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
+      desc = "Toggle mute";
+    }
+    {
+      key = "XF86MonBrightnessUp";
+      cmd = "brightnessctl set 5%+";
+      desc = "Яскравість +5%";
+    }
+    {
+      key = "XF86MonBrightnessDown";
+      cmd = "brightnessctl set 5%-";
+      desc = "Яскравість -5%";
+    }
+    {
+      key = "Print";
+      cmd = "mkdir -p ~/Pictures/Screenshots && ${pkgs.maim}/bin/maim ~/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png";
+      desc = "Скріншот всього екрана → файл";
+    }
+    {
+      key = "super + shift + s";
+      cmd = "${pkgs.maim}/bin/maim -s | ${pkgs.xclip}/bin/xclip -selection clipboard -t image/png";
+      desc = "Скріншот ділянки → буфер";
+    }
+  ];
+
+  # nebula-keybind-help: rofi -dmenu лише ПОКАЗУЄ список (нічого не робить із
+  # вибору) — читає текст, згенерований з keybinds вище на етапі збірки, тож
+  # не може розійтись із реальним sxhkdrc.
+  nebula-keybind-help-text = pkgs.writeText "nebula-keybinds.txt" (
+    lib.concatMapStringsSep "\n" (b: "${b.key}  →  ${b.desc}") keybinds
+  );
+  nebula-keybind-help = pkgs.writeShellScriptBin "nebula-keybind-help" ''
+    ${pkgs.rofi}/bin/rofi -dmenu -i -p "Комбінації" -no-custom -width 60 -l 20 \
+      < ${nebula-keybind-help-text} > /dev/null
   '';
 in
 {
@@ -366,102 +585,17 @@ in
 
   # Системний модуль bspwm сам запускає sxhkd при старті сесії — тут ми лише
   # декларативно генеруємо ~/.config/sxhkd/sxhkdrc, який він читає.
+  # keybindings генерується з `keybinds` (let-блок вище) — те саме джерело,
+  # з якого будується й nebula-keybind-help, щоб опис і реальний бінд не
+  # розходились.
   services.sxhkd = {
     enable = true;
-    keybindings = {
-      "super + Return" = "kitty";
-      "super + shift + q" = "bspc node -c";
-      "super + d" = "${pkgs.rofi}/bin/rofi -show drun";
-      "super + shift + e" = "power-menu";
-
-      # Блокування/екран/тема — перенесено з crew/i3.nix (той самий колір і
-      # той самий xset), theme toggle — з crew/sway.nix (portable-скрипт).
-      "super + Escape" = "${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e";
-      "super + shift + Escape" = "xset dpms force off";
-      "super + n" = "toggle-theme";
-
-      # Косметика з crew/sway.nix: waypaper (wayland-only picker) →
-      # nitrogen (X11-native); nwg-look і roulette самі по собі portable
-      # (gsettings/xdg-open), тому запускаються без заміни.
-      "super + w" = "${pkgs.nitrogen}/bin/nitrogen";
-      "super + shift + t" = "nwg-look";
-      "super + shift + r" = "xdg-open file://${../assets/cprogram/roulette.html}";
-
-      # Панель керування мишею Swiftpoint X1 — в sway.nix запускається
-      # автостартом, тут — за біндом (той самий позасистемний бінарник).
-      "super + shift + m" =
-        ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
-
-      # Швидкий запуск дев-клієнта Ascension-мода (~/Projects/ascension-limitless-progression)
-      # у kitty, щоб бачити build/runtime лог; той самий `nix develop --command ./gradlew
-      # runClient`, що й уручну в терміналі. Гучність — pavucontrol, вже системний пакет
-      # (core/packages.nix), тут просто бінд для швидкого виклику GUI.
-      "super + shift + c" =
-        ''kitty --title "Ascension runClient" -e sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'';
-      "super + shift + v" = "${pkgs.pavucontrol}/bin/pavucontrol";
-
-      # Калькулятор у rofi (PowerToys Run calc-plugin еквівалент) —
-      # librofi_calc.so підвантажується напряму через -plugin-path, без
-      # обгортки programs.rofi (тут rofi лишається "сирим" пакетом скрізь
-      # інде). -calc-command копіює результат у буфер тим самим xclip, що й
-      # решта copy-в-буфер біндів.
-      "super + equal" =
-        ''${pkgs.rofi}/bin/rofi -modi calc -show calc -plugin-path ${pkgs.rofi-calc}/lib/rofi -no-show-match -no-sort -calc-command "echo -n '{result}' | ${pkgs.xclip}/bin/xclip -selection clipboard"'';
-
-      # PowerToys Awake / Text Extractor / Always On Top / Color Picker —
-      # скрипти визначені в let-блоці вище. `super + shift + c` вже зайнятий
-      # Ascension-байндом вище, тому Color Picker — на `x` (від xcolor).
-      "super + shift + a" = "nebula-awake";
-      "super + shift + o" = "nebula-ocr";
-      "super + shift + p" = "nebula-always-on-top";
-      "super + shift + x" = "nebula-color-picker";
-
-      # Історія буфера обміну (clipmenud автостартує в bspwmrc) — сам пікер
-      # викликається лише по біндy, CM_LAUNCHER=rofi замість дефолтного dmenu.
-      "super + v" = "CM_LAUNCHER=rofi ${pkgs.clipmenu}/bin/clipmenu";
-
-      # Список відкритих вікон (усі десктопи) — bspwm сам виставляє EWMH-хінти,
-      # якими користується вбудований rofi-модуль "window".
-      "super + Tab" = "${pkgs.rofi}/bin/rofi -show window";
-
-      # Режими роботи/навчання/гри — ті самі скрипти, що й у sway.nix
-      # (crew/modes.nix), скрипти самі визначають bspwm vs sway в рантаймі.
-      "super + F1" = "mode-work";
-      "super + F2" = "mode-study";
-      "super + F3" = "mode-play";
-
-      # floating toggle — bspc-еквівалент "floating toggle" з sway/i3.
-      "super + shift + space" = "bspc node -t ~floating";
-
-      # фокус між вікнами (vim-стиль і стрілки — обидва варіанти)
-      "super + {h,j,k,l}" = "bspc node -f {west,south,north,east}";
-      "super + {Left,Down,Up,Right}" = "bspc node -f {west,south,north,east}";
-
-      # робочі простори: перемкнутись / перекинути туди вікно
-      "super + {1-5}" = "bspc desktop -f '^{1-5}'";
-      "super + shift + {1-5}" = "bspc node -d '^{1-5}' --follow";
-
-      # layout: перемикання tiled/monocle, фулскрін, обмін місцями, resize
-      "super + m" = "bspc desktop -l next";
-      "super + f" = "bspc node -t ~fullscreen";
-      "super + shift + {h,j,k,l}" = "bspc node -s {west,south,north,east}";
-      "super + ctrl + {h,j,k,l}" = "bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}";
-
-      # Гучність/яскравість — перенесено з crew/sway.nix, ці команди самі по
-      # собі не wayland-specific (wpctl керує pipewire, brightnessctl — sysfs).
-      "XF86AudioRaiseVolume" = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+";
-      "XF86AudioLowerVolume" = "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-";
-      "XF86AudioMute" = "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
-      "XF86MonBrightnessUp" = "brightnessctl set 5%+";
-      "XF86MonBrightnessDown" = "brightnessctl set 5%-";
-
-      # Скріншоти — перенесено з crew/sway.nix, там grim/slurp/wl-copy
-      # (wayland-only); тут X11-еквівалент maim/xclip.
-      "Print" =
-        "mkdir -p ~/Pictures/Screenshots && ${pkgs.maim}/bin/maim ~/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png";
-      "super + shift + s" =
-        "${pkgs.maim}/bin/maim -s | ${pkgs.xclip}/bin/xclip -selection clipboard -t image/png";
-    };
+    keybindings = builtins.listToAttrs (
+      map (b: {
+        name = b.key;
+        value = b.cmd;
+      }) keybinds
+    );
   };
 
   home.packages = with pkgs; [
@@ -487,6 +621,7 @@ in
     nebula-always-on-top
     nebula-color-picker
     xcolor
+    nebula-keybind-help
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
     # непрацював стабільно (Follow-up #18, TODO.md); замінено власним

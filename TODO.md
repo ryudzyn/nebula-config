@@ -2199,3 +2199,57 @@ retry for real — they then confirmed live: picker pipette appears, click copie
 
 All five binds in this batch (`super + equal`, `super + shift + a/o/p/x`) are now confirmed working on
 the real system.
+
+## Follow-up #35 (2026-09-03): phone-camera → OBS recording setup — WiFi/MJPEG choppy, RTSP retry planned
+
+User got a phone tripod/mount and books arrived they want to film, live-previewed and recorded on
+`earth` via OBS (already installed, `core/packages.nix:63`). Recommended path (WiFi, no NixOS changes
+needed): **"IP Webcam"** Android app + OBS **Media Source** pointed at `http://<phone-ip>:8080/video`
+(MJPEG) — bypasses the whole `v4l2loopback` virtual-webcam route entirely, since OBS's Media Source
+consumes network streams directly.
+
+**Tested**: MJPEG-over-WiFi worked but the picture stuttered intermittently. **Next step (user,
+tomorrow)**: switch the same IP Webcam app to RTSP mode instead of MJPEG in the OBS Media Source URL —
+more bandwidth-efficient, less prone to WiFi-induced frame drops.
+
+**Fallback if RTSP still stutters**: USB connection via `droidcam` + a `v4l2loopback` kernel module
+(would need `boot.kernelModules`/`boot.extraModulePackages` added to `hosts/earth/default.nix` or a
+`core/*.nix` module) — lower latency, no WiFi variability, but requires actual config changes not yet
+written.
+
+No code changes in this repo for this Follow-up — pure usage/workflow guidance so far.
+
+## Follow-up #36 (2026-09-03): bspwm keybind cheat-sheet — `super + shift + slash` lists every bind with a description, confirmed live
+
+Same request as the idea originally logged here: as the bind list grew (~40 combos across power-menu,
+the PowerToys batch, window management, media keys — Follow-ups #26–#34), the user kept forgetting
+what half of them do and wanted something like Hyprland's keybind-overlay to look them up on demand.
+Considered a true live "which-key" overlay (real-time hint while holding a modifier) first — ruled out
+as the wrong trade-off: `sxhkd`'s chord-chain primitive (`man sxhkd`, `-s STATUS_FIFO`) can drive that,
+but only for binds restructured as press-release-then-key chains, which would double the interaction
+cost of the daily-driver holds (terminal, launcher, window nav) just to get discoverability for the
+binds actually being forgotten (the newest/rarest ones). User agreed a static, on-demand list was the
+better fit.
+
+**Implementation** (`crew/bspwm.nix`): every keybind was restructured from a flat
+`services.sxhkd.keybindings` attrset into a single ordered list, `keybinds = [ { key; cmd; desc; } ... ]`
+— a list rather than an attrset specifically because Nix sorts attrset keys alphabetically, which would
+have destroyed the logical grouping (window management together, media keys together, etc.) that makes
+the cheat-sheet readable. Both `services.sxhkd.keybindings` (`builtins.listToAttrs`, mapping
+`key`→`cmd`) and a generated help text (`pkgs.writeText`, `key  →  desc` per line) are derived from this
+one list, so the description shown can never drift from the binding that's actually wired up — no
+separate hand-maintained cheat-sheet to go stale.
+
+New bind: `super + shift + slash` → `nebula-keybind-help`, a `rofi -dmenu` (read-only — nothing is
+executed on selection, it's `-no-custom` and stdout is discarded) reading that generated text file.
+Added itself as an entry in the same `keybinds` list ("Цей список комбінацій"), so it documents its own
+existence.
+
+**Live-verified**: `dry-build` clean, then the actual built `sxhkdrc` and help-text derivations were
+read directly from the store before switching (41 total binds present, help text in the intended
+grouped order, not alphabetical). After the user's `nh os switch`, the same `sxhkd`-reload-timing gotcha
+from Follow-up #34 recurred (bind did nothing until a fresh `pkill -USR1 -x sxhkd`) — consistent with
+that being a general property of switches that only touch HM dotfiles, not a one-off. Once reloaded,
+user confirmed live: `super + shift + slash` opens the rofi list with all combos and their descriptions.
+
+Not yet committed.
