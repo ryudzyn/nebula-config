@@ -171,13 +171,23 @@ in
     font-1 = JetBrainsMono Nerd Font:size=11;2
     modules-left = bspwm xwindow
     modules-center = date
-    modules-right = xkeyboard volume network cpu memory
+    modules-right = tray xkeyboard volume network cpu memory
     separator = "  "
     border-bottom-size = 2
     border-bottom-color = #9d4edd
-    tray-position = right
-    tray-padding = 4
-    tray-background = #1a1a2e
+
+    ; Іконки трею запущених програм (Discord, Steam...) — раніше глобальний
+    ; bar-level tray-position="right" (deprecated, попереджав про це сам
+    ; polybar у логах) чіплявся до самого краю бару ПІСЛЯ info-пілюль; тепер
+    ; окремий internal/tray-модуль, вставлений на початок modules-right, —
+    ; тобто перед пілюлями, ближче до центру, як системний трей у Windows
+    ; (іконки програм зліва від завжди-видимих індикаторів/годинника).
+    ; Поява/зникнення іконки все одно займає/звільняє реальний простір, тож
+    ; невеликий зсув при відкритті нової програми лишається — так само
+    ; поводиться будь-який живий трей, включно з Windows.
+    [module/tray]
+    type = internal/tray
+    tray-spacing = 4px
 
     [module/bspwm]
     type = internal/bspwm
