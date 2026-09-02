@@ -1916,3 +1916,62 @@ mode-*/toggle-theme convention exactly (one-line addition, no other changes need
 (`mode-work`/`mode-study`/`mode-play` and `toggle-theme` both follow the identical
 writeShellScriptBin-then-home.packages pattern) rather than guessing. User confirmed live on `earth`
 that `super+shift+e` now opens the power menu as expected.
+
+## Follow-up #27 (2026-09-02): bspwm gained clipboard history, window switcher, panel context — plus a live-caught polybar separator bug (committed `f629aca`)
+
+Added to `crew/bspwm.nix`:
+- `clipmenud` autostart in `bspwmrc` + `super + v` bound to `CM_LAUNCHER=rofi clipmenu` for
+  clipboard history (rofi picker instead of the default dmenu).
+- `super + Tab` bound to `rofi -show window` — cross-desktop window switcher, relying on bspwm's
+  own EWMH hints (no extra config needed on the bspwm side).
+- Two new polybar modules: `xwindow` (`modules-left`, focused-window title, `%title:0:60:...%`)
+  and `xkeyboard` (`modules-right`, persistent layout indicator `us`/`ua`/`de`) — the panel
+  previously showed neither.
+- A `notify-send` loop piped from `xkb-switch -W`, meant to pop a transient notification on every
+  layout switch (`super+shift`), complementing the new persistent `xkeyboard` module.
+
+**Live-verified, not just dry-built**: after the user's `nh os switch` + reboot, confirmed every
+piece actually works by driving it directly rather than trusting the config alone —
+`xclip`-seeded a clipboard entry, confirmed `clipmenud`'s cache file appeared, simulated
+`super+v` with `xdotool key`, and screenshotted the resulting rofi picker showing the seeded entry
+by name. Same live-process check for `bspwm`/`polybar`/`xkb-switch -W`, and the deployed
+`sxhkdrc`/`bspwmrc`/`polybar/config.ini` were diffed against intent on disk.
+
+**Bug found via that same screenshot, not by inspection**: `[bar/mybar]` had no `separator` set, so
+`modules-right` rendered as one unbroken string — `Розкладка: usEthernetCPU 9%RAM 1.30 GiБ`. Fixed
+by adding `separator = "  "` to `[bar/mybar]`. `polybar` (like `dunst`/`clipmenud` — see Follow-up
+#28) is a plain background process started once from `bspwmrc`, so a `switch` alone doesn't apply a
+config-only change to the already-running instance — it had to be `pkill`ed and manually restarted
+for the fix to actually show up; confirmed via a second screenshot with the separator now visible
+(`Розкладка: ua  Ethernet  CPU 10%  RAM 1.45 GiБ`).
+
+## Follow-up #28 (2026-09-02): `mako` never actually worked under bspwm/X11 at all — replaced with `dunst` (committed `0c29e88`, pushed to `origin/master`)
+
+Surfaced while reviewing Follow-up #27's new layout-switch `notify-send` call: manually running
+`notify-send` in the live bspwm session failed with `Remote peer disconnected` (no notification
+service registered on D-Bus), and `pgrep mako` found nothing despite `mako &` being present in
+`bspwmrc`'s autostart. Running `mako` by hand surfaced the real error: `failed to create display`.
+
+**Root cause**: `mako` is a Wayland-only notification daemon (uses `wlr-layer-shell`), and bspwm is
+an X11 session with no Wayland compositor for it to connect to — it was never going to work here,
+regardless of any systemd-target/autostart-ordering issue. The comment previously in `bspwm.nix`
+blamed `sway-session.target` not being reached, which was incomplete: even a "correctly" started
+`mako` would still fail immediately under X11. This also meant `crew/modes.nix`'s
+`makoctl set-mode do-not-disturb`/`set-mode default` calls (`super+F1`/`F2` work/study modes) had
+been silently no-oping the entire time — nobody had noticed because the failure is silent (`&`
+backgrounded, no error surfaced to the user).
+
+**Fix**: swapped `mako` for `dunst` (X11-native, no Wayland dependency) in `crew/bspwm.nix`
+(autostart line + new `xdg.configFile."dunst/dunstrc"` themed to match the existing palette —
+`#1a1a2e`/`#9d4edd`/`#e05561`, `origin = top-right` to line up with the `poe-price-check` overlay
+placement) and in `crew/modes.nix` (`makoctl set-mode do-not-disturb` → `dunstctl set-paused true`,
+`set-mode default` → `set-paused false`). `core/packages.nix`'s system-wide `mako` package was left
+untouched — it's plausibly genuinely functional there for halley's Wayland greetd session, which is
+outside this bug's scope.
+
+**Live-verified**: after the user's `nh os switch`, `dunst` (like `clipmenud`/`polybar`) had to be
+manually restarted since it's a plain `bspwmrc`-launched background process that a switch alone
+doesn't touch. With it running: `dunstctl is-paused` toggled `false → true → false` correctly
+(matching `mode-work`/`mode-study`/`mode-play`'s calls exactly), `notify-send` returned exit 0
+instead of erroring, and a screenshot confirmed the popup actually renders — themed purple-bordered
+card, top-right, matching the configured `dunstrc`.
