@@ -168,10 +168,13 @@ in
     background = #1a1a2e
     foreground = #e0e0f0
     font-0 = monospace:size=10
+    font-1 = JetBrainsMono Nerd Font:size=11;2
     modules-left = bspwm xwindow
     modules-center = date
-    modules-right = xkeyboard pulseaudio network cpu memory
+    modules-right = xkeyboard volume network cpu memory
     separator = "  "
+    border-bottom-size = 2
+    border-bottom-color = #9d4edd
     tray-position = right
     tray-padding = 4
     tray-background = #1a1a2e
@@ -188,10 +191,14 @@ in
     label-empty-foreground = #888888
     label-empty-padding = 2
 
+    ; Повна дата (не лише час) — Follow-up на "не вистачає дати". Без %a
+    ; (день тижня) навмисно: polybar-3.7 не локалізує strftime %a/%b, навіть
+    ; коли LC_TIME=uk_UA.UTF-8 системно вірний (перевірено живим рендером —
+    ; видавало "Wed" замість "Ср"), тож день/місяць лишені суто числовими.
     [module/date]
     type = internal/date
-    date = %H:%M
-    label = %date%
+    date = %d.%m.%Y  %H:%M
+    label = %{T2}%{T-} %date%
 
     ; Заголовок активного вікна — контекст того, що зараз у фокусі,
     ; чого раніше в panel взагалі не було.
@@ -207,21 +214,30 @@ in
     type = internal/xkeyboard
     blacklist-0 = num lock
     blacklist-1 = caps lock
-    label-layout = Розкладка: %layout%
+    label-layout = %{T2}%{T-} %layout%
+    label-layout-background = #242444
+    label-layout-padding = 1
     label-layout-foreground = #c9b8ff
 
     ; Решта модулів — паритет з waybar-набором в crew/sway.nix
     ; (pulseaudio/network/cpu/memory/tray), X11-native через polybar internal-модулі.
+    ; Іконки — nerd-fonts.jetbrains-mono (crew/default.nix), pill-фони
+    ; (#242444, трохи світліше за фон бару) — щоб модулі читались окремими
+    ; чипами, а не суцільним рядком тексту.
     [module/cpu]
     type = internal/cpu
     interval = 2
-    label = CPU %percentage%%
+    label = %{T2}%{T-} %percentage%%
+    label-background = #242444
+    label-padding = 1
     label-foreground = #c9b8ff
 
     [module/memory]
     type = internal/memory
     interval = 2
-    label = RAM %gb_used%G
+    label = %{T2}%{T-} %gb_used%G
+    label-background = #242444
+    label-padding = 1
     label-foreground = #c9b8ff
 
     ; Стаціонарна машина на дроті — інтерфейс enp5s0 (перевірено `ip link`),
@@ -230,19 +246,25 @@ in
     type = internal/network
     interface = enp5s0
     interval = 3
-    label-connected = Ethernet
+    label-connected = %{T2}%{T-} Ethernet
+    label-connected-background = #242444
+    label-connected-padding = 1
     label-connected-foreground = #c9b8ff
     label-disconnected = Немає мережі
     label-disconnected-foreground = #888888
 
-    [module/pulseaudio]
-    type = internal/pulseaudio
-    format-volume = <label-volume>
-    format-muted = <label-muted>
-    label-volume = Vol %percentage%%
-    label-volume-foreground = #c9b8ff
-    label-muted = Vol Muted
-    label-muted-foreground = #888888
+    ; internal/pulseaudio не built-in у цій збірці polybar ("No built-in
+    ; support for internal/pulseaudio", перевірено живим запуском) — модуль
+    ; мовчки нічого не рендерив, тож "Vol" ніколи не було видно. custom/script
+    ; на wpctl (той самий бінарник, що й XF86Audio*-біндинги нижче) працює.
+    [module/volume]
+    type = custom/script
+    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else print pct "%"}'
+    interval = 1
+    label = %{T2}%{T-} %output%
+    label-background = #242444
+    label-padding = 1
+    label-foreground = #c9b8ff
   '';
 
   # Системний модуль bspwm сам запускає sxhkd при старті сесії — тут ми лише
