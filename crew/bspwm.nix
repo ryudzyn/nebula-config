@@ -108,11 +108,16 @@ in
   '';
 
   # Мінімальний dunstrc — та сама палітра, що в polybar/poe-price-check
-  # (bg #1a1a2e, accent #9d4edd), позиція top-right паралельно оверлею
-  # poe-price-check (crew/poe-price-check.nix), щоб не перекривались.
+  # (bg #1a1a2e, accent #9d4edd). origin = bottom-right, а не top-right —
+  # єдине, що зараз шле сповіщення через dunst, це розкладка клавіатури
+  # (notify-send з bspwmrc), і навмисно окремо від poe-price-check
+  # (top-right, tkinter-оверлей, не dunst). Geometry (origin/offset) можна
+  # задавати лише в [global] — dunst 1.13 явно відкидає це в rule-секціях
+  # ("Setting origin is in the wrong section", перевірено -verbosity debug),
+  # тож per-notification позиція тут неможлива, лише глобальна.
   xdg.configFile."dunst/dunstrc".text = ''
     [global]
-    origin = top-right
+    origin = bottom-right
     offset = 24x24
     width = (250, 400)
     height = 200
