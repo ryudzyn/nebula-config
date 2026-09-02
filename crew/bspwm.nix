@@ -79,6 +79,18 @@ in
     # Нічний фільтр — X11-еквівалент wlsunset з crew/sway.nix (той самий
     # розклад/температури), налаштування розкладу в ~/.config/redshift.conf.
     ${pkgs.redshift}/bin/redshift &
+
+    # Історія буфера обміну — clipmenud лише пасивно пише в SQLite/файловий
+    # кеш (~/.cache/clipmenu), сам пікер викликається окремо біндом
+    # (super+v, нижче) з CM_LAUNCHER=rofi.
+    ${pkgs.clipmenu}/bin/clipmenud &
+
+    # Сповіщення про зміну розкладки — xkb-switch -W блокується і друкує нову
+    # розкладку в stdout щоразу, коли setxkbmap-групу перемкнули
+    # (super+shift, налаштовано вище через grp:alt_shift_toggle).
+    while read -r layout; do
+      ${pkgs.libnotify}/bin/notify-send -t 1000 "Розкладка" "$layout"
+    done < <(${pkgs.xkb-switch}/bin/xkb-switch -W) &
   '';
 
   # Мінімальний конфіг picom — лише те, що потрібно для коректного
@@ -116,9 +128,10 @@ in
     background = #1a1a2e
     foreground = #e0e0f0
     font-0 = monospace:size=10
-    modules-left = bspwm
+    modules-left = bspwm xwindow
     modules-center = date
-    modules-right = pulseaudio network cpu memory
+    modules-right = xkeyboard pulseaudio network cpu memory
+    separator = "  "
     tray-position = right
     tray-padding = 4
     tray-background = #1a1a2e
@@ -139,6 +152,23 @@ in
     type = internal/date
     date = %H:%M
     label = %date%
+
+    ; Заголовок активного вікна — контекст того, що зараз у фокусі,
+    ; чого раніше в panel взагалі не було.
+    [module/xwindow]
+    type = internal/xwindow
+    label = %title:0:60:...%
+    label-foreground = #e0e0f0
+
+    ; Персистентний індикатор поточної розкладки (us/ua/de, налаштовані в
+    ; bspwmrc через setxkbmap) — доповнює транзиентне notify-send вище:
+    ; тут завжди видно, яка розкладка активна, не лише в момент перемикання.
+    [module/xkeyboard]
+    type = internal/xkeyboard
+    blacklist-0 = num lock
+    blacklist-1 = caps lock
+    label-layout = Розкладка: %layout%
+    label-layout-foreground = #c9b8ff
 
     ; Решта модулів — паритет з waybar-набором в crew/sway.nix
     ; (pulseaudio/network/cpu/memory/tray), X11-native через polybar internal-модулі.
@@ -210,6 +240,14 @@ in
         ''kitty --title "Ascension runClient" -e sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'';
       "super + shift + v" = "${pkgs.pavucontrol}/bin/pavucontrol";
 
+      # Історія буфера обміну (clipmenud автостартує в bspwmrc) — сам пікер
+      # викликається лише по біндy, CM_LAUNCHER=rofi замість дефолтного dmenu.
+      "super + v" = "CM_LAUNCHER=rofi ${pkgs.clipmenu}/bin/clipmenu";
+
+      # Список відкритих вікон (усі десктопи) — bspwm сам виставляє EWMH-хінти,
+      # якими користується вбудований rofi-модуль "window".
+      "super + Tab" = "${pkgs.rofi}/bin/rofi -show window";
+
       # Режими роботи/навчання/гри — ті самі скрипти, що й у sway.nix
       # (crew/modes.nix), скрипти самі визначають bspwm vs sway в рантаймі.
       "super + F1" = "mode-work";
@@ -261,6 +299,8 @@ in
     nitrogen
     redshift
     power-menu
+    clipmenu
+    xkb-switch
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
     # непрацював стабільно (Follow-up #18, TODO.md); замінено власним

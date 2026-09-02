@@ -52,31 +52,35 @@ that a new module must be added to or it silently has no effect:
   unbound+AdGuard Home, sound via pipewire, docker/podman, printing/scanning/misc udisks
   services). Aggregated through `constellations/default.nix` — a new constellation module must be
   added to that import list.
-- `crew/` — everything that runs as the `ryudzyn` Home Manager profile: window managers (sway is
-  the primary WM; i3 is a secondary/gaming-session WM), terminal/shell, CLI tools, theming, the
-  VSCodium profile, Spotify (spicetify), and `modes.nix` (workspace-launcher scripts bound to
-  `Mod4+F1/F2/F3` in sway: work / study / play). Aggregated through `crew/default.nix` — same
-  rule, a new crew module must be added there.
+- `crew/` — everything that runs as the `ryudzyn` Home Manager profile: `bspwm.nix` (the sole
+  window manager/session — sway and i3 were retired once bspwm reached feature parity, see below),
+  terminal/shell, CLI tools, theming, the VSCodium profile, Spotify (spicetify, inside
+  `media.nix`), and `modes.nix` (workspace-launcher scripts bound to `Mod4+F1/F2/F3`: work / study
+  / play). Aggregated through `crew/default.nix` — same rule, a new crew module must be added
+  there.
 - `pkgs/halley/` — a `buildRustPackage` derivation for `halley`, a Wayland compositor built from
   source (github:saltnpepper97/halley) with a checked-in `Cargo.lock`. It's exposed as a flake
-  package and consumed two ways: as the greetd session (`core/desktop.nix`) and as the
+  package and consumed two ways: as the default greetd session (`core/desktop.nix`) and as the
   `xdg-desktop-portal` implementation for screenshot/screencast (also `core/desktop.nix`), always
-  referenced as `self.packages.${pkgs.stdenv.hostPlatform.system}.halley`.
+  referenced as `self.packages.${pkgs.stdenv.hostPlatform.system}.halley`. The daily/gaming session
+  is still bspwm (an X11 WM) — halley is greetd's default pick but not the only session on offer;
+  `core/x11-greetd-sessions.nix` generates a private-Xorg xinit session for every enabled
+  `services.xserver.windowManager.*`, which today is just bspwm.
 - `assets/` — wallpapers and a static `roulette.html`, referenced by absolute Nix path from
-  `crew/i3.nix` / `crew/sway.nix` (e.g. `${../assets/wallpaper/wallpaper.jpg}`).
+  `crew/bspwm.nix` (e.g. `${../assets/wallpaper/wallpaper.jpg}`, `${../assets/cprogram/roulette.html}`).
 
 ### Things to know before adding a module
 
 - Adding a file under `core/`, `constellations/`, or `crew/` does nothing until it's added to the
   relevant `imports` list (`hosts/earth/default.nix`, `constellations/default.nix`,
   `crew/default.nix` respectively) — there's no auto-discovery.
-- Several files currently exist as empty, unimported placeholders staked out for future work:
-  `core/security.nix`, `constellations/gravity-drive.nix`, `constellations/propulsion.nix`. Two
-  more are written but deliberately left commented out in `crew/default.nix` pending later work:
-  `crew/terminal/kitty.nix`, `crew/terminal/starship.nix`.
-- Sway is the primary compositor/session; i3 (`crew/i3.nix`) is kept for the Steam/gamescope
-  gaming session (`core/games.nix` enables `services.xserver.windowManager.i3` for that path).
-  Don't assume one replaces the other.
+- `crew/terminal/kitty.nix` and `crew/terminal/starship.nix` are written but deliberately left
+  commented out in `crew/default.nix` pending later work.
+- bspwm (`crew/bspwm.nix`) is the sole WM/session, for both the daily desktop and the
+  Steam/gamescope gaming path (`core/games.nix` enables `services.xserver.windowManager.bspwm`
+  for that path too) — sway and i3 were deleted outright once bspwm reached parity with sway.
+  Don't reintroduce a second X11/Wayland session without checking whether that decision still
+  holds.
 - `self` and `inputs` are threaded through via `specialArgs` in `flake.nix` — modules that need the
   `halley` package or flake inputs (e.g. `zen-browser`, `spicetify-nix`) take `self`/`inputs` as
   module arguments rather than importing them another way.
