@@ -224,18 +224,28 @@ in
     ; Іконки — nerd-fonts.jetbrains-mono (crew/default.nix), pill-фони
     ; (#242444, трохи світліше за фон бару) — щоб модулі читались окремими
     ; чипами, а не суцільним рядком тексту.
+    ; %percentage:3% ліворуч доповнює число пробілами до 3 символів — без
+    ; цього пілюля стрибала б по ширині щоразу, коли відсоток переходив
+    ; між 1/2/3-значним числом (напр. 9% -> 10%), зсуваючи все праворуч.
     [module/cpu]
     type = internal/cpu
     interval = 2
-    label = %{T2}%{T-} %percentage%%
+    label = %{T2}%{T-} %percentage:3%%
     label-background = #242444
     label-padding = 1
     label-foreground = #c9b8ff
 
+    ; Іконка — база даних (не сервер-стойка, U+F493: та сама, що й тут,
+    ; виявилась на такому розмірі гліфа нерозбірливим "прапорцем", не
+    ; клпінг-баг, а невдалий вибір гліфа, перевірено на живому рендері).
+    ; %gb_used% вже сам повертає "1.70 GiB" (з одиницею) — раніше тут був
+    ; ще дописаний "G" вручну, що давало дублікат "GiBG". %gb_used:9%
+    ; резервує 9 символів (макс "XX.XX GiB"), той самий анти-стрибковий
+    ; прийом, що й у cpu вище.
     [module/memory]
     type = internal/memory
     interval = 2
-    label = %{T2}%{T-} %gb_used%G
+    label = %{T2}%{T-} %gb_used:9%
     label-background = #242444
     label-padding = 1
     label-foreground = #c9b8ff
@@ -257,9 +267,11 @@ in
     ; support for internal/pulseaudio", перевірено живим запуском) — модуль
     ; мовчки нічого не рендерив, тож "Vol" ніколи не було видно. custom/script
     ; на wpctl (той самий бінарник, що й XF86Audio*-біндинги нижче) працює.
+    ; printf "%3d%%" замість голого pct"%" — той самий анти-стрибковий
+    ; прийом (awk сам не розуміє polybar-івський %token:N% синтаксис).
     [module/volume]
     type = custom/script
-    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else print pct "%"}'
+    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\n", pct}'
     interval = 1
     label = %{T2}%{T-} %output%
     label-background = #242444
