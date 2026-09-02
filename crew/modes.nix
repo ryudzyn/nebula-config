@@ -4,7 +4,7 @@ let
   # потрібний десктоп *перед* запуском кожного застосунку замість матчити
   # app_id/WM_CLASS постфактум (як робив sway-варіант до видалення sway/i3).
   mode-work = pkgs.writeShellScriptBin "mode-work" ''
-    ${pkgs.mako}/bin/makoctl set-mode do-not-disturb
+    ${pkgs.dunst}/bin/dunstctl set-paused true
     bspc desktop -f '^2'; vscodium &
     sleep 0.3
     bspc desktop -f '^3'; ${pkgs.kitty}/bin/kitty &
@@ -15,7 +15,7 @@ let
   '';
 
   mode-study = pkgs.writeShellScriptBin "mode-study" ''
-    ${pkgs.mako}/bin/makoctl set-mode do-not-disturb
+    ${pkgs.dunst}/bin/dunstctl set-paused true
     bspc desktop -f '^2'; anki &
     sleep 0.3
     bspc desktop -f '^2'; goldendict-ng &
@@ -26,7 +26,7 @@ let
   '';
 
   mode-play = pkgs.writeShellScriptBin "mode-play" ''
-    ${pkgs.mako}/bin/makoctl set-mode default
+    ${pkgs.dunst}/bin/dunstctl set-paused false
     bspc desktop -f '^2'; steam &
     sleep 0.3
     bspc desktop -f '^3'; discord-canary &

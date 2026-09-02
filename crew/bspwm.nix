@@ -70,11 +70,13 @@ in
     # (тоді оверлей і потрібен).
     ${pkgs.picom}/bin/picom --config "$HOME/.config/picom.conf" &
 
-    # mako (сповіщення) в sway реально стартує лише тому, що sway явно
-    # запускає sway-session.target/graphical-session.target; наша xinit-сесія
-    # (core/x11-greetd-sessions.nix) цього не робить, тож без явного запуску
-    # тут makoctl (в т.ч. з crew/modes.nix) стукав би в порожнечу.
-    ${pkgs.mako}/bin/mako &
+    # dunst (сповіщення) — mako сюди не годиться в принципі: це Wayland-only
+    # демон (wlr-layer-shell), під X11/bspwm він падає одразу з
+    # "failed to create display", і makoctl (в т.ч. з crew/modes.nix) стукав
+    # би в порожнечу. dunst — нативний X11, працює без Wayland-компоситора.
+    # core/packages.nix лишає mako системним пакетом окремо для halley
+    # (Wayland-сесія greetd) — там він реально живий.
+    ${pkgs.dunst}/bin/dunst &
 
     # Нічний фільтр — X11-еквівалент wlsunset з crew/sway.nix (той самий
     # розклад/температури), налаштування розкладу в ~/.config/redshift.conf.
@@ -103,6 +105,39 @@ in
     backend = "glx";
     vsync = false;
     unredirect-fullscreen-windows = false;
+  '';
+
+  # Мінімальний dunstrc — та сама палітра, що в polybar/poe-price-check
+  # (bg #1a1a2e, accent #9d4edd), позиція top-right паралельно оверлею
+  # poe-price-check (crew/poe-price-check.nix), щоб не перекривались.
+  xdg.configFile."dunst/dunstrc".text = ''
+    [global]
+    origin = top-right
+    offset = 24x24
+    width = (250, 400)
+    height = 200
+    frame_width = 2
+    frame_color = "#9d4edd"
+    separator_color = frame
+    font = monospace 10
+
+    [urgency_low]
+    background = "#1a1a2e"
+    foreground = "#e0e0f0"
+    frame_color = "#9d4edd"
+    timeout = 4
+
+    [urgency_normal]
+    background = "#1a1a2e"
+    foreground = "#e0e0f0"
+    frame_color = "#9d4edd"
+    timeout = 5
+
+    [urgency_critical]
+    background = "#1a1a2e"
+    foreground = "#e05561"
+    frame_color = "#e05561"
+    timeout = 0
   '';
 
   # dawn-time/dusk-time дозволяють задати фіксовані години переходу без
@@ -301,6 +336,7 @@ in
     power-menu
     clipmenu
     xkb-switch
+    dunst
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
     # непрацював стабільно (Follow-up #18, TODO.md); замінено власним
