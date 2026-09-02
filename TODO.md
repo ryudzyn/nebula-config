@@ -2054,3 +2054,39 @@ session — a switch alone doesn't restart it) was killed and relaunched against
 system: workspace pill, window title, centered `02.09.2026 20:17` with clock icon, and
 `ua · 105% · Ethernet · 0% · 1.70 GiB` as five distinct pills on the right, all preceded by their
 respective icons.
+
+## Follow-up #31 (2026-09-02): Follow-up #30's redesign had two live-only bugs — RAM icon looked cut off, and pills jumped width on every digit change (committed `d870787`)
+
+User report after living with the redesigned bar for a bit: some icons "обрізаються" (look clipped),
+and parts of the bar visibly jump when the numbers change.
+
+**RAM icon**: not actually a clipping bug — tested `label-padding` at 1/2/3 in a throwaway bar with
+the real font/size, identical result every time. The glyph itself (U+F493, chosen as a "server rack"
+icon in Follow-up #30) just renders as an unrecognizable angled-flag shape at 11px in this font,
+independent of padding. Rendered several alternates live in the same pill context before picking —
+U+F0A0 (hdd) looked like an ambiguous bracket, U+F1C0 (database cylinder) rendered as a clean,
+immediately-recognizable stack. Swapped to that.
+
+**Pill-width jitter**: `%percentage%` (cpu) and `%gb_used%` (memory) have no fixed width, so e.g.
+`9%` → `10%` changes the pill's rendered width and shifts every pill to its right. Confirmed polybar
+supports left-padding via `%token:N%` — tested live in a throwaway bar (`%percentage:3%` produced
+`"  9"` vs `"9"` for the bare token, verified by screenshot, not assumed from docs) — and applied
+`%percentage:3%` to `cpu` and `%gb_used:9%` to `memory`. The `volume` module doesn't go through this
+path at all since it's our own `custom/script` around `wpctl`/`awk`, not a polybar internal token, so
+the equivalent fix there is `awk`'s own `printf "%3d%%"` instead.
+
+**Bonus bug caught while re-testing memory**: `%gb_used%` turns out to already return the full
+`"1.70 GiB"` string (unit included) — the label had been manually appending a literal `G` after it
+since Follow-up #30, producing a double unit (`"1.70 GiBG"`), only visible on close zoom. Dropped the
+manual `G` now that the padding rewrite touched the same line anyway.
+
+**Tooling note, reusing Follow-up #30's finding**: all icon/token edits here were built the same way
+— `printf '\xEF\x82\xA0'`-style raw hex-byte escapes into small per-icon files, spliced into the real
+`crew/bspwm.nix` via `sed` line-range replacement rather than typing PUA glyphs directly into an Edit
+call. No repeat of the earlier flakiness.
+
+**Live-verified**: dry-build clean, then tested against the actual built `hm_polybarconfig.ini` store
+path (not a hand-copied approximation) before touching `crew/bspwm.nix` for real. After the user's
+`nh os switch`, `polybar` was restarted (same plain-background-process caveat as every other daemon
+this session) and a final screenshot against the live deployed config confirms the database-cylinder
+icon, a padded `"  4%"` / `"1.71 GiB"` pill pair, and no more `GiBG`.
