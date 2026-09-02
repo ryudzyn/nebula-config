@@ -2090,3 +2090,37 @@ path (not a hand-copied approximation) before touching `crew/bspwm.nix` for real
 `nh os switch`, `polybar` was restarted (same plain-background-process caveat as every other daemon
 this session) and a final screenshot against the live deployed config confirms the database-cylinder
 icon, a padded `"  4%"` / `"1.71 GiB"` pill pair, and no more `GiBG`.
+
+## Follow-up #32 (2026-09-02): polybar tray icons (Discord, Steam, ...) moved before the info pills, Windows-style (committed `326d5b0`)
+
+User request: app tray icons currently sit at the bar's far right edge, *after* the info pills
+(cpu/memory/network/volume/xkeyboard) — move them so they sit before the info section instead, like
+Windows puts notification-area icons to the left of the always-on system indicators/clock. Also
+reported the bar visibly shifts right when a tray-icon app (Discord, Steam) opens, and asked for a
+fresh screenshot to confirm no icon overlap either way.
+
+**Root mechanism**: the bar was using the old bar-level `tray-position = right` / `tray-padding` /
+`tray-background` keys, which polybar's own log already flagged as deprecated (`tray: ... is
+deprecated, use the dedicated tray module`) back when Follow-up #30 first surfaced them — not
+addressed at the time since they weren't causing visible problems yet. That global attachment glues
+the tray to the bar's absolute edge with no control over its position relative to `modules-right`.
+
+**Fix**: replaced it with the documented `[module/tray]` (`type = internal/tray`, added in polybar
+3.7.0 — confirmed via `share/doc/polybar/user/modules/tray.html` in the installed package, not
+assumed), placed as the *first* entry in `modules-right` (`tray xkeyboard volume network cpu
+memory`) so it renders left of the pill cluster, closer to center — matching Windows' layout.
+`tray-spacing = 4px` added so multiple tray icons don't touch each other.
+
+**On the "jumps when opening an app" complaint**: didn't try to eliminate this — a live tray icon
+claims/releases real horizontal space when it appears/disappears, so *something* shifts; that's true
+of Windows' own tray too. What the dedicated module fixes is the shift interacting oddly with the
+deprecated global edge-attachment; the module keeps it contained and predictable.
+
+**Live-verified with a real tray icon**, not a synthetic test: `discord-canary` turned out to already
+be running in the background from earlier in the session, giving an actual Discord tray icon to test
+against rather than a placeholder. Launched `nm-applet` for a second icon alongside it, screenshotted
+before the switch (confirmed no overlap between the two tray icons or into the neighboring
+`xkeyboard` pill) and again after the user's `nh os switch` + a `polybar` restart against the newly
+deployed config. The user separately sent their own screenshot from the live system (not one of the
+`import`-captured ones) showing Discord's icon followed cleanly by `de · 105% · Ethernet · 25% ·
+2.25 GiB` — independent confirmation, not just self-reported.
