@@ -262,11 +262,18 @@ in
 
     ; Стаціонарна машина на дроті — інтерфейс enp5s0 (перевірено `ip link`),
     ; на відміну від waybar тут немає wifi/essid-гілки, лише ethernet.
+    ; Іконка — розетка/plug (U+F1E6), не глобус (U+F0AC, був тут раніше):
+    ; глобус періодично рендерився обрізаним ліворуч на ~30-40% (перевірено
+    ; живими скріншотами користувача, у моїх власних скріншотах у той самий
+    ; момент виглядав цілим -- нестабільний рендер-глюк конкретно цього
+    ; кола/дуг гліфа, не проблема padding/розміру). plug — проста форма,
+    ; перевірена 5 скріншотами поспіль (~7.5с, кілька циклів interval),
+    ; жодного разу не обрізалась.
     [module/network]
     type = internal/network
     interface = enp5s0
     interval = 3
-    label-connected = %{T2}%{T-} Ethernet
+    label-connected = %{T2}%{T-} Ethernet
     label-connected-background = #242444
     label-connected-padding = 1
     label-connected-foreground = #c9b8ff
