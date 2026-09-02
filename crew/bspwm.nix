@@ -1,5 +1,14 @@
 { pkgs, ... }:
 let
+  # Дефолтний pkgs.tesseract тягне tessdata "all" (~470 МіБ усіх мов) —
+  # звужено до укр/eng, більше нам для OCR тут не треба.
+  tesseract-ocr = pkgs.tesseract.override {
+    enableLanguages = [
+      "eng"
+      "ukr"
+    ];
+  };
+
   # Повноцінне меню живлення на super+shift+e замість голого "bspc quit" —
   # той самий rofi -dmenu, що й на super+d (drun), лише в текстовому режимі.
   # systemctl reboot/poweroff/suspend без sudo працюють завдяки дефолтним
@@ -14,6 +23,68 @@ let
       "Вимкнути") systemctl poweroff ;;
       "Призупинити") systemctl suspend ;;
     esac
+  '';
+
+  # PowerToys Awake-еквівалент: тримає системний inhibitor-лок
+  # (systemd-inhibit) на idle/sleep/lid, доки не перемкнеш ще раз тим самим
+  # біндом. Стан позначається pid-файлом у XDG_RUNTIME_DIR (там і так живе
+  # решта рантайм-сокетів користувача) — наявність живого процесу з цим pid
+  # і є єдиним джерелом правди, замість окремого прапорця, який міг би
+  # розсинхронитись з реальним inhibitor-локом.
+  nebula-awake = pkgs.writeShellScriptBin "nebula-awake" ''
+    pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-awake.pid"
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      kill "$(cat "$pidfile")"
+      rm -f "$pidfile"
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Вимкнено — сон/блокування дозволено"
+    else
+      ${pkgs.systemd}/bin/systemd-inhibit --what=idle:sleep:handle-lid-switch \
+        --who=nebula-awake --why="Ручний keep-awake" sleep infinity &
+      echo $! > "$pidfile"
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Увімкнено — сон/блокування заблоковано"
+    fi
+  '';
+
+  # OCR-скрипт у стилі PowerToys Text Extractor: виділяєш ділянку екрана
+  # (той самий maim -s, що й у screenshot-region-біндах нижче), tesseract
+  # розпізнає текст, результат одразу в буфер обміну. notify-send з
+  # прев'ю — той самий патерн, що для сповіщень про розкладку в bspwmrc,
+  # бо на відміну від скріншота результат OCR інакше ніяк не видно.
+  nebula-ocr = pkgs.writeShellScriptBin "nebula-ocr" ''
+    tmp=$(${pkgs.coreutils}/bin/mktemp --suffix=.png)
+    trap 'rm -f "$tmp"' EXIT
+    ${pkgs.maim}/bin/maim -s "$tmp" || exit 1
+    text=$(${tesseract-ocr}/bin/tesseract "$tmp" - -l ukr+eng 2>/dev/null)
+    if [ -z "$text" ]; then
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "OCR" "Текст не розпізнано"
+      exit 0
+    fi
+    printf '%s' "$text" | ${pkgs.xclip}/bin/xclip -selection clipboard
+    preview=$(printf '%s' "$text" | head -c 120)
+    ${pkgs.libnotify}/bin/notify-send -t 3000 "OCR → буфер" "$preview"
+  '';
+
+  # Always On Top — bspwm сам цього не вміє (немає z-order поверх фокусу),
+  # тож напряму через EWMH _NET_WM_STATE_ABOVE. :ACTIVE: у wmctrl резолвиться
+  # через _NET_ACTIVE_WINDOW, який bspwm як EWMH-сумісний WM виставляє сам.
+  nebula-always-on-top = pkgs.writeShellScriptBin "nebula-always-on-top" ''
+    ${pkgs.wmctrl}/bin/wmctrl -r :ACTIVE: -b toggle,above
+    win=$(${pkgs.xprop}/bin/xprop -root _NET_ACTIVE_WINDOW | ${pkgs.gawk}/bin/awk '{print $NF}')
+    if ${pkgs.xprop}/bin/xprop -id "$win" _NET_WM_STATE 2>/dev/null | grep -q _NET_WM_STATE_ABOVE; then
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Always on top" "Увімкнено"
+    else
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Always on top" "Вимкнено"
+    fi
+  '';
+
+  # PowerToys Color Picker-еквівалент: xcolor сам відкриває піпетку, клік по
+  # пікселю — і сам же пише hex у clipboard (`-s clipboard`), без окремого
+  # xclip. notify-send лише показує, що саме щойно скопійовано.
+  nebula-color-picker = pkgs.writeShellScriptBin "nebula-color-picker" ''
+    color=$(${pkgs.xcolor}/bin/xcolor -s clipboard)
+    if [ -n "$color" ]; then
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "Color picker → буфер" "$color"
+    fi
   '';
 in
 {
@@ -318,7 +389,8 @@ in
 
       # Панель керування мишею Swiftpoint X1 — в sway.nix запускається
       # автостартом, тут — за біндом (той самий позасистемний бінарник).
-      "super + shift + m" = ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
+      "super + shift + m" =
+        ''sh -c 'cd ~/Applications/SwiftpointX1 && ./"Swiftpoint X1 Control Panel"' '';
 
       # Швидкий запуск дев-клієнта Ascension-мода (~/Projects/ascension-limitless-progression)
       # у kitty, щоб бачити build/runtime лог; той самий `nix develop --command ./gradlew
@@ -327,6 +399,22 @@ in
       "super + shift + c" =
         ''kitty --title "Ascension runClient" -e sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'';
       "super + shift + v" = "${pkgs.pavucontrol}/bin/pavucontrol";
+
+      # Калькулятор у rofi (PowerToys Run calc-plugin еквівалент) —
+      # librofi_calc.so підвантажується напряму через -plugin-path, без
+      # обгортки programs.rofi (тут rofi лишається "сирим" пакетом скрізь
+      # інде). -calc-command копіює результат у буфер тим самим xclip, що й
+      # решта copy-в-буфер біндів.
+      "super + equal" =
+        ''${pkgs.rofi}/bin/rofi -modi calc -show calc -plugin-path ${pkgs.rofi-calc}/lib/rofi -no-show-match -no-sort -calc-command "echo -n '{result}' | ${pkgs.xclip}/bin/xclip -selection clipboard"'';
+
+      # PowerToys Awake / Text Extractor / Always On Top / Color Picker —
+      # скрипти визначені в let-блоці вище. `super + shift + c` вже зайнятий
+      # Ascension-байндом вище, тому Color Picker — на `x` (від xcolor).
+      "super + shift + a" = "nebula-awake";
+      "super + shift + o" = "nebula-ocr";
+      "super + shift + p" = "nebula-always-on-top";
+      "super + shift + x" = "nebula-color-picker";
 
       # Історія буфера обміну (clipmenud автостартує в bspwmrc) — сам пікер
       # викликається лише по біндy, CM_LAUNCHER=rofi замість дефолтного dmenu.
@@ -357,8 +445,7 @@ in
       "super + m" = "bspc desktop -l next";
       "super + f" = "bspc node -t ~fullscreen";
       "super + shift + {h,j,k,l}" = "bspc node -s {west,south,north,east}";
-      "super + ctrl + {h,j,k,l}" =
-        "bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}";
+      "super + ctrl + {h,j,k,l}" = "bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}";
 
       # Гучність/яскравість — перенесено з crew/sway.nix, ці команди самі по
       # собі не wayland-specific (wpctl керує pipewire, brightnessctl — sysfs).
@@ -390,6 +477,16 @@ in
     clipmenu
     xkb-switch
     dunst
+    rofi-calc
+    tesseract-ocr
+    wmctrl
+    xprop
+    gawk
+    nebula-awake
+    nebula-ocr
+    nebula-always-on-top
+    nebula-color-picker
+    xcolor
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,
     # непрацював стабільно (Follow-up #18, TODO.md); замінено власним

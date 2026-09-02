@@ -2161,3 +2161,41 @@ immediately after each add/remove — 12 frames on a throwaway test bar mirrorin
 structure, 10 more against the actual built `hm_polybarconfig.ini` store path, and 10 more again after
 the user's real `nh os switch` + a `polybar` restart. Zero clipped icons across all 32 frames, versus
 the old approach which the user had already caught failing twice in normal use.
+
+## Follow-up #34 (2026-09-02): four PowerToys-equivalent binds confirmed live, fifth (Color Picker) added
+
+User asked for a batch of PowerToys-inspired bspwm binds ("давай візьмемо всяких корисних штук з
+powertoys"). Four were implemented, dry-build clean, then switched and live-tested by the user, who
+confirmed all four work as intended:
+
+- `super + equal` — rofi calculator (`rofi-calc` plugin, loaded via `-plugin-path` since
+  `programs.rofi` isn't used anywhere in this repo), result copied to clipboard via `xclip`.
+- `super + shift + a` — `nebula-awake`, toggles a `systemd-inhibit --what=idle:sleep:handle-lid-switch`
+  lock (PowerToys Awake), state tracked via a pidfile in `$XDG_RUNTIME_DIR`.
+- `super + shift + o` — `nebula-ocr` (PowerToys Text Extractor): `maim -s` region capture → `tesseract`
+  (language data narrowed to `eng`+`ukr` via `.override`, avoiding the ~470MB all-language default) →
+  clipboard + `notify-send` preview.
+- `super + shift + p` — `nebula-always-on-top`: `wmctrl -r :ACTIVE: -b toggle,above` (bspwm has no
+  native concept of this) + `xprop`/`notify-send` for on/off feedback.
+
+User then asked to add the previously-declined **Color Picker** (PowerToys Color Picker equivalent)
+after all: `super + shift + x` — `nebula-color-picker`, wraps `xcolor -s clipboard` (the tool picks
+the pixel and writes hex straight to the clipboard itself, no `xclip` needed) with a `notify-send`
+showing the copied hex. Bound to `x` rather than PowerToys' own `c` because `super + shift + c` is
+already the Ascension dev-client launcher in this config.
+
+`dry-build` clean (only the expected small rebuild: `nebula-color-picker` + HM files).
+
+**Live-tested and confirmed working** — with one gotcha along the way: right after the user's `nh os
+switch`, `super + shift + x` did nothing at all. Root cause: `sxhkd` (spawned once by the system-level
+bspwm module at session start, not re-launched by a switch) had loaded its config into memory *before*
+this switch updated `~/.config/sxhkd/sxhkdrc` — `pkill -USR1 -x sxhkd` reloads that config live, but
+the user's first attempt apparently missed the timing window. Confirmed directly on the running
+session: `~/.config/sxhkd/sxhkdrc`'s symlink target already had the correct `super + shift + x` entry,
+`nebula-color-picker`/`xcolor` were already on `$PATH`, but the live `sxhkd` process predated the
+config update. Re-sent `SIGUSR1` and simulated the keypress via `xdotool key --clearmodifiers
+super+shift+x` to confirm `nebula-color-picker` → `xcolor` actually spawned before asking the user to
+retry for real — they then confirmed live: picker pipette appears, click copies the hex to clipboard.
+
+All five binds in this batch (`super + equal`, `super + shift + a/o/p/x`) are now confirmed working on
+the real system.
