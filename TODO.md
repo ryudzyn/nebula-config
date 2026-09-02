@@ -2124,3 +2124,40 @@ before the switch (confirmed no overlap between the two tray icons or into the n
 deployed config. The user separately sent their own screenshot from the live system (not one of the
 `import`-captured ones) showing Discord's icon followed cleanly by `de · 105% · Ethernet · 25% ·
 2.25 GiB` — independent confirmation, not just self-reported.
+
+## Follow-up #33 (2026-09-02): the icon-clipping bug wasn't about which icon — it was `label-*-background`/`-padding` racing bar relayouts (committed `e6a8885`, then `5ba0b0f` for the real fix)
+
+The user sent a live screenshot showing the network module's globe icon (U+F0AC) clipped ~30-40% on
+its left edge. My own screenshots at the same moments showed it complete — first misread as an
+intermittent rendering glitch specific to that glyph's curved geometry (the same class of issue as
+the RAM icon in Follow-up #31, which really was glyph-specific). Swapped it for a plug icon (U+F1E6)
+and verified clean across 5 screenshots spaced 1.5s apart, before and after a switch (`e6a8885`).
+
+**That fix was incomplete.** The user pushed back with a third screenshot and the actual right framing:
+"not just the globe — look carefully at *all* the icons, I think it's not the icons, it's the space
+allocated for them." That screenshot showed the *keyboard* icon (`xkeyboard`, previously never
+suspected) clipped on its right side, in the same frame where cpu/memory/network/volume all rendered
+fine — a different pill each time is strong evidence this was never about a specific glyph.
+
+**Real root cause**: `label-*-background`/`label-*-padding` pre-compute a static pixel rectangle for
+the pill, separately from actually laying out the mixed font-0/font-1 label text. Every time the
+tray's icon count changes (Discord/Steam tray icons appearing or disappearing — both screenshots that
+showed clipping were taken with Steam's tray icon newly present), the whole bar relayouts, and that
+box calculation apparently races the real text width — whichever pill's box happened to be stale that
+cycle rendered visibly clipped. Explains everything: why it was never the same icon twice, why my
+single-shot checks kept looking fine (the race is timing-dependent, not always-on), and why it started
+showing up right around when Follow-up #32 added the tray module (more tray churn = more chances to
+hit the race).
+
+**Fix** (`5ba0b0f`): replaced `label-*-background`/`label-*-padding` on all five icon pills
+(`xkeyboard`/`cpu`/`memory`/`network`/`volume`) with inline `%{B#242444}...%{B-}` formatting tags,
+which paint background color behind the actually-rendered pixels rather than a separately-computed
+box. Also fixed an unrelated but now-visible `unescaped backslashes` warning in the `volume` module's
+own `awk` exec string (`\n` → `\\n`), spotted while re-testing this file.
+
+**Verification actually targeted the trigger condition**, not just idle screenshots: repeatedly
+launched and killed `nm-applet` (5-6 cycles) to force tray-driven relayouts on purpose, screenshotting
+immediately after each add/remove — 12 frames on a throwaway test bar mirroring the real module
+structure, 10 more against the actual built `hm_polybarconfig.ini` store path, and 10 more again after
+the user's real `nh os switch` + a `polybar` restart. Zero clipped icons across all 32 frames, versus
+the old approach which the user had already caught failing twice in normal use.
