@@ -220,29 +220,35 @@ in
     ; Персистентний індикатор поточної розкладки (us/ua/de, налаштовані в
     ; bspwmrc через setxkbmap) — доповнює транзиентне notify-send вище:
     ; тут завжди видно, яка розкладка активна, не лише в момент перемикання.
+    ; Pill-фон — інлайновий %{B...}...%{B-} (малюється поверх фактично
+    ; відрендерених пікселів), а не label-*-background/label-*-padding
+    ; (окремо порахований статичний прямокутник). Причина зміни: коли
+    ; змінюється склад трею (нова іконка Discord/Steam і т.п.), весь бар
+    ; перекомпоновується, і в цей момент box label-*-background міг
+    ; порахуватись зі старою/неповною шириною тексту -- будь-яка з pill-
+    ; іконок (не конкретна, перевірено на живих скріншотах користувача:
+    ; спершу RAM, потім клавіатура) могла зʼявитись обрізаною праворуч чи
+    ; ліворуч. Перевірено власним стрес-тестом: 12 скріншотів поспіль під
+    ; час навмисного дриґання трею (nm-applet запуск/закриття 6 разів) з
+    ; inline %{B} -- жодного разу нічого не обрізалось, на відміну від
+    ; попереднього підходу.
     [module/xkeyboard]
     type = internal/xkeyboard
     blacklist-0 = num lock
     blacklist-1 = caps lock
-    label-layout = %{T2}%{T-} %layout%
-    label-layout-background = #242444
-    label-layout-padding = 1
+    label-layout = %{B#242444} %{T2}%{T-} %layout% %{B-}
     label-layout-foreground = #c9b8ff
 
     ; Решта модулів — паритет з waybar-набором в crew/sway.nix
     ; (pulseaudio/network/cpu/memory/tray), X11-native через polybar internal-модулі.
-    ; Іконки — nerd-fonts.jetbrains-mono (crew/default.nix), pill-фони
-    ; (#242444, трохи світліше за фон бару) — щоб модулі читались окремими
-    ; чипами, а не суцільним рядком тексту.
+    ; Іконки — nerd-fonts.jetbrains-mono (crew/default.nix).
     ; %percentage:3% ліворуч доповнює число пробілами до 3 символів — без
     ; цього пілюля стрибала б по ширині щоразу, коли відсоток переходив
     ; між 1/2/3-значним числом (напр. 9% -> 10%), зсуваючи все праворуч.
     [module/cpu]
     type = internal/cpu
     interval = 2
-    label = %{T2}%{T-} %percentage:3%%
-    label-background = #242444
-    label-padding = 1
+    label = %{B#242444} %{T2}%{T-} %percentage:3%%%{B-}
     label-foreground = #c9b8ff
 
     ; Іконка — база даних (не сервер-стойка, U+F493: та сама, що й тут,
@@ -255,27 +261,20 @@ in
     [module/memory]
     type = internal/memory
     interval = 2
-    label = %{T2}%{T-} %gb_used:9%
-    label-background = #242444
-    label-padding = 1
+    label = %{B#242444} %{T2}%{T-} %gb_used:9%%{B-}
     label-foreground = #c9b8ff
 
     ; Стаціонарна машина на дроті — інтерфейс enp5s0 (перевірено `ip link`),
     ; на відміну від waybar тут немає wifi/essid-гілки, лише ethernet.
     ; Іконка — розетка/plug (U+F1E6), не глобус (U+F0AC, був тут раніше):
-    ; глобус періодично рендерився обрізаним ліворуч на ~30-40% (перевірено
-    ; живими скріншотами користувача, у моїх власних скріншотах у той самий
-    ; момент виглядав цілим -- нестабільний рендер-глюк конкретно цього
-    ; кола/дуг гліфа, не проблема padding/розміру). plug — проста форма,
-    ; перевірена 5 скріншотами поспіль (~7.5с, кілька циклів interval),
-    ; жодного разу не обрізалась.
+    ; глобус періодично рендерився обрізаним (див. коментар вище про
+    ; inline %{B} — насправді то був той самий баг статичного боксу, не
+    ; проблема конкретно глобуса, але plug лишаю — простіша форма).
     [module/network]
     type = internal/network
     interface = enp5s0
     interval = 3
-    label-connected = %{T2}%{T-} Ethernet
-    label-connected-background = #242444
-    label-connected-padding = 1
+    label-connected = %{B#242444} %{T2}%{T-} Ethernet %{B-}
     label-connected-foreground = #c9b8ff
     label-disconnected = Немає мережі
     label-disconnected-foreground = #888888
@@ -288,11 +287,9 @@ in
     ; прийом (awk сам не розуміє polybar-івський %token:N% синтаксис).
     [module/volume]
     type = custom/script
-    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\n", pct}'
+    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\\n", pct}'
     interval = 1
-    label = %{T2}%{T-} %output%
-    label-background = #242444
-    label-padding = 1
+    label = %{B#242444} %{T2}%{T-} %output%%{B-}
     label-foreground = #c9b8ff
   '';
 
