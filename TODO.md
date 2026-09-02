@@ -1975,3 +1975,82 @@ doesn't touch. With it running: `dunstctl is-paused` toggled `false → true →
 (matching `mode-work`/`mode-study`/`mode-play`'s calls exactly), `notify-send` returned exit 0
 instead of erroring, and a screenshot confirmed the popup actually renders — themed purple-bordered
 card, top-right, matching the configured `dunstrc`.
+
+## Follow-up #29 (2026-09-02): dunst notifications moved to bottom-right — a rule-based attempt failed first (committed `93a1434`)
+
+Asked to move the layout-switch popup away from `poe-price-check`'s top-right corner. First attempt
+was a per-notification `[layout-switch]` rule (`summary = "Розкладка"`, `origin = bottom-right`) —
+looked like the natural fit given dunst's rule-matching system. Live-tested with `-verbosity debug`
+before assuming it worked: `WARNING: Setting origin is in the wrong section (layout-switch, should
+be global)` — dunst 1.13 rejects geometry keys (`origin`/`offset`) outside `[global]` entirely, no
+per-notification placement is possible in this version.
+
+**Fix**: moved `origin` in `[global]` itself to `bottom-right`. Harmless — the layout-switch
+notification is currently the only thing dunst ever renders in this session, so a global change has
+no other side effect to worry about.
+
+**Verification hit its own obstacle**: `~/.config/dunst/dunstrc` is a home-manager-managed symlink,
+read-only outside an actual `switch` — couldn't just drop the fixed file in directly to test. Instead
+verified the effect in isolation first, with `dunst -config <tmpfile>` pointed at a throwaway copy of
+the new config and a real `notify-send`, screenshotted showing the popup actually bottom-right, before
+writing the change to `crew/bspwm.nix`. After the user's `nh os switch`, re-verified against the real
+deployed `~/.config/dunst/dunstrc` (now writable again, rule confirmed present) with a fresh
+`notify-send` + screenshot — same result on the real config, not just the isolated test copy.
+
+## Follow-up #30 (2026-09-02): polybar redesign — icons, pill modules, accent border, full date, and a second silently-broken module found (committed `b451c2e`)
+
+User feedback on the panel: looked "flat/cheap" and was missing the actual date (day/month/year), not
+just `%H:%M`. Discussed options and the user picked three: Nerd Font icons, pill-style module
+backgrounds, and a thin accent line under the bar (declined a picom drop-shadow option).
+
+Implementation, `crew/bspwm.nix`:
+- `font-1 = JetBrainsMono Nerd Font:size=11;2` (already installed system-wide via
+  `crew/default.nix`, no new package needed) layered in per-label via `%{T2}<icon>%{T-}` around just
+  the icon glyph, leaving the rest of each label on `font-0`.
+- Icon codepoints were **not** guessed from memory — candidates were rendered live in a throwaway
+  `custom/text` test bar and checked against polybar's own `Dropping unmatched character` log (three
+  of the first nine candidates tried for RAM/network weren't in the font at all). Final picks:
+  clock (`date`), keyboard (`xkeyboard`), microchip (`cpu`), server-rack (`memory`), globe
+  (`network`), speaker (`volume`).
+- `cpu`/`memory`/`network`/`volume`/`xkeyboard` each got `label-*-background = #242444` (a shade
+  lighter than the bar's `#1a1a2e`) + `label-*-padding = 1`, so they read as separate pill-shaped
+  chips instead of one flat run of text.
+- `border-bottom-size = 2` / `border-bottom-color = #9d4edd` for the accent line. Confirmed empirically
+  (throwaway test bar) that plain `border-size` only accepts a single uniform value (a CSS-style
+  `0pt 0pt 2pt 0pt` shorthand was tried first and rejected: `Unrecognized unit`), but the dedicated
+  `border-bottom-size`/`border-bottom-color` keys exist and do work bottom-only.
+- `date = %d.%m.%Y  %H:%M` instead of bare `%H:%M`. Deliberately **no** `%a` weekday: live-tested with
+  `%a` first and polybar rendered `Wed` — English — despite the system's `LC_TIME=uk_UA.UTF-8`
+  correctly producing `ср` for the same moment via plain `date` in the same shell. polybar's
+  `internal/date` module doesn't localize `strftime` weekday/month names the way glibc's own `date`
+  does; numeric-only sidesteps the bug rather than fighting it.
+
+**Bonus bug found while testing the volume icon**: `internal/pulseaudio` turned out to not be
+built into this polybar package at all — running it from a terminal (instead of backgrounded from
+`bspwmrc`, where this is invisible) surfaced `error: Disabling module "pulseaudio" (reason: No
+built-in support for 'internal/pulseaudio')`. The `Vol` module has been rendering nothing this whole
+time, silently, since it was first added — nobody noticed because an empty module just looks like
+absence, not failure. Replaced with `type = custom/script` polling `wpctl get-volume
+@DEFAULT_AUDIO_SINK@ | awk ...` (`wpctl` is already what the `XF86Audio*` keybinds use), which
+actually works.
+
+**Tooling note for future icon/glyph work**: embedding raw Private-Use-Area Unicode characters
+(Nerd Font icon codepoints) directly in tool-call text proved unreliable in this session — the same
+`\uXXXX`-style escape sometimes produced the correct 3-byte UTF-8 sequence and sometimes silently
+produced nothing, verified repeatedly with `od -An -tx1`, with no discernible pattern (worked in a
+small isolated command, failed in an outwardly-identical one). Switched to computing the UTF-8 bytes
+via `printf '\xEF\x80\xA8'`-style raw hex-byte escapes (ASCII-only, no Unicode escape parsing
+involved) instead, which was reliable every time it was tried. Worth reusing that approach directly
+next time rather than re-discovering it.
+
+**Live-verified end to end**: dry-build clean, then — before writing anything to the real
+`crew/bspwm.nix` — the exact built `hm_polybarconfig.ini` store path was located via `nix build
+--print-out-paths` on the home-manager `xdg.configFile` derivation and run standalone
+(`polybar -c <store-path> mybar`), confirming icons/pills/border/date/volume all render correctly
+against the *actual* Nix-built artifact, not a hand-copied approximation of it. After the user's `nh
+os switch`, `polybar` (plain `bspwmrc`-launched background process, same as every other daemon this
+session — a switch alone doesn't restart it) was killed and relaunched against the newly-deployed
+`~/.config/polybar/config.ini`, and a final screenshot confirmed the redesigned bar live on the real
+system: workspace pill, window title, centered `02.09.2026 20:17` with clock icon, and
+`ua · 105% · Ethernet · 0% · 1.70 GiB` as five distinct pills on the right, all preceded by their
+respective icons.
