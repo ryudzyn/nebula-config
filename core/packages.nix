@@ -39,6 +39,17 @@
     proton-vpn
     anki
     goldendict-ng
+    keepassxc
+
+    # Перегляд медіа/архівів — раніше не було жодного плеєра/переглядача
+    # взагалі, тільки feh для встановлення шпалер (crew/bspwm.nix). nsxiv, не
+    # imv/loupe — той самий нативний X11 підхід, що й dunst замість mako
+    # (crew/bspwm.nix:365), без зайвих Wayland-залежностей заради сесії,
+    # якої зараз немає.
+    mpv
+    nsxiv
+    xarchiver
+    p7zip
 
     # Системні утиліти
     appimage-run

@@ -31,16 +31,22 @@ let
   # решта рантайм-сокетів користувача) — наявність живого процесу з цим pid
   # і є єдиним джерелом правди, замість окремого прапорця, який міг би
   # розсинхронитись з реальним inhibitor-локом.
+  # xset s тут — той самий X11 screensaver-таймер, що й авто-блокування
+  # нижче (xss-lock у bspwmrc); вимикається/вертається разом із
+  # systemd-inhibit, щоб "awake"-режим блокував і сон, і авто-блокування
+  # екрана одночасно, а не лише перше.
   nebula-awake = pkgs.writeShellScriptBin "nebula-awake" ''
     pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-awake.pid"
     if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
       kill "$(cat "$pidfile")"
       rm -f "$pidfile"
+      xset s 600 600
       ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Вимкнено — сон/блокування дозволено"
     else
       ${pkgs.systemd}/bin/systemd-inhibit --what=idle:sleep:handle-lid-switch \
         --who=nebula-awake --why="Ручний keep-awake" sleep infinity &
       echo $! > "$pidfile"
+      xset s off
       ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Увімкнено — сон/блокування заблоковано"
     fi
   '';
@@ -349,6 +355,14 @@ in
     ${pkgs.feh}/bin/feh --bg-fill ${../assets/wallpaper/wallpaper.jpg}
     ${pkgs.polybar}/bin/polybar -c "$HOME/.config/polybar/config.ini" mybar &
 
+    # Авто-блокування за бездіяльністю (раніше блокування було лише ручне,
+    # super+Escape/power-menu) — xset заводить X11 screensaver-таймер (10 хв),
+    # xss-lock слухає його спрацювання й запускає той самий i3lock-color.
+    # nebula-awake (super+shift+a) вимикає/повертає цей таймер разом із
+    # systemd-inhibit-локом сну.
+    xset s 600 600
+    ${pkgs.xss-lock}/bin/xss-lock -- ${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e &
+
     # Композитор — раніше тримався заради Awakened PoE Trade (видалений,
     # Follow-up #18 в TODO.md), тепер потрібен для напівпрозорого
     # оверлей-вікна crew/poe-price-check.nix (tkinter -alpha), яке так само
@@ -607,6 +621,7 @@ in
     xclip
     brightnessctl
     i3lock-color
+    xss-lock
     nitrogen
     redshift
     power-menu

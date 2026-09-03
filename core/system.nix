@@ -48,6 +48,15 @@
   # Nix feature 'nix-command' is disabled".
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Без цього /nix/store росте необмежено з кожним поколінням — щотижня
+  # прибирає покоління старші 30 днів і дедублікує store автоматично.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 30d";
+  };
+  nix.settings.auto-optimise-store = true;
+
   # Налаштування клавіатури для іксових/вейланд сесій
   # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
   # у двох місцях — core/games.nix (той самий services.xserver.xkb, окремо для

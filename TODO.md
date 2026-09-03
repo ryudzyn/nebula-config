@@ -2253,3 +2253,41 @@ that being a general property of switches that only touch HM dotfiles, not a one
 user confirmed live: `super + shift + slash` opens the rofi list with all combos and their descriptions.
 
 Committed `2127be6`, pushed to `origin/master`.
+
+## Follow-up #37 (2026-09-03): "what's missing for full daily PC use?" — brainstorm, then a batch of concrete gaps closed
+
+After the whole-repo audit (docs-only commit `2330ba3`), asked the user to brainstorm real gaps for
+full daily usage rather than config bugs. Checked what already existed first (grep sweep): lock
+screen existed but manual-only, no idle auto-lock; no backup tool; no password manager; no Nix
+store GC/optimise policy; no video player, image viewer, or GUI archive manager at all (only `feh`
+for wallpaper-setting, `unzip`/`unrar` CLI only).
+
+User picked, in order: idle auto-lock, backup (restic), password manager, Nix GC/optimise, plus
+video player / image viewer / archive manager (typed in as extra items, not on the original list).
+
+**Implemented this round** (`crew/bspwm.nix`, `core/packages.nix`, `core/system.nix`):
+- **Idle auto-lock**: `bspwmrc` now runs `xset s 600 600` + `xss-lock -- i3lock-color -c 1a1a2e &`
+  (10 min timeout, same lock screen as the existing `super+Escape`/power-menu binds). `nebula-awake`
+  (`super+shift+a`) now also toggles `xset s off`/`xset s 600 600` alongside its existing
+  `systemd-inhibit`, so "awake" mode blocks both sleep *and* auto-lock together — otherwise the X11
+  screensaver timer (independent of `systemd-inhibit`, which only affects logind idle handling)
+  would still fire and lock the screen even with awake mode on.
+- **Password manager**: `keepassxc` added to `core/packages.nix` (local `.kdbx` file, no account —
+  user's choice over Bitwarden specifically to avoid a cloud dependency; can sync the db file via
+  the syncthing already configured in `constellations/` if needed later).
+- **Video/image/archive**: `mpv` (video), `nsxiv` (image viewer — picked over `imv`/`loupe`
+  specifically to match the existing native-X11-only pattern set by the `dunst`-over-`mako` decision
+  in Follow-up #28, since there's no Wayland session actually in daily use yet), `xarchiver` + `p7zip`
+  (archive GUI + format coverage beyond the existing `unzip`/`unrar`).
+- **Nix store hygiene**: `core/system.nix` gained `nix.gc = { automatic = true; dates = "weekly";
+  options = "--delete-older-than 30d"; }` and `nix.settings.auto-optimise-store = true` — `/nix/store`
+  had no cleanup policy at all before this.
+
+**Deferred, explicitly**: backup (`restic`/`borgbackup`) — needs a real destination (external
+drive/NAS path or remote) that wasn't decided yet ("ще не вирішено, пропустити поки"). Revisit once
+a target exists; `syncthing` (already configured) is not a substitute — it's device-to-device sync,
+not versioned/off-site backup.
+
+**Verification**: `dry-build` clean (exit 0), all new derivations — `bspwmrc.drv`, `nebula-awake.drv`,
+`unit-nix-gc.service.drv`, `unit-nix-gc.timer.drv`, plus the new packages — resolved with no errors.
+Not yet switched/live-tested by the user.
