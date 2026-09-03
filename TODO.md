@@ -2290,4 +2290,138 @@ not versioned/off-site backup.
 
 **Verification**: `dry-build` clean (exit 0), all new derivations — `bspwmrc.drv`, `nebula-awake.drv`,
 `unit-nix-gc.service.drv`, `unit-nix-gc.timer.drv`, plus the new packages — resolved with no errors.
-Not yet switched/live-tested by the user.
+User switched, confirmed live. Committed `68340cd`, pushed to `origin/master`.
+
+## Follow-up #38 (2026-09-03): Follow-up #37's idle auto-lock turned off the monitor during video playback — self-inflicted regression, fixed with `xidlehook`
+
+Next day, user reported: "коли щось дивлюсь в браузері, якесь довге відео/фільм, монітор вимикається"
+(the monitor turns off during long browser video playback). Root cause confirmed live on `earth`:
+`xset q` showed `DPMS Standby/Suspend/Off: 600/600/600, DPMS is Enabled` — X11's DPMS timeouts
+default to whatever `xset s <timeout>` sets unless given their own explicit `xset dpms` values.
+Follow-up #37's `xset s 600 600` (added for `xss-lock`-based auto-lock) had silently armed DPMS on
+the same 600s timer as a side effect. Before that change, DPMS had no timeout configured at all —
+the monitor never auto-blanked, which is why this never came up before. A genuine self-inflicted
+regression from the previous day's own work, not a pre-existing bug.
+
+**Real problem, not just the DPMS side effect**: even fixing the DPMS-inherits-screensaver-timeout
+issue wouldn't have solved the actual complaint — a bare X11 idle timer has no concept of "the user
+is watching something," it only tracks keyboard/mouse input. Long-form video with no clicking will
+always look idle to `xset`/`xss-lock` regardless of timeout tuning.
+
+**Fix**: replaced the `xset s` + `xss-lock` pair entirely with `xidlehook` (`crew/bspwm.nix`), which
+supports `--not-when-audio` (checks PulseAudio-compatible streams — works out of the box since
+`pipewire.pulse.enable = true` in `constellations/soundwave.nix`) and `--not-when-fullscreen`,
+combined so both audible background video and silent fullscreen video are excluded from idle
+detection, not just one or the other. Chained two timers matching xidlehook's own README example
+pattern: `--timer 600 i3lock-color ''` then `--timer 15 'xset dpms force off' ''` (durations are
+relative to the previous stage firing, not from idle-start) — lock after 10 min of *real*
+inactivity, monitor off 15s after that if still idle. DPMS's own autonomous timeout is no longer
+armed at all (no more `xset s` call), so it can't drift out of sync with the lock timer again.
+
+New `nebula-idle` script wraps the `xidlehook` invocation (`exec`, so `pkill -x xidlehook` from
+`nebula-awake` matches the real process name). `nebula-awake` (`super+shift+a`) now stops/restarts
+`nebula-idle` instead of toggling `xset s off`/`xset s 600 600` — kept as a manual fallback for
+cases `--not-when-audio`/`--not-when-fullscreen` won't catch (e.g. reading a long article with
+neither audio nor fullscreen).
+
+**Verification**: confirmed via `xset q` on the live host that DPMS had inherited the 600s
+screensaver timeout (the actual root-cause evidence, not a guess). Read back both generated
+scripts from the Nix store after `dry-build` (`nix-store --realise` on the `nebula-idle.drv` /
+`nebula-awake.drv` paths from the build plan) to confirm correct shell-escaping and that a leftover
+stale `xset s off` line (missed on the first edit pass, from Follow-up #37's now-removed toggle) was
+actually gone before calling it done. `dry-build` clean (exit 0).
+
+### Round 2 (same day): user switched, `xidlehook` wasn't running at all — plus `--not-when-audio` turned out to be permanently broken by Discord
+
+User ran `nh os switch`, reported "як швидко перевірити" (how to verify quickly) instead of waiting
+10 minutes for a real idle cycle. Live investigation on `earth` (this session has direct shell
+access to the same host) found two real problems, not just "how to test faster":
+
+1. **`bspwmrc` doesn't re-run on switch.** `pgrep -x xidlehook` came back empty and `xset q` still
+   showed the old `600/600/600` DPMS timeouts from Follow-up #37 — the switch updated the
+   HM-generated file on disk, but `bspwmrc` is a one-shot script invoked once at session start (by
+   whatever launches the X session), not something with a live-reload path like `sxhkdrc` (which at
+   least responds to `SIGUSR1`). A `switch` alone never applies new bspwmrc autostart entries to an
+   already-running session — needs a full logout/login. This is a distinct gotcha from the
+   `sxhkd`-reload one already recorded in [[project_bspwm_ux_pending_verification]]: that one is
+   "the signal can miss its target," this one is "there's no reload path at all for bspwmrc."
+2. **`--not-when-audio` would have permanently disabled auto-lock, not just during video.** Built a
+   disposable short-timer `xidlehook` instance (`--timer 6`, `--once`, writing to a marker file) to
+   test without waiting 10 minutes — confirmed (`pw-cli info` on the relevant node) that
+   `--not-when-audio` never fired the timer at all, then isolated why: Discord (`discord-canary`,
+   already a daily-running app on this system) keeps a `WEBRTC VoiceEngine` PipeWire stream in
+   `state: "running"` continuously, not just during an actual voice call. `--not-when-audio` treats
+   any non-corked stream as "audio playing," so with Discord open — which is effectively always —
+   the entire auto-lock chain would never have fired, forever, not just during video playback.
+   Removed `--not-when-audio` from `nebula-idle` (`crew/bspwm.nix`), kept only
+   `--not-when-fullscreen` (live-tested separately with a real fullscreen `kitty` window via
+   `wmctrl -r :ACTIVE: -b add,fullscreen` + `xprop` — confirmed it genuinely blocks the timer while
+   fullscreen and lets it fire once fullscreen is removed, one flaky rerun of a stale process aside).
+   Narrows the fix to "fullscreen video is exempt," not "any video/audio ever." Windowed video with
+   background audio will still auto-lock after 10 min — `nebula-awake` (`super+shift+a`) remains the
+   manual escape hatch for that case.
+3. **DPMS's own timeout needed an explicit reset, not just a new consumer.** Even with the
+   `--not-when-audio` regression fixed, DPMS itself still independently remembered the `600/600/600`
+   timeout `xset s 600 600` had set in Follow-up #37 — `xset s`/`xset dpms` state persists across
+   processes until explicitly changed, it doesn't reset just because nothing calls `xset s` anymore.
+   `nebula-idle` now explicitly runs `xset dpms 0 0 0` before `exec`ing `xidlehook`, disabling DPMS's
+   own auto-trigger while leaving `xset dpms force off` (used as `xidlehook`'s second chained timer,
+   and the existing manual `super+shift+Escape` bind) fully functional — DPMS's "force" commands are
+   independent of its timeout state.
+
+**Live-patched the running session directly** (not just told the user to wait for a relogin):
+realized the corrected `nebula-idle.drv` from the `dry-build` plan via `nix-store --realise`, killed
+the stale/absent `xidlehook`, and launched the corrected binary directly in the user's live X
+session (`setsid nohup ... & disown`, `DISPLAY=:1` from the running `bspwm` process's own environ).
+Confirmed via `xset q`: `DPMS Standby/Suspend/Off: 0 0 0`, `xidlehook` running with
+`--not-when-fullscreen` only. This live patch does not survive logout — the next real `nh os switch`
+will make it the persisted default for future sessions too, since the source is already correct in
+`crew/bspwm.nix`.
+
+**Not yet committed** — waiting on the user's own confirmation after a real video-watching test
+before locking this in.
+
+## Follow-up #39 (2026-09-03): auto-lock fired, correct password didn't unlock — `i3lock-color` had no PAM service at all
+
+While testing Follow-up #38's fix, user hit a new symptom: screen locks, correct password typed,
+screen stays locked. Not a keyboard-layout or `xidlehook` issue — root cause is that `i3lock-color`
+could not authenticate *any* password, correct or not, because NixOS never generates
+`/etc/pam.d/i3lock-color` unless something explicitly enables it.
+
+**Root cause**: `nixos/modules/security/pam.nix` defines `i3lock.enable` and `i3lock-color.enable`
+both as `lib.mkDefault config.programs.i3lock.enable` — and `programs.i3lock.enable` was never set
+anywhere in this repo (`i3lock-color` was only ever installed as a plain package via
+`crew/bspwm.nix`/home-manager, never through the `programs.i3lock` NixOS module). With the PAM
+service disabled, `environment.etc` never materializes `/etc/pam.d/i3lock-color`, so the PAM
+conversation `i3lock-color` opens at unlock time has nothing to check the password against and
+rejects unconditionally — this means the manual `super+Escape` lock bind was *never* functional
+either, not just the new auto-lock chain; it just hadn't been tested end-to-end before now.
+
+Confirmed live before touching anything: `ls /etc/pam.d/` showed only `xlock`/`vlock` (NixOS's own
+built-in defaults, keyed off `console.enable`/`services.xserver.enable`) — no `i3lock`/`i3lock-color`
+at all. `nix eval .#nixosConfigurations.earth.config.security.pam.services` did list both names
+(setting `security.pam.services.i3lock-color = {}` alone *is* enough to register the attrset), but
+`enabledServices` in `pam.nix` filters on `.enable`, which stayed `false` via the `mkDefault` above —
+so the plain `{}` attempt silently did nothing (built `etc.drv` directly via `nix-store --realise`
+and confirmed no `pam.d/i3lock*` file existed in the output before this fix).
+
+**Fix** (`core/security.nix`): `security.pam.services.i3lock.enable = true;` and
+`security.pam.services.i3lock-color.enable = true;`, set directly rather than via
+`programs.i3lock.enable = true` — that module option also unconditionally adds `pkgs.i3lock` (not
+`-color`) to `environment.systemPackages`, a redundant package we don't use since `i3lock-color`
+already comes from `crew/bspwm.nix`.
+
+**Why this is a real, not cosmetic, fix**: unlike a missing package or wrong keybind, a PAM service
+that's absent doesn't error loudly — `i3lock-color` just silently refuses every password forever,
+which reads to the user as "the screen doesn't unlock" with no diagnostic to go on. Worth remembering
+for any *other* locker/auth-adjacent package added later (e.g. if `i3lock-color` is ever swapped for
+something else): check whether it needs its own `security.pam.services.<name>.enable = true` before
+assuming it'll "just work" once installed.
+
+**Verification**: `dry-build` clean. Built `system.build.etc.drvPath` directly via `nix-store
+--realise` both before (missing file, confirmed the bug) and after the fix (confirmed
+`/etc/pam.d/i3lock-color` now exists with a real `pam_unix.so` auth stack) — evidence-based, not
+inferred from reading the Nix source alone. User ran a real `nh os switch` (this fix applies
+immediately post-switch with no relogin needed, unlike Follow-up #38's `bspwmrc` gotcha — PAM config
+is read fresh on every auth attempt, not cached at session start), then locked via `super+Escape` and
+confirmed live: password now unlocks correctly. **Not yet committed.**

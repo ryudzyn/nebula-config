@@ -25,28 +25,57 @@ let
     esac
   '';
 
+  # Ланцюжок авто-блокування: 10 хв бездіяльності → i3lock-color, ще 15с →
+  # DPMS force off. Раніше (Follow-up #37) голий xset s 600 600 неявно
+  # виставляв той самий таймаут і на DPMS (перевірено `xset q` — Standby/
+  # Suspend/Off стали 600/600/600, хоча раніше DPMS взагалі не мав
+  # автотаймауту), тож монітор гас під час перегляду відео.
+  #
+  # --not-when-audio НЕ використовується, хоча спершу здавався очевидним
+  # рішенням: живий тест на earth показав, що Discord тримає свій
+  # "WEBRTC VoiceEngine"-потік у стані `running` в pipewire постійно, навіть
+  # поза дзвінком (pw-cli info підтвердив state=running) — з цим прапорцем
+  # xidlehook вважав би систему "не в простої" 24/7, доки відкритий Discord,
+  # тобто авто-блокування не спрацювало б НІКОЛИ, не лише під час відео.
+  # --not-when-fullscreen (реальний EWMH-стан вікна, не аудіо-евристика) сам
+  # по собі покриває основний випадок скарги — перегляд фільму на весь
+  # екран. Відео у невеликому вікні з фоновою активністю все ще заблокує
+  # екран за 10 хв — тоді рятує ручний nebula-awake (super+shift+a).
+  nebula-idle = pkgs.writeShellScriptBin "nebula-idle" ''
+    # DPMS має власний незалежний автотаймаут (Follow-up #37 виставив його на
+    # 600/600/600 через xset s і лишив увімкненим) — 0 0 0 вимикає саме
+    # автоспрацювання, а не DPMS загалом, тож "xset dpms force off" нижче в
+    # ланцюжку xidlehook все одно працює як пряма команда.
+    xset dpms 0 0 0
+    exec ${pkgs.xidlehook}/bin/xidlehook \
+      --not-when-fullscreen \
+      --timer 600 "${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e" "" \
+      --timer 15 "xset dpms force off" ""
+  '';
+
   # PowerToys Awake-еквівалент: тримає системний inhibitor-лок
   # (systemd-inhibit) на idle/sleep/lid, доки не перемкнеш ще раз тим самим
   # біндом. Стан позначається pid-файлом у XDG_RUNTIME_DIR (там і так живе
   # решта рантайм-сокетів користувача) — наявність живого процесу з цим pid
   # і є єдиним джерелом правди, замість окремого прапорця, який міг би
-  # розсинхронитись з реальним inhibitor-локом.
-  # xset s тут — той самий X11 screensaver-таймер, що й авто-блокування
-  # нижче (xss-lock у bspwmrc); вимикається/вертається разом із
-  # systemd-inhibit, щоб "awake"-режим блокував і сон, і авто-блокування
-  # екрана одночасно, а не лише перше.
+  # розсинхронитись з реальним inhibitor-локом. Разом із сном зупиняє й
+  # nebula-idle (pkill -x xidlehook — точне ім'я процесу, exec у nebula-idle
+  # замінює ним shell), щоб "awake"-режим блокував і сон, і авто-блокування
+  # одночасно — це резервний ручний перемикач на випадок, якщо
+  # --not-when-audio/--not-when-fullscreen самі не спрацюють (наприклад,
+  # читаєш довгу статтю без відео/звуку).
   nebula-awake = pkgs.writeShellScriptBin "nebula-awake" ''
     pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-awake.pid"
     if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
       kill "$(cat "$pidfile")"
       rm -f "$pidfile"
-      xset s 600 600
+      ${nebula-idle}/bin/nebula-idle &
       ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Вимкнено — сон/блокування дозволено"
     else
+      pkill -x xidlehook
       ${pkgs.systemd}/bin/systemd-inhibit --what=idle:sleep:handle-lid-switch \
         --who=nebula-awake --why="Ручний keep-awake" sleep infinity &
       echo $! > "$pidfile"
-      xset s off
       ${pkgs.libnotify}/bin/notify-send -t 1500 "Awake" "Увімкнено — сон/блокування заблоковано"
     fi
   '';
@@ -356,12 +385,9 @@ in
     ${pkgs.polybar}/bin/polybar -c "$HOME/.config/polybar/config.ini" mybar &
 
     # Авто-блокування за бездіяльністю (раніше блокування було лише ручне,
-    # super+Escape/power-menu) — xset заводить X11 screensaver-таймер (10 хв),
-    # xss-lock слухає його спрацювання й запускає той самий i3lock-color.
-    # nebula-awake (super+shift+a) вимикає/повертає цей таймер разом із
-    # systemd-inhibit-локом сну.
-    xset s 600 600
-    ${pkgs.xss-lock}/bin/xss-lock -- ${pkgs.i3lock-color}/bin/i3lock-color -c 1a1a2e &
+    # super+Escape/power-menu) — деталі ланцюжка й чому саме xidlehook, а не
+    # голий xset s, дивись коментар біля nebula-idle вище.
+    ${nebula-idle}/bin/nebula-idle &
 
     # Композитор — раніше тримався заради Awakened PoE Trade (видалений,
     # Follow-up #18 в TODO.md), тепер потрібен для напівпрозорого
@@ -621,7 +647,7 @@ in
     xclip
     brightnessctl
     i3lock-color
-    xss-lock
+    xidlehook
     nitrogen
     redshift
     power-menu
@@ -634,6 +660,7 @@ in
     xprop
     gawk
     nebula-awake
+    nebula-idle
     nebula-ocr
     nebula-always-on-top
     nebula-color-picker
