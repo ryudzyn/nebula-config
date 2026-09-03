@@ -1162,7 +1162,7 @@ this follow-up here. Still worth a spot-check on any other plain-GTK4 (non-libad
 white/light-with-dark-accents symptom ever turns up — this bug would have affected all of them
 identically, not just `pavucontrol`.
 
-## Follow-up #16: `nitrogen` (super+w) stayed white after Follow-ups #14/#15 — GTK2, not GTK4 (root-caused, fixed, not yet committed)
+## Follow-up #16: `nitrogen` (super+w) stayed white after Follow-ups #14/#15 — GTK2, not GTK4 (root-caused, fixed, committed `f812076`)
 
 2026-08-15. After #14/#15 fixed GTK4 dark mode, `nitrogen` (the wallpaper picker, `super+w` in
 `crew/bspwm.nix`) still rendered white. Root cause: `ldd` on the `nitrogen` binary shows it links
@@ -1171,7 +1171,7 @@ against `libgtk-x11-2.0`, i.e. GTK2, not GTK3/4 — a toolkit generation `gtk.th
 in this config) has no `gtk-2.0/` directory at all in the package, so `gtk.gtk2.theme` inheriting it
 by default silently found nothing and GTK2 fell back to its stock light theme.
 
-Fix (`crew/default.nix`, **uncommitted**): `gtk.gtk2.theme = { name = "Arc-Dark"; package =
+Fix (`crew/default.nix`, committed `f812076`): `gtk.gtk2.theme = { name = "Arc-Dark"; package =
 pkgs.arc-theme; }` — `arc-theme` genuinely ships `gtk-2.0/gtk-3.0/gtk-4.0` in one package (checked
 on disk), so `Arc-Dark` is used for GTK2 only, `adw-gtk3-dark` stays for GTK3/4 elsewhere (closer
 visual match to the rest of the theme). Also added `gtk-engine-murrine` to `home.packages` —
@@ -1180,7 +1180,7 @@ present GTK2 logs "Unable to locate theme engine in module_path: murrine" and si
 unstyled. **Confirmed live** via a real `nitrogen` launch + screenshot: background went from white
 to `#404552` (dark) after `GTK_PATH` picked up `libmurrine.so`.
 
-## Follow-up #17: PoE1 wouldn't launch again — three different crash signatures chased, root-caused to session-wide MangoHud forced vsync (confirmed, fix not yet applied to .nix)
+## Follow-up #17: PoE1 wouldn't launch again — three different crash signatures chased, root-caused to session-wide MangoHud forced vsync (confirmed, closed — fix is a Steam-side launch option, not a `.nix` change)
 
 2026-08-15, later the same evening as #16. User report: "PoE1 знову не вмикається" (again won't
 launch), despite Follow-up #9's 2026-08-12 confirmation that it worked cleanly. Chased through
@@ -2252,4 +2252,4 @@ from Follow-up #34 recurred (bind did nothing until a fresh `pkill -USR1 -x sxhk
 that being a general property of switches that only touch HM dotfiles, not a one-off. Once reloaded,
 user confirmed live: `super + shift + slash` opens the rofi list with all combos and their descriptions.
 
-Not yet committed.
+Committed `2127be6`, pushed to `origin/master`.

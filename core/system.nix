@@ -49,6 +49,10 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   # Налаштування клавіатури для іксових/вейланд сесій
+  # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
+  # у двох місцях — core/games.nix (той самий services.xserver.xkb, окремо для
+  # gamescope-сесії) і crew/bspwm.nix (через setxkbmap у bspwmrc, X11-еквівалент
+  # для сесії без system-рівня). Зміна розкладки — усі три треба правити разом.
   services.xserver.xkb = {
     # Додаємо німецьку розкладку для зручного набору специфічних літер і текстів
     layout = "us,ua,de";

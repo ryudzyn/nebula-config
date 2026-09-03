@@ -326,7 +326,9 @@ in
     bspc monitor -d 1 2 3 4 5
 
     # Розкладка клавіатури — перенесено з crew/sway.nix (там input.xkb_layout),
-    # тут X11-еквівалент через setxkbmap.
+    # тут X11-еквівалент через setxkbmap. Та сама розкладка ще прописана в
+    # core/system.nix і core/games.nix (services.xserver.xkb) — тримати всі
+    # три копії в синхроні.
     ${pkgs.setxkbmap}/bin/setxkbmap -layout us,ua,de -option grp:alt_shift_toggle
 
     bspc config border_width 0

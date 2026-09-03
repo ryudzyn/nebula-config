@@ -16,6 +16,10 @@
     nemo-with-extensions
     prismlauncher
     mako
+    # Wayland idle-manager для halley-сесії (пара до nebula-awake в
+    # crew/bspwm.nix, який робить те саме для X11/bspwm через systemd-inhibit) —
+    # halley поки не має власного home-manager-модуля/autostart-конфіга в
+    # цьому репо, тож stasis зараз не підключений жодним конфіг-файлом/юнітом.
     stasis
     libva-utils
     jetbrains.idea-oss
