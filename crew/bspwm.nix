@@ -503,7 +503,7 @@ in
     font-1 = JetBrainsMono Nerd Font:size=11;2
     modules-left = bspwm xwindow
     modules-center = date
-    modules-right = tray xkeyboard volume network cpu memory
+    modules-right = tray xkeyboard volume network cpu memory nixgen
     separator = "  "
     border-bottom-size = 2
     border-bottom-color = #9d4edd
@@ -523,13 +523,28 @@ in
 
     [module/bspwm]
     type = internal/bspwm
-    label-focused = %name%
+    ; Іконки замість голих цифр — суто косметично, самі десктопи лишаються
+    ; "1".."5" (bspwmrc: `bspc monitor -d 1 2 3 4 5`), тож усі bspc rule/
+    ; sxhkd-біндинги на номер десктопа не зачіпаються, ws-icon-N лише підміняє
+    ; візуальний %icon% в лейблі. Немає фіксованої прив'язки застосунків до
+    ; конкретного номера (bspc rule ніде не задає desktop=) — призначення суто
+    ; за темою (браузер/термінал/код/чат/гра), не за реальним використанням.
+    ; Один гліф на десктоп — та сама фіксована ширина, що й попередній %name%
+    ; (одна цифра), тож стрибка label-*-background/padding (той самий баг
+    ; статичного боксу, що описаний нижче біля xkeyboard/cpu/memory) тут не
+    ; буде: ширина не змінюється між станами.
+    ws-icon-0 = 1;
+    ws-icon-1 = 2;
+    ws-icon-2 = 3;
+    ws-icon-3 = 4;
+    ws-icon-4 = 5;
+    label-focused = %icon%
     label-focused-background = #9d4edd
     label-focused-foreground = #1a1a2e
     label-focused-padding = 2
-    label-occupied = %name%
+    label-occupied = %icon%
     label-occupied-padding = 2
-    label-empty = %name%
+    label-empty = %icon%
     label-empty-foreground = #888888
     label-empty-padding = 2
 
@@ -622,6 +637,20 @@ in
     exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\\n", pct}'
     interval = 1
     label = %{B#242444} %{T2}%{T-} %output%%{B-}
+    label-foreground = #c9b8ff
+
+    ; Номер поточного system-покоління (`readlink /nix/var/nix/profiles/system`
+    ; дає "system-N-link") і скільки днів тому був останній `nh os switch`
+    ; (mtime самого symlink-у, а не таргету — профіль перелінковується щоразу
+    ; при switch, тож mtime symlink-а і є моментом останнього switch).
+    ; interval=300 — це значення міняється лише раз на switch, не варто
+    ; опитувати щосекунди як volume. Іконка — refresh (U+F021, той самий
+    ; F0xx-F2xx Font Awesome діапазон, що й database/plug/microchip вище).
+    [module/nixgen]
+    type = custom/script
+    exec = gen=$(readlink /nix/var/nix/profiles/system | grep -oP '(?<=system-)[0-9]+(?=-link)'); age=$(( ( $(date +%s) - $(stat -c %Y /nix/var/nix/profiles/system) ) / 86400 )); printf "#%s / %sd" "$gen" "$age"
+    interval = 300
+    label = %{B#242444} %{T2}%{T-} %output%%{B-}
     label-foreground = #c9b8ff
   '';
 
