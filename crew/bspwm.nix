@@ -733,13 +733,34 @@ in
     ; потрібна лише internal/*-модулям, див. коментар біля [module/cpu]) —
     ; реальна зміна гучності, а не лише перегляд стану. 5% — той самий крок,
     ; що й XF86Audio*-біндинги нижче (щоб scroll і клавіші відчувались однаково).
+    ;
+    ; Іконка міняється залежно від рівня (mute/<50%/≥50%) — той самий
+    ; принцип, що й <ramp-volume> у internal/pulseaudio-темах з
+    ; github.com/adi1090x/polybar-themes (звідти й запит користувача), але
+    ; internal/pulseaudio тут не built-in (див. вище), тож ramp реалізовано
+    ; вручну в awk. Іконка друкується самим exec-скриптом прямо з %{T2}...%{T-}
+    ; — polybar тегово парсить і вміст %output%, підставлений у label, не лише
+    ; статичний текст навколо нього, тож формат-теги зі stdout скрипта так само
+    ; відпрацьовують.
+    ;
+    ; ВІДОМЕ ОБМЕЖЕННЯ (перевірено живцем, не переслідувати знову): три
+    ; кодпоінти (U+F026/F027/F028) підтверджено різні як у самому шрифті
+    ; (ізольований рендер через ImageMagick label: показав чіткі cone/
+    ; cone+1-хвиля/cone+3-хвилі), так і в реальному exec-рядку зібраного
+    ; конфігу (od -tx1 підтвердив всі три байт-послідовності на місці) —
+    ; але на живій панелі при font-1 size=11 тонкі хвильки low/high
+    ; згладжуються antialiasing-ом до невиразності, і всі три стани на вид
+    ; зливаються в один силует. Залишено як є за рішенням користувача:
+    ; відсоток поруч і так однозначно показує рівень, а збільшення розміру
+    ; шрифту лише для цієї іконки означало б окремий font-слот і ризик
+    ; зламати вписування у 24px-бар.
     [module/volume]
     type = custom/script
-    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\\n", pct}'
+    exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) printf "%{T2}%{T-} Muted"; else if (pct<50) printf "%{T2}%{T-} %3d%%\\n", pct; else printf "%{T2}%{T-} %3d%%\\n", pct}'
     interval = 1
     scroll-up = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
     scroll-down = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-    label = %{B#242444} %{T2}%{T-} %output%%{B-}
+    label = %{B#242444} %output%%{B-}
     label-foreground = #c9b8ff
     click-left = ${nebula-audioinfo}/bin/nebula-audioinfo
 
