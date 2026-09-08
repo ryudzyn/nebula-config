@@ -122,6 +122,76 @@ let
     fi
   '';
 
+  # Клік по cpu/memory-пілюлі polybar — попап з розширеною системною
+  # інфою (CPU/GPU temp, GPU usage/fan, RAM) замість окремих постійних
+  # GPU/temp-модулів на панелі (щоб не перевантажувати панель інформацією).
+  # sensors -j + jq — чистіший парсинг, ніж регулярки по голому виводу
+  # sensors; фільтр по назві чипа ("k10temp"/"amdgpu"), а не по PCI bus id
+  # (00c3/0100 у сирому виводі sensors) — назва чипа надійніша прив'язка,
+  # хоч bus id й не мав би змінюватись на фіксованому десктопі.
+  # /sys/class/drm/card*/device/gpu_busy_percent — wildcard, бо на цій
+  # машині GPU виявилась під card1, не card0 (перевірено живим `cat`), і
+  # опора саме на "*" безпечніша за хардкод конкретного номера card.
+  # LC_ALL=C обов'язковий: під живою uk_UA-локаллю системи `free -h`
+  # локалізує заголовок стовпця в "Пам.:" замість "Mem:" (awk '/^Mem:/'
+  # мовчки не знаходив нічого, RAM-рядок виходив порожнім), а bash-івський
+  # `printf %.0f` очікує кому як десятковий роздільник під тією ж локаллю
+  # і падає з "неправильне число" на крапкових числах від jq (47.500000)
+  # — обидва баги живцем зловлені й відтворені на earth перед цим фіксом.
+  nebula-sysinfo = pkgs.writeShellScriptBin "nebula-sysinfo" ''
+    export LC_ALL=C
+    json=$(sensors -j)
+    cpu_temp=$(echo "$json" | jq -r '[.[] | select(has("temp1")) | .temp1.temp1_input][0] // empty')
+    gpu_temp=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("amdgpu")) | .value.edge.temp1_input')
+    gpu_fan=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("amdgpu")) | .value.fan1.fan1_input')
+    gpu_busy=$(cat /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1)
+    mem_summary=$(free -h | awk '/^Mem:/{print $3"/"$2}')
+    cpu_top=$(ps -eo comm,%cpu --sort=-%cpu --no-headers | head -5 | awk '{printf "%-15s %5s%%\n", $1, $2}')
+    mem_top=$(ps -eo comm,rss --sort=-rss --no-headers | head -5 | awk '{printf "%-15s %6.1f MiB\n", $1, $2/1024}')
+    body=$(printf 'CPU %.0f°C  ·  GPU %.0f°C, %s%%, %.0f RPM  ·  RAM %s\n\nТоп CPU:\n%s\n\nТоп RAM:\n%s' \
+      "''${cpu_temp:-0}" "''${gpu_temp:-0}" "''${gpu_busy:-?}" "''${gpu_fan:-0}" "$mem_summary" "$cpu_top" "$mem_top")
+    ${pkgs.libnotify}/bin/notify-send -t 8000 "Система" "$body"
+  '';
+
+  # Клік по network-пілюлі — IP і швидкість лінку, яких на самій пілюлі
+  # постійно немає (там лише "Ethernet"/"Немає мережі", навмисно коротко).
+  nebula-netinfo = pkgs.writeShellScriptBin "nebula-netinfo" ''
+    ip=$(ip -4 addr show enp5s0 | grep -oP '(?<=inet\s)[0-9.]+' || true)
+    [ -z "$ip" ] && ip="немає IP"
+    speed=$(cat /sys/class/net/enp5s0/speed 2>/dev/null || echo "?")
+    ${pkgs.libnotify}/bin/notify-send -t 5000 "Мережа (enp5s0)" "IP: $ip
+Швидкість лінку: ''${speed} Mb/s"
+  '';
+
+  # Клік по volume-пілюлі — дефолтні sink/source і які застосунки зараз
+  # мають активні аудіо-потоки (internal/pulseaudio тут не built-in, тож
+  # усе через wpctl, той самий бінарник, що й сам volume-модуль).
+  # 7 пробілів у grep -oP нижче — фактичний відступ верхнього рівня секції
+  # "Streams:" у виводі wpctl (перевірено живим `wpctl status | cat -A`);
+  # дочірні порти відступлені глибше (12 пробілів) і цим патерном не
+  # зачіпаються. sort -u прибирає дублі напряму/назад одного застосунку
+  # (напр. WEBRTC VoiceEngine фігурує і як вхідний, і як вихідний потік).
+  nebula-audioinfo = pkgs.writeShellScriptBin "nebula-audioinfo" ''
+    status=$(wpctl status)
+    sink=$(echo "$status" | grep -A6 '├─ Sinks:' | grep '\*' | sed -E 's/^[^*]*\* *[0-9]+\. *//; s/ *\[vol[^]]*\]//')
+    source=$(echo "$status" | grep -A6 '├─ Sources:' | grep '\*' | sed -E 's/^[^*]*\* *[0-9]+\. *//; s/ *\[vol[^]]*\]//')
+    streams=$(echo "$status" | sed -n '/Streams:/,/^$/p' | grep -oP '^ {7}[0-9]+\.\s+\K.*' | sed -E 's/ {2,}.*$//' | sort -u)
+    [ -z "$streams" ] && streams="(немає активних)"
+    ${pkgs.libnotify}/bin/notify-send -t 6000 "Аудіо" "Sink: $sink
+Source: $source
+Потоки: $streams"
+  '';
+
+  # Клік по nixgen-пілюлі — повний timestamp switch (сама пілюля показує
+  # лише кількість днів) і скільки поколінь ще лежить у профілі, чекаючи
+  # на щотижневий nix.gc (core/system.nix, --delete-older-than 30d).
+  nebula-nixgeninfo = pkgs.writeShellScriptBin "nebula-nixgeninfo" ''
+    ts=$(date -d @"$(stat -c %Y /nix/var/nix/profiles/system)" '+%d.%m.%Y %H:%M:%S')
+    count=$(ls /nix/var/nix/profiles/ | grep -c '^system-[0-9]\+-link$')
+    ${pkgs.libnotify}/bin/notify-send -t 5000 "Nix generation" "Останній switch: $ts
+Поколінь у профілі: $count"
+  '';
+
   # Єдине джерело правди для біндингів: список (не attrset — Nix сортує
   # ключі attrset-а алфавітно, це зламало б логічне групування нижче),
   # кожен запис одразу несе короткий опис для nebula-keybind-help. Звідси ж
@@ -447,12 +517,16 @@ in
   # задавати лише в [global] — dunst 1.13 явно відкидає це в rule-секціях
   # ("Setting origin is in the wrong section", перевірено -verbosity debug),
   # тож per-notification позиція тут неможлива, лише глобальна.
+  # height був фіксованим (200) — nebula-sysinfo (два топ-5 списки процесів)
+  # живцем зловлено обрізаним по цій межі, "Топ RAM" взагалі не рендерився.
+  # Діапазон, як і в width, дозволяє коротким сповіщенням (розкладка/OCR)
+  # лишатись компактними, а довшим — вирости.
   xdg.configFile."dunst/dunstrc".text = ''
     [global]
     origin = bottom-right
     offset = 24x24
     width = (250, 400)
-    height = 200
+    height = (100, 500)
     frame_width = 2
     frame_color = "#9d4edd"
     separator_color = frame
@@ -592,10 +666,21 @@ in
     ; %percentage:3% ліворуч доповнює число пробілами до 3 символів — без
     ; цього пілюля стрибала б по ширині щоразу, коли відсоток переходив
     ; між 1/2/3-значним числом (напр. 9% -> 10%), зсуваючи все праворуч.
+    ;
+    ; click-left = <команда> як окремий ключ модуля НЕ спрацьовує для
+    ; internal/*-модулів (перевірено живцем на earth: xdotool-клік точно в
+    ; піксель пілюлі, підтверджений через xdotool getmouselocation, не
+    ; викликав навіть тестовий `touch` — жодної помилки чи попередження в
+    ; лозі теж не було, просто мовчки ігнорується). За офіційним actions.html
+    ; click-left на рівні модуля документований лише для custom/script/menu/
+    ; ipc та як bar-wide фолбек — і саме так у volume/nixgen нижче (обидва
+    ; custom/script) це реально працює. Для internal/cpu/memory/network
+    ; єдиний робочий шлях — inline %{A1:команда:}...%{A} прямо в label:
+    ; це bar-рівня markup-тег, не залежить від типу модуля.
     [module/cpu]
     type = internal/cpu
     interval = 2
-    label = %{B#242444} %{T2}%{T-} %percentage:3%%%{B-}
+    label = %{A1:${nebula-sysinfo}/bin/nebula-sysinfo:}%{B#242444} %{T2}%{T-} %percentage:3%%%{B-}%{A}
     label-foreground = #c9b8ff
 
     ; Іконка — база даних (не сервер-стойка, U+F493: та сама, що й тут,
@@ -608,7 +693,7 @@ in
     [module/memory]
     type = internal/memory
     interval = 2
-    label = %{B#242444} %{T2}%{T-} %gb_used:9%%{B-}
+    label = %{A1:${nebula-sysinfo}/bin/nebula-sysinfo:}%{B#242444} %{T2}%{T-} %gb_used:9%%{B-}%{A}
     label-foreground = #c9b8ff
 
     ; Стаціонарна машина на дроті — інтерфейс enp5s0 (перевірено `ip link`),
@@ -621,7 +706,7 @@ in
     type = internal/network
     interface = enp5s0
     interval = 3
-    label-connected = %{B#242444} %{T2}%{T-} Ethernet %{B-}
+    label-connected = %{A1:${nebula-netinfo}/bin/nebula-netinfo:}%{B#242444} %{T2}%{T-} Ethernet %{B-}%{A}
     label-connected-foreground = #c9b8ff
     label-disconnected = Немає мережі
     label-disconnected-foreground = #888888
@@ -638,6 +723,7 @@ in
     interval = 1
     label = %{B#242444} %{T2}%{T-} %output%%{B-}
     label-foreground = #c9b8ff
+    click-left = ${nebula-audioinfo}/bin/nebula-audioinfo
 
     ; Номер поточного system-покоління (`readlink /nix/var/nix/profiles/system`
     ; дає "system-N-link") і скільки днів тому був останній `nh os switch`
@@ -652,6 +738,7 @@ in
     interval = 300
     label = %{B#242444} %{T2}%{T-} %output%%{B-}
     label-foreground = #c9b8ff
+    click-left = ${nebula-nixgeninfo}/bin/nebula-nixgeninfo
   '';
 
   # Системний модуль bspwm сам запускає sxhkd при старті сесії — тут ми лише
