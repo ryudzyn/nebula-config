@@ -192,6 +192,17 @@ Source: $source
 Поколінь у профілі: $count"
   '';
 
+  # Клік по date-пілюлі — місячний календар (cal, локалізований через
+  # системну uk_UA-локаль, на відміну від free -h тут це працює коректно
+  # "з коробки") плюс повна дата з днем тижня, якого на самій пілюлі немає
+  # (там лише %d.%m.%Y %H:%M, без %a — polybar сам не локалізує strftime,
+  # див. коментар біля [module/date] нижче).
+  nebula-calendar = pkgs.writeShellScriptBin "nebula-calendar" ''
+    ${pkgs.libnotify}/bin/notify-send -t 6000 "Календар" "$(date '+%A, %d %B %Y')
+
+$(cal)"
+  '';
+
   # Єдине джерело правди для біндингів: список (не attrset — Nix сортує
   # ключі attrset-а алфавітно, це зламало б логічне групування нижче),
   # кожен запис одразу несе короткий опис для nebula-keybind-help. Звідси ж
@@ -629,7 +640,7 @@ in
     [module/date]
     type = internal/date
     date = %d.%m.%Y  %H:%M
-    label = %{T2}%{T-} %date%
+    label = %{A1:${nebula-calendar}/bin/nebula-calendar:}%{T2}%{T-} %date%%{A}
 
     ; Заголовок активного вікна — контекст того, що зараз у фокусі,
     ; чого раніше в panel взагалі не було.
@@ -717,10 +728,17 @@ in
     ; на wpctl (той самий бінарник, що й XF86Audio*-біндинги нижче) працює.
     ; printf "%3d%%" замість голого pct"%" — той самий анти-стрибковий
     ; прийом (awk сам не розуміє polybar-івський %token:N% синтаксис).
+    ; scroll-up/scroll-down — на відміну від click-left (custom/script-
+    ; модулі, працює як звичайний ключ, без inline %{A}-обгортки, яка
+    ; потрібна лише internal/*-модулям, див. коментар біля [module/cpu]) —
+    ; реальна зміна гучності, а не лише перегляд стану. 5% — той самий крок,
+    ; що й XF86Audio*-біндинги нижче (щоб scroll і клавіші відчувались однаково).
     [module/volume]
     type = custom/script
     exec = wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{pct=int($2*100+0.5); if ($0 ~ /MUTED/) print "Muted"; else printf "%3d%%\\n", pct}'
     interval = 1
+    scroll-up = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
+    scroll-down = wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
     label = %{B#242444} %{T2}%{T-} %output%%{B-}
     label-foreground = #c9b8ff
     click-left = ${nebula-audioinfo}/bin/nebula-audioinfo
