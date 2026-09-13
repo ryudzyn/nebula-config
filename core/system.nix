@@ -29,6 +29,19 @@
   
   services.logind.settings.Login.KillUserProcesses = true;
 
+  # Своп раніше був взагалі вимкнений (hardware.nix: swapDevices = []).
+  # 2026-09-13: живий `free -h` під час стріму в Discord показав 13Gi/15Gi
+  # зайнятих і 385Mi вільних без жодного запасу — коли одночасно висять
+  # Android Studio + gradle/kotlin daemon'и + гра + браузер + Discord,
+  # система впирається в межу й ядро зависає на reclaim, що найпомітніше
+  # вилазить на курсорі миші (найлатентність-чутливіше, що постійно
+  # перемальовується). zram стискає RAM-своп на льоту — куди дешевше за
+  # похибку в latency, ніж диск-своп, і не зношує SSD.
+  zramSwap = {
+    enable = true;
+    memoryPercent = 50;
+  };
+
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "uk_UA.UTF-8";
     LC_IDENTIFICATION = "uk_UA.UTF-8";

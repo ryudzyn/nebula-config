@@ -13,6 +13,10 @@
     retroarch
     xwayland-satellite
     discord-canary
+    # Звичайний (stable) Discord поряд з Canary — для A/B-тесту підвисання
+    # курсора під час стріму (2026-09-13, TODO.md?): Canary — нічна збірка,
+    # історично більше багів навколо Linux screen-share, ніж у stable.
+    discord
     nemo-with-extensions
     prismlauncher
     mako

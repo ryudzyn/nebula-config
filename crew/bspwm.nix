@@ -514,9 +514,17 @@ in
   # glx-backend і unredirect-fullscreen-windows=false — та сама комбінація,
   # яку вже пробували в Follow-up #17 (TODO.md) як A/B-тест на причину краху
   # PoE1 (сам компоситор тоді ні до чого не був — див. коментар в bspwmrc).
+  # vsync=true (2026-09-13, follow-up на підвисання курсора під час
+  # Discord-стрімів): раніше стояв vsync=false, але це давало компоситору
+  # композитити кадри без узгодження з дисплеєм, тож під додатковим GPU-
+  # навантаженням від кодування стріму саме курсор (рендериться через той
+  # самий GLX-пайплайн picom) "плавав" помітніше за все інше. Вимикання
+  # Hardware Acceleration у самому Discord цю проблему не зняло (перевірено
+  # користувачем) — тож тестуємо композитор. Якщо це не допоможе, наступний
+  # кандидат — backend = "xrender".
   xdg.configFile."picom.conf".text = ''
     backend = "glx";
-    vsync = false;
+    vsync = true;
     unredirect-fullscreen-windows = false;
   '';
 
