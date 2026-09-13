@@ -24,6 +24,13 @@
     libva-utils
     jetbrains.idea-oss
     claude-code
+
+    # Android-розробка (проєкт orbit) — Android Studio дає AVD Manager +
+    # апаратно прискорений емулятор (KVM вже є через core/virtualisation.nix)
+    # для тестування apk без встановлення на реальний телефон; android-tools
+    # (adb/fastboot) — системно, а не через nix-shell щоразу
+    android-studio
+    android-tools
     
     # Творчі
     kdePackages.kdenlive
