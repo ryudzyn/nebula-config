@@ -1,13 +1,18 @@
 { config, pkgs, self, ... }:
 {
-  services.greetd = {
-    enable = true;
-    settings = {
-      default_session = {
-        command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --sessions ${config.services.displayManager.sessionData.desktops}/share/wayland-sessions:${config.services.displayManager.sessionData.desktops}/share/xsessions";
-      };
-    };
-  };
+  # Hyprland — кінцева мета міграції (не тимчасовий тест поруч з bspwm).
+  # Сам собою реєструє свою wayland-сесію (services.displayManager.sessionPackages)
+  # і власний xdg-desktop-portal-hyprland (xdg.portal.extraPortals +
+  # configPackages, для ScreenCast/Screenshot з Noctalia) — нічого з цього не
+  # треба дублювати вручну нижче.
+  programs.hyprland.enable = true;
+
+  # ReGreet замість tuigreet: показує список сесій (bspwm + Hyprland, зручно
+  # поки Hyprland не стабілізується) і сам пам'ятає останній вибір
+  # (~/.local/state або /var/lib/regreet — на відміну від tuigreet, без
+  # --remember-прапорця). enable=true сам вмикає services.greetd і прописує
+  # default_session.command (cage + regreet) — окремо його більше не задаємо.
+  programs.regreet.enable = true;
 
   services.displayManager.sessionPackages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.halley ];
   environment.sessionVariables.NIXOS_OZONE_WL = "1";

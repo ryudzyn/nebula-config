@@ -12,6 +12,11 @@
     ./bspwm.nix
     ./poe-price-check.nix
     ./remote-control.nix
+    ./hyprland
+    ./noctalia
+    ./wezterm.nix
+    ./kando.nix
+    ./gzml.nix
 
     # Ці файли ми напишемо трохи згодом, тому поки вони закоментовані (#).
     # Базовий programs.starship.enable вже увімкнено напряму в
@@ -84,7 +89,6 @@
     # відміну від цього автоматично потрапляє в home.packages через
     # home-manager's collectGtkPackages, тому окремо не додається тут.
     gtk-engine-murrine
-    kando 
     fuzzel
     nerd-fonts.jetbrains-mono
     fzf

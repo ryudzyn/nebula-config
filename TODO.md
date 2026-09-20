@@ -2425,3 +2425,79 @@ inferred from reading the Nix source alone. User ran a real `nh os switch` (this
 immediately post-switch with no relogin needed, unlike Follow-up #38's `bspwmrc` gotcha — PAM config
 is read fresh on every auth attempt, not cached at session start), then locked via `super+Escape` and
 confirmed live: password now unlocks correctly. **Not yet committed.**
+
+## Follow-up #40 (2026-09-20): live Hyprland testing — Awakened PoE Trade fixed halfway, GZML packaged, poe-price-check GTK rewrite needed
+
+First real interactive session on the Hyprland migration skeleton (see the plan file at
+`~/Downloads/nebula-hyprland-plan.md`, "Статус реалізації"). Three separate investigations, each
+landed real fixes but also each hit a genuine upstream/Hyprland-version wall.
+
+**Awakened PoE Trade — two real bugs found and fixed, one root cause found and NOT fixable here:**
+- Kept clicking through to the game because the bundled Electron build auto-detects Wayland and runs
+  as a native-Wayland client, and native-Wayland click-through/input-region handling is buggy in this
+  Electron/Chromium version. Fix: force XWayland via `--ozone-platform=x11`.
+- Overlay blurred the game behind it — `hl.window_rule` with `no_blur` on `class = "^awakened-poe-trade$"`.
+- Ctrl+D (and every other in-game action) silently does nothing despite both fixes above. Root cause,
+  confirmed by direct C-source patching and a live `xprop -root _NET_ACTIVE_WINDOW` check (returns
+  `0x0` while PoE is genuinely Hyprland-focused): Awakened's hotkeys go through Electron's
+  `globalShortcut`, gated on `electron-overlay-window` detecting the game window as "active" via the
+  X11 `_NET_ACTIVE_WINDOW` root property — and Hyprland 0.55.4 (our pinned version) never populates
+  this property for XWayland clients. Not a config bug; `xwayland.*` has no related option, and
+  Hyprland's own `CXWM::activateSurface` (`src/xwayland/XWM.cpp`) only calls `setActiveWindow` in a
+  way that plausibly explains the miss but doesn't have a documented fix between 0.55 and 0.56 in the
+  changelog. A real fix needs either confirmed-working Hyprland 0.56+ (unverified, and swapping just
+  Hyprland's version means wiring `hyprwm/Hyprland`'s own flake — new dependency tree, `nixpkgs.follows`
+  needed everywhere to avoid a second closure like Noctalia — plus a live session restart to test,
+  which we did not want to force on a live gaming session) or patching `electron-overlay-window`'s C
+  code to track focus via `hyprctl` IPC instead of X11 properties (the approach `scalpelpoe/scalpel`
+  took in a fork, not upstream). Decision: **not worth it right now** — landed the two real fixes
+  (they're free wins, keep Awakened viable as a manual/tooltip tool) and moved the primary price-check
+  hotkey to `poe-price-check` instead, which doesn't depend on any of this.
+- Along the way, also found and fixed a real, separate, unrelated uiohook-napi bug: `is_evdev` in
+  `libuiohook/src/x11/input_helper.c` is auto-detected via the same `XkbGetKeyboard()` call, which
+  also fails under XWayland — meaning it silently falls back to the wrong (`xfree86`) scancode table
+  instead of `evdev` (which XWayland always uses). Patched the bundled native N-API addon (ABI-stable,
+  rebuildable independent of Electron's exact version) to hardcode `is_evdev = true` and rebuilt it
+  via `node-gyp` inside the Nix derivation, replacing just the prebuilt `.node` file in
+  `app.asar.unpacked` (had to also fix the generated wrapper script, which hardcodes the *original*
+  package's absolute store path for `app.asar` regardless of where it's copied to — `runCommand` +
+  manual `head -n -1`-and-append instead of `symlinkJoin`/`wrapProgram`). This fix is real and correct,
+  it just isn't the reason Ctrl+D fails.
+- All of this: `crew/hyprland/default.nix` (`awakened-poe-trade-x11`, `uiohook-napi-x11-fix`),
+  `crew/hyprland/hyprland.lua` (window rule + comment documenting the root cause so it isn't
+  re-investigated from scratch next time).
+
+**GZML Visual Tools — packaged from scratch, contradicts the earlier "no packaging attempted, treat
+as follow-up" note** (see the plan file and `project_hyprland_migration` memory — both now stale on
+this point): it's genuinely just one Python/GTK3/AppIndicator3 tray script
+(`zero-j89/Hyprland-Visual-Gzml`) with `presets/`/`assets/` next to it, no build step. Two real
+upstream bugs found via live-launch-and-crash testing, both because the app assumes it's installed
+in a writable `~/.local/share/...` directory (per its own Arch-only `install.sh`) and hardcodes
+`STATE_DIR`/`PRESETS_DIR` as subfolders of wherever the script itself lives — which is read-only in
+the Nix store. Patched both paths (`substituteInPlace`) to point at proper XDG locations under
+`$HOME`, and the launcher wrapper script now seed-copies the bundled `presets/` into the writable
+location on first run (`cp -rn`, but Nix-store-copied directories inherit read-only perms from the
+store, so needed an explicit `chmod -R u+w` after the copy too — silently missing this produced a
+`PermissionError` the first time a category like "themes" that doesn't ship in the repo gets created
+on demand). Confirmed live: process starts and stays alive without crashing. **Known gap, not a bug**:
+no systray host is running yet (`busctl --user` shows no `StatusNotifierWatcher`), so the tray icon
+has nowhere to render — needs Noctalia's bar up first, separate follow-up. `crew/gzml.nix`, added to
+`crew/default.nix`.
+
+**poe-price-check — now the primary price-checker on Hyprland, but its own UI needs a rewrite too**:
+added a native `hl.bind("SUPER + P", ...)` in `hyprland.lua` (the existing `services.sxhkd.keybindings`
+bind in `crew/poe-price-check.nix` is X11-only and never fires under Hyprland — `sxhkd` isn't running
+in that session at all). The bind itself works (confirmed via `hyprctl dispatch`), but the tool's
+`tkinter`/`overrideredirect(True)` popup window has two live-confirmed problems under Hyprland that no
+`hl.window_rule` combination fixed (tried `pin`, `stay_focused`, both together, neither, over several
+rounds): the popup itself isn't clickable, and — worse — while the popup is on screen, clicks on *any
+other workspace* get misrouted to the Path of Exile window instead of whatever's actually being
+clicked (confirmed by the user live; removing `pin` didn't fix it, so it's not simply "pinned window
+eating clicks everywhere"). Root cause per Hyprland's own maintainer (`hyprwm/Hyprland#2365`):
+`override_redirect` is a pure X11 concept with no Wayland equivalent, and Hyprland's XWayland
+compatibility layer doesn't handle it the way a real X11 window manager would. **This is not fixable
+via config** — the real fix is rewriting `show_overlay`/`show_stat_overlay` in `price_check.py` to use
+GTK3 + `gtk-layer-shell` (a real native-Wayland popup, the same mechanism waybar/mako/swaync use),
+which sidesteps the whole override-redirect/XWayland category of bug by construction. Sized as a real
+follow-up (new Nix deps, two functions rewritten), not attempted yet — deferred by user choice over
+finishing it same-session. Do not re-attempt a windowrule-only fix for this; it's been tried.

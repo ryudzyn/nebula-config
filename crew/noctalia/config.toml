@@ -1,0 +1,17 @@
+# Nebula OS: hand-written шар конфігу Noctalia (~/.config/noctalia/config.toml).
+# Живий файл (crew/noctalia/default.nix підключає його через mkOutOfStoreSymlink) —
+# Noctalia сама переписує ~/.local/state/noctalia/settings.toml, коли щось
+# міняєш у власному UI (тема/шпалери/тощо) — цей файл той шар НЕ чіпає,
+# settings.toml завжди має пріоритет над цим файлом при збігу ключів.
+
+[theme]
+mode = "dark"
+# Автогенерація кольорів з поточної шпалери замість фіксованого builtin-пресету.
+source = "wallpaper"
+wallpaper_scheme = "m3-content"
+
+[wallpaper]
+enabled = true
+
+[wallpaper.default]
+path = "/home/ryudzyn/nebula-config/assets/wallpaper/wallpaper.jpg"

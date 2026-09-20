@@ -10,6 +10,13 @@
       url = "github:Gerg-L/spicetify-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Гілка cachix (не main) — саме ті ревізії, під які реально збираються
+    # закешовані білди на noctalia.cachix.org. НЕ додавати
+    # inputs.nixpkgs.follows тут: follows змінює derivation hash і зносить
+    # усі кеш-хіти, збірка піде локально з нуля (alpha Quickshell-стек, довго).
+    noctalia = {
+      url = "github:noctalia-dev/noctalia/cachix";
+    };
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";

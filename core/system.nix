@@ -70,6 +70,14 @@
   };
   nix.settings.auto-optimise-store = true;
 
+  # Cachix для Noctalia (alpha Quickshell-стек, довго компілюється локально) —
+  # без цього flake.nix'ів `noctalia` вхід (гілка cachix, без nixpkgs.follows,
+  # див. коментар там) все одно збирався б із джерела.
+  nix.settings.extra-substituters = [ "https://noctalia.cachix.org" ];
+  nix.settings.extra-trusted-public-keys = [
+    "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+  ];
+
   # Налаштування клавіатури для іксових/вейланд сесій
   # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
   # у двох місцях — core/games.nix (той самий services.xserver.xkb, окремо для
