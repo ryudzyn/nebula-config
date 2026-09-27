@@ -114,6 +114,34 @@ hl.window_rule({
     center = true,
 })
 
+-- Discord video-call popout -- завжди float+pin (PiP-стиль, поверх усього).
+-- Match за initial_title, НЕ за title: title міняється на назву каналу
+-- одразу після відкриття, а Hyprland-івський windowrule перевіряє
+-- клас/тайтл лише в момент СТВОРЕННЯ вікна (задокументований лімітейшн,
+-- нема динамічного re-match на зміну title) -- initial_title фіксує
+-- "Discord Popout" назавжди, ще до цієї зміни. class лишається "discord",
+-- як і в головного вікна, тож саме тільки за title/class не розрізнити.
+hl.window_rule({
+    name  = "discord-popout",
+    match = { initial_title = "^Discord Popout$" },
+
+    float = true,
+    pin = true,
+})
+
+-- zen-browser Picture-in-Picture -- та сама історія: class лишається "zen"
+-- (як і головне вікно браузера), тож розрізняє тільки initial_title.
+-- Живо підтверджено (2026-09-27): нативний Wayland (xwayland:0), pin не
+-- ловить клік на інших workspace -- той самий висновок, що й з Discord
+-- popout вище (баг hyprwm/Hyprland#4135 специфічний саме для XWayland).
+hl.window_rule({
+    name  = "zen-pip",
+    match = { initial_title = "^Picture-in-Picture$" },
+
+    float = true,
+    pin = true,
+})
+
 -- poe-price-check -- tkinter override_redirect вікно. Пробували windowrule
 -- (pin, stay_focused, окремо й разом) -- жоден комбо не прибрав ні
 -- неклікабельність, ні "втечу" кліків на PoE при перемиканні workspace, поки
@@ -143,6 +171,14 @@ hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin())
 -- maim/xclip-біндами в crew/bspwm.nix (Print/super+shift+s).
 hl.bind("Print", hl.dsp.exec_cmd("noctalia msg screenshot-fullscreen"))
 hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("noctalia msg screenshot-region"))
+
+-- Special workspace ("scratchpad") -- прихована робоча область, куди можна
+-- закинути будь-яке вікно і потім показати/сховати одним хоткеєм, як
+-- випадаюча панель. super+shift+s вже зайнятий скріншотом (офіційний
+-- дефолтний приклад Hyprland біндить саме на нього move-в-special), тож
+-- переміщення туди -- на super+ctrl+s.
+hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"))
+hl.bind("SUPER + CTRL + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
 -- Переміщення/зміна розміру вікна мишею: SUPER + ЛКМ тягне, SUPER + ПКМ
 -- ресайзить (mouse:272/273 -- стандартні коди кнопок з офіційного
