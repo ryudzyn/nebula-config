@@ -30,14 +30,6 @@ let
     fi
   '';
 
-  # Wayland-порт калькулятора з crew/bspwm.nix: та сама rofi-calc команда,
-  # тільки xclip -> wl-copy. -plugin-path не можна інтерполювати з .lua
-  # (там нема доступу до Nix-стору), тому обгортка тут, як і решта.
-  nebula-calc-wl = pkgs.writeShellScriptBin "nebula-calc-wl" ''
-    ${pkgs.rofi}/bin/rofi -modi calc -show calc -plugin-path ${pkgs.rofi-calc}/lib/rofi \
-      -no-show-match -no-sort \
-      -calc-command "echo -n '{result}' | ${pkgs.wl-clipboard}/bin/wl-copy"
-  '';
   # Ctrl+D (і всі інші глобальні хоткеї Awakened) не працюють на XWayland:
   # уся детекція клавіш іде через вбудований uiohook-napi 1.5.4, чий
   # load_input_helper() (libuiohook/src/x11/input_helper.c) намагається
@@ -188,12 +180,19 @@ in
     pkgs.wl-clipboard
     nebula-ocr-wl
     nebula-color-picker-wl
-    nebula-calc-wl
-    # rofi/rofi-calc/nwg-look вже стоять через crew/bspwm.nix/theming.nix
-    # (спільний home-manager профіль, доступні і в Hyprland-сесії);
-    # pavucontrol/hyprpicker там нема -- додаю тут.
+    # rofi/nwg-look вже стоять через crew/bspwm.nix/theming.nix (спільний
+    # home-manager профіль, доступні і в Hyprland-сесії); pavucontrol/
+    # hyprpicker там нема -- додаю тут.
     pkgs.pavucontrol
     pkgs.hyprpicker
+    # Калькулятор (super+equal) -- rofi-calc замінено на Qalculate (набагато
+    # потужніший: одиниці виміру, наукові функції, константи, конвертація
+    # валют), окреме GTK-вікно замість rofi-попапу.
+    pkgs.qalculate-gtk
+    # Рулетка (super+shift+r) -- той самий assets/cprogram/roulette.html, але
+    # тепер у власному вікні через surf (suckless, мінімальний WebKitGTK,
+    # без вкладок/адресного рядка) замість вкладки в основному браузері.
+    pkgs.surf
   ];
 
   # hyprland.lua/tweaks.lua лишаються звичайними файлами в репо (не в .nix) —

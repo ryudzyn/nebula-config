@@ -14,6 +14,32 @@
   # default_session.command (cage + regreet) — окремо його більше не задаємо.
   programs.regreet.enable = true;
 
+  # Космічна тема для ReGreet — та сама adw-gtk3-dark/Papirus-Dark/
+  # Bibata-Modern-Classic і та сама nebula-шпалера, що й у crew/default.nix і
+  # crew/bspwm.nix, щоб грітер виглядав продовженням десктопу, а не дефолтним
+  # Adwaita-екраном. background.fit = "Cover" (а не sample-івський "Contain")
+  # -- заповнює весь екран без чорних смуг, image ширший за екран (3840x2160).
+  programs.regreet.theme = {
+    name = "adw-gtk3-dark";
+    package = pkgs.adw-gtk3;
+  };
+  programs.regreet.iconTheme = {
+    name = "Papirus-Dark";
+    package = pkgs.papirus-icon-theme;
+  };
+  programs.regreet.cursorTheme = {
+    name = "Bibata-Modern-Classic";
+    package = pkgs.bibata-cursors;
+  };
+  programs.regreet.settings = {
+    background = {
+      path = ../assets/wallpaper/wallpaper.jpg;
+      fit = "Cover";
+    };
+    GTK.application_prefer_dark_theme = true;
+    appearance.greeting_msg = "Nebula OS — ласкаво просимо";
+  };
+
   services.displayManager.sessionPackages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.halley ];
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 

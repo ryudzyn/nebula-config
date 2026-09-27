@@ -92,6 +92,28 @@ hl.window_rule({
     border_size = 0,
 })
 
+-- Рулетка (surf) -- floating, розмір під контент (колесо 360px + кнопки/
+-- редактор списку), по центру екрана, а не на весь tiled-простір.
+hl.window_rule({
+    name  = "roulette-surf",
+    match = { class = "^Surf$" },
+
+    float = true,
+    size  = "460 700",
+    center = true,
+})
+
+-- Калькулятор (Qalculate) -- floating, компактний розмір замість
+-- дефолтного 1261x1382 (tiled на весь простір).
+hl.window_rule({
+    name  = "qalculate-gtk",
+    match = { class = "^qalculate-gtk$" },
+
+    float = true,
+    size  = "460 620",
+    center = true,
+})
+
 -- poe-price-check -- tkinter override_redirect вікно. Пробували windowrule
 -- (pin, stay_focused, окремо й разом) -- жоден комбо не прибрав ні
 -- неклікабельність, ні "втечу" кліків на PoE при перемиканні workspace, поки
@@ -148,8 +170,10 @@ hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("nebula-ocr-wl"))
 hl.bind("SUPER + SHIFT + X", hl.dsp.exec_cmd("nebula-color-picker-wl"))
 hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("nwg-look"))
 hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("pavucontrol"))
+-- surf замість xdg-open -- окреме вікно без вкладок/адресного рядка
+-- браузера, той самий готовий HTML/CSS/JS без переписування.
 hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd(
-    "xdg-open file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
+    "surf file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
 ))
 hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd(
     "sh -c 'cd ~/Applications/SwiftpointX1 && ./\"Swiftpoint X1 Control Panel\"'"
@@ -157,7 +181,7 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd(
 hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd(
     'wezterm start --always-new-process -- sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'
 ))
-hl.bind("SUPER + Equal", hl.dsp.exec_cmd("nebula-calc-wl"))
+hl.bind("SUPER + Equal", hl.dsp.exec_cmd("qalculate-gtk"))
 
 -- Медіа/яскравість -- ті самі команди, що й у crew/bspwm.nix, портативні
 -- (wpctl/brightnessctl не залежать від X11/bspwm).
