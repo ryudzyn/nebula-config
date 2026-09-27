@@ -2501,3 +2501,80 @@ GTK3 + `gtk-layer-shell` (a real native-Wayland popup, the same mechanism waybar
 which sidesteps the whole override-redirect/XWayland category of bug by construction. Sized as a real
 follow-up (new Nix deps, two functions rewritten), not attempted yet — deferred by user choice over
 finishing it same-session. Do not re-attempt a windowrule-only fix for this; it's been tried.
+
+**Ideas for later** (not scoped, just noted so they aren't lost):
+- Roulette (`super+shift+r`, currently `xdg-open` on a static `assets/cprogram/roulette.html`) —
+  build it as its own real little app/program instead of a static page.
+- Calculator (`super+equal`, currently `nebula-calc-wl` / rofi-calc) — replace with something more
+  capable than a plain rofi expression evaluator.
+
+## Follow-up #41 (2026-09-27): portal fix confirmed live, full bspwm→Hyprland bind port via `noctalia msg`,
+Exiled Exchange 2 packaged, and the real story behind Awakened's "unfixable" Ctrl+D turned out wrong
+
+**Portal fix (`core/desktop.nix`) confirmed live**: `xdg.portal.config.common` was hardcoding
+`ScreenCast`/`Screenshot` to `"halley"` for *every* session, not just halley's own — halley already
+declares `UseIn=Halley` in its own `.portal` file, so the override was both redundant and actively
+harmful once Hyprland became a real second session (Hyprland isn't running when halley's portal
+backend is expected to serve the request, so the call just goes nowhere). Removed the override,
+confirmed via `journalctl --user -u xdg-desktop-portal`: `Choosing hyprland.portal for
+org.freedesktop.impl.portal.Screenshot/ScreenCast via the deprecated UseIn key` — Discord screen
+share and Noctalia's own screenshot both confirmed working live after a `sysup` + relogin (stale
+per-session D-Bus-activated `dbus-:1.2-org.freedesktop.impl.portal.desktop.halley@0.service` had to
+be stopped manually once; a real relogin wouldn't need that step).
+
+**`noctalia msg` is a full IPC surface — check it before writing a replacement for anything.**
+Discovered while porting `crew/bspwm.nix`'s custom keybinds: Noctalia ships `noctalia msg <command>`
+covering session actions (`session lock/suspend/logout/reboot/shutdown`, `panel-toggle session` for
+an interactive power-menu), screenshots (`screenshot-fullscreen`, `screenshot-region`,
+`screenshot-annotate`), clipboard history (`panel-toggle clipboard`), wallpaper
+(`panel-toggle wallpaper`, `wallpaper-set/-next/-random`), theme (`theme-mode-toggle`), idle
+inhibit (`caffeine-toggle`, replaces the old `nebula-awake` script), DPMS, and a native
+`window-switcher`. All of these are now bound directly in `crew/hyprland/hyprland.lua` instead of
+reimplementing with separate X11 tools (nitrogen, clipmenu, a custom always-on-top script, etc.) —
+per explicit user instruction ("if Noctalia already has it, use that"). What Noctalia does *not*
+cover got small Wayland-native wrapper scripts in `crew/hyprland/default.nix`: `nebula-ocr-wl`
+(grim+slurp+tesseract, replacing `maim -s`), `nebula-color-picker-wl` (hyprpicker, replacing
+`xcolor` — X11-only), `nebula-calc-wl` (same rofi-calc as bspwm, just `wl-copy` instead of `xclip`,
+and the `-plugin-path` had to move into a proper Nix wrapper since `.lua` files can't interpolate
+Nix store paths). Explicitly *not* ported: `super+m` (bspwm's monocle-layout toggle has no direct
+Hyprland/dwindle equivalent) and `super+F1/F2/F3` (`crew/modes.nix`'s `mode-work/study/play` call
+`bspc desktop -f`, which no-ops under Hyprland — needs a `hyprctl dispatch workspace` rewrite,
+not attempted since `crew/modes.nix` is shared across both sessions).
+
+**Exiled Exchange 2 (PoE2's Awakened-equivalent) packaged** (`crew/hyprland/default.nix`,
+`appimageTools.extractType2` + `makeWrapper`, same idiom as nixpkgs' own `awakened-poe-trade`
+package.nix) — confirmed via its `package.json` to depend on the *exact* same
+`electron-overlay-window@4.0.2` / `uiohook-napi@1.5.4` as Awakened, so the same two fixes
+(`--ozone-platform=x11`, `is_evdev` patch — reused the already-built `uiohook-napi-x11-fix`
+derivation unchanged, exact version match) were applied preemptively. A live vanilla test first
+(no patches) reproduced the identical `XkbGetKeyboard failed` log line, confirming the shared-bug
+prediction before spending time patching.
+
+**This overturns Follow-up #40's "Ctrl+D is unfixable on Hyprland 0.55.4" conclusion — it was our
+own windowrule, not a Hyprland limitation.** Awakened's Ctrl+D windowrule included `no_focus = true`
+(to stop the overlay stealing Hyprland focus); Exiled Exchange 2 got the *identical* rule minus
+`no_focus`, and Ctrl+D worked immediately, live-confirmed, first try. Removed `no_focus` from
+Awakened's rule too — **needs a live re-test in PoE1** to confirm it's actually fixed now, not just
+inferred from EE2. The `_NET_ACTIVE_WINDOW`-stays-0x0 observation from Follow-up #40 was real
+(confirmed via `xprop`), but the mechanism connecting it to `no_focus` specifically wasn't
+investigated further — don't re-litigate *why* without new evidence, just don't put `no_focus` back
+on these overlay rules.
+
+**Two more windowrule/behavior bugs found and fixed on EE2, both instructive:**
+- Clicking on another workspace while the EE2 price overlay was showing kept sending input to the
+  Path of Exile 2 window instead — **root cause was `pin = true`** on the overlay's windowrule. This
+  is the exact same bug already diagnosed and fixed for `poe-price-check`'s popup earlier the same
+  week (Follow-up #40) — got reintroduced here because the Awakened/EE2 rules were written fresh
+  without cross-checking that earlier lesson. Removed `pin` from both the Awakened and both EE2
+  windowrules. **`pin` on a floating overlay-style rule is now a known footgun for this whole
+  category of app — do not add it back.**
+- The price popup disappearing the instant the mouse moved away from the hover position looked like
+  a Hyprland focus bug (tried `follow_mouse = 0`, since bspwm never set `focus_follows_pointer` and
+  Hyprland's `follow_mouse = 1` default was a real behavior change) — but two live tests (one gave a
+  false negative because EE2 had already crashed between the config change and the test) showed
+  `follow_mouse` made no difference either way. Root cause was in EE2's own `app.asar` (`AreaTracker`
+  class): moving the mouse more than `closeThreshold` pixels from the hover-start position sends a
+  "hide" event *unless* the hold-key (Ctrl) is still pressed — this is deliberate upstream UX, not a
+  bug, and has nothing to do with the compositor. Reverted `follow_mouse` back to Hyprland's default.
+  **The fix is behavioral, not config**: keep holding Ctrl while moving the mouse onto the popup to
+  interact with it, release once there.

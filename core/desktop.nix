@@ -23,10 +23,14 @@
       self.packages.${pkgs.stdenv.hostPlatform.system}.halley
       pkgs.xdg-desktop-portal-gtk
     ];
-    config.common = {
-      default = [ "gtk" ];
-      "org.freedesktop.impl.portal.ScreenCast" = [ "halley" ];
-      "org.freedesktop.impl.portal.Screenshot" = [ "halley" ];
-    };
+    # ScreenCast/Screenshot тут раніше форсились на "halley" у config.common
+    # -- тобто для ВСІХ сесій, не тільки halley. Halley сам оголошує
+    # `UseIn=Halley` у власному .portal-файлі (перевірено:
+    # /nix/store/.../share/xdg-desktop-portal/portals/halley.portal), тож
+    # цей глобальний override був не просто зайвим, а шкідливим у Hyprland-
+    # сесії: halley там не запущений, портал-запит впирався в нікуди --
+    # звідси і скріншот у Noctalia, і screen-share в Discord мовчки не
+    # працювали. Прибрано; кожна сесія сама бере свій портал за UseIn=.
+    config.common.default = [ "gtk" ];
   };
 }

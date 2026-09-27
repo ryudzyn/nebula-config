@@ -17,6 +17,13 @@ hl.config({
     -- crew/bspwm.nix — тримати всі три копії в синхроні при зміні розкладки.
     kb_layout = "us,ua,de",
     kb_options = "grp:alt_shift_toggle",
+    -- follow_mouse=0 -- перевірено вдруге, з живим EE2, PoE все одно
+    -- перехоплював контроль. Не той фікс, прибрано остаточно. Реальна
+    -- причина зникання попапу при наведенні -- власна uiohook-логіка
+    -- застосунку (AreaTracker: рух миші без утримання Ctrl понад
+    -- closeThreshold = сигнал "сховати", ніяк не пов'язано з Hyprland-
+    -- фокусом), а "PoE перехоплює контроль на інших workspace" -- та сама
+    -- причина, що й із poe-price-check: `pin = true` (див. нижче).
   },
 })
 
@@ -38,26 +45,51 @@ end)
 
 -- Awakened PoE Trade -- встановлений, оверлей/тултіп працює (no_blur,
 -- клікабельні кнопки гри через --ozone-platform=x11, дивись
--- crew/hyprland/default.nix), АЛЕ Ctrl+D (і всі інші дії, завʼязані на
--- electron-overlay-window) НЕ ПРАЦЮЮТЬ і не запрацюють без патчу поза
--- розумним обсягом: Hyprland 0.55.4 лишає X11-властивість
--- _NET_ACTIVE_WINDOW як 0x0 для XWayland-клієнтів (підтверджено `xprop
--- -root`), а саме на неї спирається electron-overlay-window, щоб
--- зрозуміти, що гра активна, і зареєструвати глобальний Ctrl+D. no_focus
--- тут не зайвий (без нього вікно оверлею іноді перехоплює Hyprland-фокус),
--- але кореневу причину не лікує. Community-рецепт з
--- SnosMe/awakened-poe-trade#1137. Основний прайс-чекер на Hyprland --
--- poe-price-check (нижче), саме через цю причину.
+-- crew/hyprland/default.nix). Раніше тут стояв no_focus, і з ним Ctrl+D не
+-- працював -- висновок був "Hyprland 0.55.4 не виставляє _NET_ACTIVE_WINDOW
+-- для XWayland, не лагодиться". 2026-09-27: Exiled Exchange 2 (той самий
+-- electron-overlay-window/uiohook-napi код, PoE2-форк Awakened) отримав
+-- ІДЕНТИЧНЕ правило БЕЗ no_focus -- і Ctrl+D в ньому працює одразу, живо
+-- підтверджено. Тобто справжня причина провалу в Awakened, схоже, був саме
+-- no_focus (заважав XWM-у Hyprland коректно віддавати фокус назад грі), а
+-- не непоборний ліміт компоситора -- прибрано, ПОТРІБЕН повторний живий
+-- тест Ctrl+D в PoE1.
+-- pin теж прибрано (та сама причина, що й у poe-price-check нижче: pinned
+-- вікно "тікає" на всі workspace одночасно, і клік на ІНШОМУ workspace
+-- плутано роутиться на гру -- живо підтверджено з EE2 2026-09-27).
 hl.window_rule({
     name  = "awakened-poe-trade-overlay",
     match = { class = "^awakened-poe-trade$" },
 
     float = true,
     no_blur = true,
-    no_focus = true,
     no_shadow = true,
     border_size = 0,
-    pin = true,
+})
+
+-- Exiled Exchange 2 (PoE2) -- той самий рецепт, АЛЕ без no_focus (див.
+-- коментар вище над awakened-poe-trade-overlay) -- живо підтверджено:
+-- Ctrl+D працює. class з .desktop (StartupWMClass=Exiled Exchange 2) міг
+-- відрізнятись від реального runtime app-id (як і в Awakened, де
+-- StartupWMClass не збігався з "awakened-poe-trade") -- обидва варіанти
+-- про всяк випадок.
+hl.window_rule({
+    name  = "exiled-exchange-2-overlay",
+    match = { class = "^Exiled Exchange 2$" },
+
+    float = true,
+    no_blur = true,
+    no_shadow = true,
+    border_size = 0,
+})
+hl.window_rule({
+    name  = "exiled-exchange-2-overlay-lc",
+    match = { class = "^exiled-exchange-2$" },
+
+    float = true,
+    no_blur = true,
+    no_shadow = true,
+    border_size = 0,
 })
 
 -- poe-price-check -- tkinter override_redirect вікно. Пробували windowrule
@@ -71,7 +103,7 @@ hl.window_rule({
 
 -- Основні
 hl.bind("SUPER + Return", hl.dsp.exec_cmd(terminal))
-hl.bind("SUPER + D", hl.dsp.exec_cmd("fuzzel"))
+hl.bind("SUPER + D", hl.dsp.exec_cmd("noctalia msg panel-toggle launcher"))
 -- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix
 -- біндить те саме на super+p через sxhkd, але sxhkd -- X11-демон з bspwm-сесії,
 -- на Hyprland він не піднятий; тут окремий, нативний Hyprland-бінд, який не
@@ -80,6 +112,60 @@ hl.bind("SUPER + P", hl.dsp.exec_cmd("poe-price-check"))
 hl.bind("SUPER + Q", hl.dsp.window.close())
 hl.bind("SUPER + F", hl.dsp.window.fullscreen({}))
 hl.bind("SUPER + SHIFT + Space", hl.dsp.window.float({}))
+-- Pin -- закріпити плаваюче вікно поверх усіх воркспейсів (той самий
+-- super+shift+p, що й always-on-top у crew/bspwm.nix). Не floating-вікно
+-- pin просто ігнорує -- спершу SUPER+SHIFT+Space.
+hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin())
+
+-- Скріншоти -- Noctalia сама це вміє (noctalia msg), той самий набір, що й
+-- maim/xclip-біндами в crew/bspwm.nix (Print/super+shift+s).
+hl.bind("Print", hl.dsp.exec_cmd("noctalia msg screenshot-fullscreen"))
+hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("noctalia msg screenshot-region"))
+
+-- Переміщення/зміна розміру вікна мишею: SUPER + ЛКМ тягне, SUPER + ПКМ
+-- ресайзить (mouse:272/273 -- стандартні коди кнопок з офіційного
+-- дефолтного hyprland.lua, mouse=true обов'язковий для mouse-біндів).
+hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
+
+-- Порт решти кастомних bspwm-біндів (crew/bspwm.nix) під Hyprland. Де
+-- Noctalia сама вміє те саме (noctalia msg) -- береться саме воно, а не
+-- окремий X11-інструмент/скрипт: лок, power-menu, dpms, theme, wallpaper,
+-- caffeine (=nebula-awake), clipboard-історія, window switcher.
+hl.bind("SUPER + Escape", hl.dsp.exec_cmd("noctalia msg session lock"))
+hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd("noctalia msg panel-toggle session"))
+hl.bind("SUPER + SHIFT + Escape", hl.dsp.exec_cmd("noctalia msg dpms-off"))
+hl.bind("SUPER + N", hl.dsp.exec_cmd("noctalia msg theme-mode-toggle"))
+hl.bind("SUPER + W", hl.dsp.exec_cmd("noctalia msg panel-toggle wallpaper"))
+hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("noctalia msg caffeine-toggle"))
+hl.bind("SUPER + V", hl.dsp.exec_cmd("noctalia msg panel-toggle clipboard"))
+hl.bind("SUPER + Tab", hl.dsp.exec_cmd("noctalia msg window-switcher"))
+
+-- Немає нативного еквіваленту в Noctalia -- лишаються окремими
+-- інструментами/скриптами (nwg-look конфігурує GTK-тему застосунків
+-- взагалі, не саму Noctalia, тож не замінюється).
+hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("nebula-ocr-wl"))
+hl.bind("SUPER + SHIFT + X", hl.dsp.exec_cmd("nebula-color-picker-wl"))
+hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("nwg-look"))
+hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("pavucontrol"))
+hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd(
+    "xdg-open file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
+))
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd(
+    "sh -c 'cd ~/Applications/SwiftpointX1 && ./\"Swiftpoint X1 Control Panel\"'"
+))
+hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd(
+    'wezterm start --always-new-process -- sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'
+))
+hl.bind("SUPER + Equal", hl.dsp.exec_cmd("nebula-calc-wl"))
+
+-- Медіа/яскравість -- ті самі команди, що й у crew/bspwm.nix, портативні
+-- (wpctl/brightnessctl не залежать від X11/bspwm).
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"))
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"))
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"))
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set 5%+"))
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
 
 -- Фокус між вікнами
 hl.bind("SUPER + Left", hl.dsp.focus({ direction = "l" }))
@@ -92,3 +178,4 @@ for i = 1, 9 do
     hl.bind("SUPER + " .. i, hl.dsp.focus({ workspace = i }))
     hl.bind("SUPER + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
+

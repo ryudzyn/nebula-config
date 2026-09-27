@@ -1,5 +1,43 @@
 { config, pkgs, ... }:
 let
+  # Той самий звужений (укр/eng) tesseract, що й crew/bspwm.nix -- окрема
+  # копія тут навмисно, кожен crew-модуль лишається самодостатнім (див.
+  # CLAUDE.md), а override -- це два рядки, не варте крос-модульного імпорту.
+  tesseract-ocr = pkgs.tesseract.override { enableLanguages = [ "eng" "ukr" ]; };
+
+  # Wayland-порт nebula-ocr з crew/bspwm.nix: maim -s -> grim+slurp,
+  # xclip -> wl-copy. Та сама логіка/notify-send-патерн.
+  nebula-ocr-wl = pkgs.writeShellScriptBin "nebula-ocr-wl" ''
+    tmp=$(${pkgs.coreutils}/bin/mktemp --suffix=.png)
+    trap 'rm -f "$tmp"' EXIT
+    ${pkgs.grim}/bin/grim -g "$(${pkgs.slurp}/bin/slurp)" "$tmp" || exit 1
+    text=$(${tesseract-ocr}/bin/tesseract "$tmp" - -l ukr+eng 2>/dev/null)
+    if [ -z "$text" ]; then
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "OCR" "Текст не розпізнано"
+      exit 0
+    fi
+    printf '%s' "$text" | ${pkgs.wl-clipboard}/bin/wl-copy
+    preview=$(printf '%s' "$text" | head -c 120)
+    ${pkgs.libnotify}/bin/notify-send -t 3000 "OCR → буфер" "$preview"
+  '';
+
+  # Wayland-порт nebula-color-picker: xcolor (X11-лише) -> hyprpicker,
+  # яке саме копіює hex у буфер через -a.
+  nebula-color-picker-wl = pkgs.writeShellScriptBin "nebula-color-picker-wl" ''
+    color=$(${pkgs.hyprpicker}/bin/hyprpicker -a)
+    if [ -n "$color" ]; then
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "Color picker → буфер" "$color"
+    fi
+  '';
+
+  # Wayland-порт калькулятора з crew/bspwm.nix: та сама rofi-calc команда,
+  # тільки xclip -> wl-copy. -plugin-path не можна інтерполювати з .lua
+  # (там нема доступу до Nix-стору), тому обгортка тут, як і решта.
+  nebula-calc-wl = pkgs.writeShellScriptBin "nebula-calc-wl" ''
+    ${pkgs.rofi}/bin/rofi -modi calc -show calc -plugin-path ${pkgs.rofi-calc}/lib/rofi \
+      -no-show-match -no-sort \
+      -calc-command "echo -n '{result}' | ${pkgs.wl-clipboard}/bin/wl-copy"
+  '';
   # Ctrl+D (і всі інші глобальні хоткеї Awakened) не працюють на XWayland:
   # уся детекція клавіш іде через вбудований uiohook-napi 1.5.4, чий
   # load_input_helper() (libuiohook/src/x11/input_helper.c) намагається
@@ -55,6 +93,50 @@ let
     '';
   };
 
+  # Exiled Exchange 2 (PoE2 price-checker) -- неофіційний наступник Awakened
+  # PoE Trade, той самий package.json: electron-overlay-window@4.0.2,
+  # uiohook-napi@1.5.4 (перевірено -- точно та сама версія, той самий
+  # node.napi.node з uiohook-napi-x11-fix вище підходить без перезбірки).
+  # Живий тест на "чистій" версії (2026-09-27) підтвердив той самий
+  # is_evdev/XkbGetKeyboard баг у логах -- тому тут одразу з обома фіксами
+  # (той самий рецепт, що й awakened-poe-trade-x11 нижче):
+  # --ozone-platform=x11 + патчений uiohook.
+  exiled-exchange-2 = pkgs.stdenv.mkDerivation rec {
+    pname = "exiled-exchange-2";
+    version = "0.16.3";
+
+    src = pkgs.fetchurl {
+      url = "https://github.com/Kvan7/Exiled-Exchange-2/releases/download/v${version}/Exiled-Exchange-2-${version}.AppImage";
+      hash = "sha256-aAHFELdlL7cccpzAW9ROHF1hZDAnQGTLLtDonS0CT2Q=";
+    };
+
+    appImageContents = pkgs.appimageTools.extractType2 { inherit pname src version; };
+
+    dontUnpack = true;
+    dontConfigure = true;
+    dontBuild = true;
+
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out/share/exiled-exchange-2"
+      cp -a "${appImageContents}"/{locales,resources} "$out/share/exiled-exchange-2"
+      chmod -R u+w "$out/share/exiled-exchange-2"
+
+      cp ${uiohook-napi-x11-fix}/node.napi.node \
+        "$out/share/exiled-exchange-2/resources/app.asar.unpacked/node_modules/uiohook-napi/prebuilds/linux-x64/node.napi.node"
+
+      runHook postInstall
+    '';
+
+    postFixup = ''
+      makeWrapper ${pkgs.lib.getExe pkgs.electron} "$out/bin/exiled-exchange-2" \
+        --add-flags "$out/share/exiled-exchange-2/resources/app.asar --ozone-platform=x11" \
+        --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.libxtst pkgs.libxt ]}
+    '';
+  };
+
   # Нативний Wayland-режим Electron ламає click-through оверлею — вікно
   # ловить весь інпут і блокує кнопки гри під собою. Форсуємо XWayland
   # через --ozone-platform=x11 (живо перевірено на Hyprland: з цим флагом
@@ -94,7 +176,25 @@ in
   # Рішення "Awakened чи poe-price-check" (див. план міграції) прийняте
   # 2026-09-20 після живого тесту на Hyprland: Awakened працює нормально з
   # цими двома фіксами → лишається основним, Windows dual-boot не потрібен.
-  home.packages = [ awakened-poe-trade-x11 ];
+  home.packages = [
+    awakened-poe-trade-x11
+    exiled-exchange-2
+    # Скріншот-біндинги в hyprland.lua (Print, super+shift+s) -- Wayland-
+    # еквівалент bspwm-івського maim+xclip з crew/bspwm.nix: grim знімає,
+    # slurp обирає ділянку, wl-clipboard -- буфер обміну для Wayland (xclip
+    # там працює тільки з X11-застосунками через XWayland).
+    pkgs.grim
+    pkgs.slurp
+    pkgs.wl-clipboard
+    nebula-ocr-wl
+    nebula-color-picker-wl
+    nebula-calc-wl
+    # rofi/rofi-calc/nwg-look вже стоять через crew/bspwm.nix/theming.nix
+    # (спільний home-manager профіль, доступні і в Hyprland-сесії);
+    # pavucontrol/hyprpicker там нема -- додаю тут.
+    pkgs.pavucontrol
+    pkgs.hyprpicker
+  ];
 
   # hyprland.lua/tweaks.lua лишаються звичайними файлами в репо (не в .nix) —
   # mkOutOfStoreSymlink лінкує ~/.config/hypr/* прямо на файл у чекауті
