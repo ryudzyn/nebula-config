@@ -1,5 +1,9 @@
 { config, pkgs, lib, ... }:
 {
+  # nix-ld -- дозволяє запускати НЕ-Nix-збірені бінарники (закачані appimage,
+  # чужі .deb-розпаковки, IDE-плагіни з власними бінарями тощо) через
+  # підмінений динамічний лінкер, який шукає ці бібліотеки за стандартними
+  # шляхами замість жорсткого /nix/store-хеша, вшитого в NixOS-збірки.
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
@@ -33,6 +37,10 @@
     ];
   };
 
+  # Swiftpoint-миша (Z/Z2/Z3, звичайний і bootloader-режим для прошивки) та
+  # Kinetis-bootloader -- без MODE="0666" ці hidraw-пристрої доступні тільки
+  # root, тож crew/bspwm.nix'ів Swiftpoint Control Panel не зміг би до них
+  # достукатись з-під звичайного юзера.
   services.udev.extraRules = ''
     KERNEL=="hidraw*", ATTRS{idVendor}=="214e", ATTRS{idProduct}=="0005", MODE="0666", TAG+="Swiftpoint_Z"
     KERNEL=="hidraw*", ATTRS{idVendor}=="214e", ATTRS{idProduct}=="0007", MODE="0666", TAG+="Swiftpoint_Z Bootloader"

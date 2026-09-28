@@ -1,10 +1,8 @@
 { config, pkgs, ... }:
 
 {
-  # Одразу ставимо правильний місцевий час
   time.timeZone = "Europe/Berlin";
 
-  # Основна мова системи
   i18n.defaultLocale = "uk_UA.UTF-8";
 
   # Дефолтний консольний (TTY) шрифт не містить кириличних гліфів, тож навіть
@@ -78,7 +76,6 @@
     "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
   ];
 
-  # Налаштування клавіатури для іксових/вейланд сесій
   # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
   # у двох місцях — core/games.nix (той самий services.xserver.xkb, окремо для
   # gamescope-сесії) і crew/bspwm.nix (через setxkbmap у bspwmrc, X11-еквівалент

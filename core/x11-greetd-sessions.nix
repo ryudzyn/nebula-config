@@ -29,57 +29,35 @@ let
     # display-managers/default.nix його дописує generic xsession-скрипт, якого
     # ми тут не використовуємо. Без нього клієнтський скрипт завершується
     # одразу після `wm & waitPID=$!`.
-    # Follow-up #6: X стартує чисто, але одразу після `wait "$waitPID"` WM
-    # репортував "Another window manager is already running" — виявилось,
-    # `$DISPLAY` у клієнтському скрипті був :0 (де реально живе
-    # halley/Xwayland-compat), а не :1. Форсуємо $DISPLAY явно, перед wm.start.
     #
-    # Follow-up #7: спершу піднімали Xorg через `xinit`, але його вбудована
-    # перевірка готовності сервера ("waiting for X server to begin accepting
-    # connections") ніколи не спрацьовувала — приблизно за 240с здавалась і
-    # вбивала сервер, хоча він сам увесь цей час був повністю робочий і
-    # приймав з'єднання (перевірено підключенням ззовні, 81/81 успіхів).
-    # Замінили на власний запуск Xorg у фоні + пулінг сокета
-    # /tmp/.X11-unix/X1, замість вбудованої в xinit перевірки. Це, своєю
-    # чергою, забрало неявний "-keeptty", який xinit завжди сам додає до
-    # команди сервера — без нього Xorg не міг отримати VT через
-    # systemd-logind ("Cannot open virtual console: Permission denied").
-    #
-    # Follow-up #9: VSCodium не запускався в цій сесії — з'ясувалось,
-    # greetd/pam_systemd протікає `XDG_SESSION_TYPE=wayland` навіть у цю
-    # приватну X11-сесію (той самий клас багу, що й DISPLAY=:0 у Follow-up
-    # #6, лише інша змінна). Electron/Chromium (принаймні VSCodium) читає
-    # XDG_SESSION_TYPE напряму для вибору ozone-бекенду, незалежно від
-    # прапорців у власній обгортці пакета — бачить "wayland", намагається
-    # підключитись, отримує "Connection refused" (жодного wayland-компоцитора
-    # тут нема) і виходить, вікно так і не з'являється. Підтверджено
-    # порівняльним тестом: з протеклим XDG_SESSION_TYPE=wayland — та сама
-    # помилка; з форсованим XDG_SESSION_TYPE=x11 — запускається нормально.
+    # Історія фіксів нижче (усі підтверджені живими тестами) -- один
+    # повторюваний клас бага: різні споживачі (WM, Electron, sxhkd,
+    # D-Bus-активовані user-сервіси) або бачать чуже оточення (DISPLAY=:0 від
+    # halley/Xwayland-compat, протеклий XDG_SESSION_TYPE=wayland від
+    # greetd/pam_systemd), або не бачать потрібного (XDG_DATA_DIRS з
+    # home-manager, DISPLAY у systemd --user), бо ця xinit-сесія — не
+    # login-шел і не звичайний generic-xsession-скрипт:
+    # - DISPLAY форсується явно (був :0, мав бути :1)
+    # - XDG_SESSION_TYPE форсується в x11 (Electron/VSCodium бачив протеклий
+    #   "wayland", ловив "Connection refused" і не показував вікно)
+    # - xinit замінено на прямий запуск Xorg + пулінг /tmp/.X11-unix/X1:
+    #   вбудована перевірка готовності xinit ніколи не спрацьовувала (~240с
+    #   таймаут і вбивство сервера, хоча він приймав з'єднання), а неявний
+    #   "-keeptty" від xinit тепер треба ставити вручну (без нього — "Cannot
+    #   open virtual console: Permission denied")
     clientScript = ''
       export DISPLAY=:1
       export XDG_SESSION_TYPE=x11
 
-      # Follow-up #12: home.sessionVariables (напр. crew/theming.nix'ів
-      # XDG_DATA_DIRS для gsettings-desktop-schemas) експортуються лише в
-      # /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh,
-      # який джерелять login-шели — ця xinit-сесія такою не є, тож sxhkd/WM
-      # їх ніколи не бачили (підтверджено читанням /proc/<sxhkd>/environ:
-      # XDG_DATA_DIRS без gsettings-schemas). Джерелимо той самий файл тут,
-      # той самий клас фіксу, що й DISPLAY/XDG_SESSION_TYPE вище.
+      # hm-session-vars.sh (XDG_DATA_DIRS з gsettings-desktop-schemas тощо) —
+      # джерелять тільки login-шели, ця сесія такою не є.
       . /etc/profiles/per-user/ryudzyn/etc/profile.d/hm-session-vars.sh
 
-      # Follow-up #14: D-Bus-активовані user-сервіси (напр.
-      # xdg-desktop-portal-gtk.service, який реалізує org.freedesktop.portal.
-      # Settings — звідти GTK4/libadwaita-застосунки типу pavucontrol беруть
-      # color-scheme, бо GTK4, на відміну від GTK3, вже не читає
-      # org.gnome.desktop.interface напряму через gsettings) стартують не з
-      # цього скрипта, а через systemd --user manager. Той успадковує своє
-      # власне оточення окремо від тутешнього export DISPLAY=:1 вище — без
-      # явного import-environment у нього DISPLAY відсутній, сервіс падає з
-      # "cannot open display", ловить start-limit-hit і лишається в failed
-      # до кінця сесії. Той самий клас бага, що й XDG_DATA_DIRS/DISPLAY/
-      # XDG_SESSION_TYPE у Follow-up #6/#9/#12, лише інший споживач
-      # (dbus-activated user unit, не прямий child-процес).
+      # D-Bus-активовані user-сервіси (напр. xdg-desktop-portal-gtk.service —
+      # звідти GTK4/libadwaita типу pavucontrol бере color-scheme) стартують
+      # через systemd --user manager, який успадковує СВОЄ оточення, а не
+      # export DISPLAY вище — без import-environment падає з "cannot open
+      # display" і лишається failed до кінця сесії.
       systemctl --user import-environment DISPLAY XDG_SESSION_TYPE
       ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd DISPLAY XDG_SESSION_TYPE
 

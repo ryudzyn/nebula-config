@@ -4,14 +4,13 @@
   users.users.ryudzyn = {
     isNormalUser = true;
     description = "ryudzyn";
-    extraGroups = [ 
-      "networkmanager" 
-      "wheel" # Надає права sudo
-      "video" 
-      "audio" 
-      "input" 
+    extraGroups = [
+      "networkmanager"
+      "wheel" # sudo
+      "video"
+      "audio"
+      "input"
     ];
-    # Одразу ставимо Zsh як оболонку за замовчуванням
     shell = pkgs.zsh;
   };
 
@@ -21,6 +20,7 @@
   # одразу мати живий Remote Control сеанс, не логінячись фізично.
   users.users.ryudzyn.linger = true;
 
-  # Оскільки ми вказали Zsh вище, систему треба попередити, що він увімкнений
-  programs.zsh.enable = true; 
+  # programs.zsh.enable реєструє /etc/shells -- без цього users.users.*.shell
+  # вище формально вказував би на неавторизовану оболонку.
+  programs.zsh.enable = true;
 }

@@ -1,11 +1,11 @@
 { pkgs, lib, ... }:
 {
   environment.systemPackages = with pkgs; [
-    lutris
-    heroic
-    bottles
-    ryubing
-    wineWow64Packages.staging
+    lutris # менеджер non-Steam ігор (GOG/Epic через плагіни, кастомні wine-префікси)
+    heroic # нативний лаунчер GOG/Epic Games Store
+    bottles # окремі wine-контейнери під конкретні Windows-застосунки, не лише ігри
+    ryubing # емулятор Nintendo Switch (форк Ryujinx)
+    wineWow64Packages.staging # wine з ще не змерджиними в stable патчами -- ширша сумісність
     gamescope
   ];
 

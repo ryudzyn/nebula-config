@@ -2,11 +2,11 @@
   description = "Nebula OS";
 
   inputs = {
-    zen-browser = {
+    zen-browser = { # Firefox-форк, core/packages.nix
       url = "github:youwen5/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    spicetify-nix = {
+    spicetify-nix = { # моди/теми для Spotify-клієнта, crew/media.nix
       url = "github:Gerg-L/spicetify-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };

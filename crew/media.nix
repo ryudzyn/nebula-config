@@ -17,5 +17,5 @@ in
     ];
   };
 
-  home.packages = [ pkgs.pear-desktop ];
+  home.packages = [ pkgs.pear-desktop ]; # нативний клієнт YouTube Music (Electron-обгортка)
 }

@@ -122,6 +122,66 @@ let
     fi
   '';
 
+  # Toggle живого рендеру Землі з космосу як root-фону замість статичної
+  # nebula-шпалери — хост зветься "earth", тож пряме влучання в тему. Toggle,
+  # а не безумовний автостарт: інакше кожен 5-хвилинний перерендер xplanet
+  # затирав би будь-яку шпалеру, обрану через variety (super+w) — той самий
+  # root window, той самий конфлікт, що й будь-які два інструменти, які
+  # малюють фон незалежно один від одного. orthographic — планета сферою на
+  # зоряному тлі (не плаский equirectangular-прямокутник на весь екран),
+  # starfreq додає розсипані зорі навколо. Без cloud_threshold/живого
+  # хмарного шару навмисно — вимагало б окремого зовнішнього сервісу для
+  # щогодинних супутникових знімків хмар, яких давно нема в публічному
+  # доступі безкоштовно; термінатор дня/ночі й обертання Землі xplanet
+  # рахує сам, локально, з системного часу, без інтернету. Вимкнення
+  # повертає ту саму nebula-шпалеру через feh, що й bspwmrc за замовчуванням.
+  nebula-earth-toggle = pkgs.writeShellScriptBin "nebula-earth-toggle" ''
+    pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.pid"
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      kill "$(cat "$pidfile")"
+      rm -f "$pidfile"
+      ${pkgs.feh}/bin/feh --bg-fill ${../assets/wallpaper/wallpaper.jpg}
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Earth wallpaper" "Вимкнено"
+    else
+      ${pkgs.xplanet}/bin/xplanet -root -wait 300 -body earth -projection orthographic -starfreq 0.005 &
+      echo $! > "$pidfile"
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Earth wallpaper" "Увімкнено"
+    fi
+  '';
+
+  # Game mode — тумблер, вимикає все "декоративне" на робочому столі заради
+  # максимального FPS: композитор (picom — сам по собі невелике навантаження,
+  # але це ще й обов'язковий vsync/glx-пайплайн, зайвий для гри без
+  # прозорого оверлея), живий рендер Землі (nebula-earth-toggle вище, якщо
+  # активний) і сповіщення (dunstctl pause — щоб попап не зривав фокус
+  # посеред матчу). НЕ займається CPU/GPU-governor'ом — те вже покриває
+  # `programs.gamemode.enable` (core/games.nix) через `gamemoderun` на рівні
+  # конкретного запуску гри в Steam, дублювати тут через sudo-команди
+  # (ще й окремий polkit-правило) не варте ризику заради того самого ефекту.
+  # ВАЖЛИВО: вимкнений picom ламає прозорість оверлею crew/poe-price-check.nix
+  # (той самий "скло" ефект, що описаний у коментарі "Композитор" в bspwmrc
+  # нижче) — під час гри з активним прайс-чекером (PoE) не вмикати game mode,
+  # або вимикати назад перед перевіркою ціни.
+  nebula-gamemode-toggle = pkgs.writeShellScriptBin "nebula-gamemode-toggle" ''
+    statefile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-gamemode.state"
+    earthpid="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.pid"
+    if [ -f "$statefile" ]; then
+      rm -f "$statefile"
+      ${pkgs.picom}/bin/picom --config "$HOME/.config/picom.conf" &
+      ${pkgs.dunst}/bin/dunstctl set-paused false
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Game mode" "Вимкнено — композитор і сповіщення повернуто"
+    else
+      touch "$statefile"
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Game mode" "Увімкнено — композитор вимкнено, сповіщення на паузі"
+      pkill -x picom
+      if [ -f "$earthpid" ] && kill -0 "$(cat "$earthpid")" 2>/dev/null; then
+        kill "$(cat "$earthpid")"
+        rm -f "$earthpid"
+      fi
+      ${pkgs.dunst}/bin/dunstctl set-paused true
+    fi
+  '';
+
   # Клік по cpu/memory-пілюлі polybar — попап з розширеною системною
   # інфою (CPU/GPU temp, GPU usage/fan, RAM) замість окремих постійних
   # GPU/temp-модулів на панелі (щоб не перевантажувати панель інформацією).
@@ -246,8 +306,8 @@ $(cal)"
     }
     {
       key = "super + w";
-      cmd = "${pkgs.nitrogen}/bin/nitrogen";
-      desc = "Вибір шпалер (nitrogen)";
+      cmd = "${pkgs.variety}/bin/variety";
+      desc = "Вибір шпалер (variety)";
     }
     {
       key = "super + shift + t";
@@ -298,6 +358,16 @@ $(cal)"
       key = "super + shift + x";
       cmd = "nebula-color-picker";
       desc = "Піпетка кольору → hex у буфер";
+    }
+    {
+      key = "super + shift + g";
+      cmd = "nebula-earth-toggle";
+      desc = "Живий рендер Землі як шпалера (toggle, xplanet)";
+    }
+    {
+      key = "super + shift + f";
+      cmd = "nebula-gamemode-toggle";
+      desc = "Game mode — вимкнути композитор/фон/сповіщення заради FPS (toggle)";
     }
     {
       key = "super + shift + slash";
@@ -508,20 +578,13 @@ in
     done < <(${pkgs.xkb-switch}/bin/xkb-switch -W) &
   '';
 
-  # Мінімальний конфіг picom — лише те, що потрібно для коректного
-  # альфа-композитингу оверлей-вікна poe-price-check поверх fullscreen-гри
-  # (раніше — заради Awakened PoE Trade, видаленого в Follow-up #18).
-  # glx-backend і unredirect-fullscreen-windows=false — та сама комбінація,
-  # яку вже пробували в Follow-up #17 (TODO.md) як A/B-тест на причину краху
-  # PoE1 (сам компоситор тоді ні до чого не був — див. коментар в bspwmrc).
-  # vsync=true (2026-09-13, follow-up на підвисання курсора під час
-  # Discord-стрімів): раніше стояв vsync=false, але це давало компоситору
-  # композитити кадри без узгодження з дисплеєм, тож під додатковим GPU-
-  # навантаженням від кодування стріму саме курсор (рендериться через той
-  # самий GLX-пайплайн picom) "плавав" помітніше за все інше. Вимикання
-  # Hardware Acceleration у самому Discord цю проблему не зняло (перевірено
-  # користувачем) — тож тестуємо композитор. Якщо це не допоможе, наступний
-  # кандидат — backend = "xrender".
+  # Мінімальний конфіг picom -- навіщо композитор узагалі, і чому саме ця
+  # комбінація backend/unredirect, дивись коментар "Композитор" у bspwmrc
+  # вище. vsync=true (2026-09-13) -- окрема спроба зняти підвисання курсора
+  # під час Discord-стрімів (не root cause, той -- окремий, лишається
+  # відкритим, див. пам'ять project_mouse_stutter_discord_stream_gpu);
+  # вимикання апаратного прискорення в Discord не допомогло, наступний
+  # кандидат, якщо і це не спрацює, -- backend = "xrender".
   xdg.configFile."picom.conf".text = ''
     backend = "glx";
     vsync = true;
@@ -804,30 +867,34 @@ in
   };
 
   home.packages = with pkgs; [
-    rofi
-    polybar
-    maim
-    xclip
-    brightnessctl
-    i3lock-color
-    xidlehook
-    nitrogen
-    redshift
+    rofi # menu/launcher -- drun, dmenu (power-menu вище), калькулятор, window-list
+    polybar # панель (bspwmrc + xdg.configFile."polybar/config.ini" вище)
+    maim # скріншоти (Print, super+shift+s, і nebula-ocr всередині себе)
+    xclip # буфер обміну для X11 -- скріншоти/OCR/калькулятор пишуть сюди
+    brightnessctl # яскравість екрана (XF86MonBrightness*)
+    i3lock-color # блокування екрана (super+Escape, power-menu, nebula-idle)
+    xidlehook # авто-блокування за бездіяльністю (усередині nebula-idle)
+    variety # вибір шпалер (super+w)
+    redshift # нічний фільтр (автостарт у bspwmrc)
     power-menu
-    clipmenu
-    xkb-switch
-    dunst
-    rofi-calc
-    tesseract-ocr
-    wmctrl
-    xprop
-    gawk
+    clipmenu # історія буфера обміну (демон + пікер, super+v)
+    xkb-switch # опитування поточної розкладки для notify-send у bspwmrc
+    dunst # демон сповіщень (X11-нативний, на відміну від mako, див. bspwmrc)
+    rofi-calc # калькулятор-плагін для rofi (super+equal)
+    tesseract-ocr # розпізнавання тексту всередині nebula-ocr
+    wmctrl # керування вікнами (always-on-top всередині nebula-always-on-top)
+    xprop # читання X11-властивостей вікна (той самий always-on-top)
+    gawk # парсинг виводу sensors/wpctl у nebula-sysinfo/nebula-audioinfo
     nebula-awake
     nebula-idle
     nebula-ocr
     nebula-always-on-top
     nebula-color-picker
-    xcolor
+    xcolor # піпетка кольору всередині nebula-color-picker
+    nebula-earth-toggle
+    nebula-gamemode-toggle
+    astroterm # планетарій у терміналі -- зорі/планети/сузір'я в реальному часі
+    starfetch # ASCII-рендер сузір'їв у терміналі
     nebula-keybind-help
 
     # Price-checker для PoE1 — awakened-poe-trade (Electron) видалено,

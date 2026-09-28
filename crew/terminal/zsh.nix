@@ -13,7 +13,7 @@
       l = "${pkgs.eza}/bin/eza -lh --icons=auto";
       ll = "${pkgs.eza}/bin/eza -lha --icons=auto --sort=name --group-directories-first";
       cls = "clear";
-      sysup = "nh os switch ~/nebula-config";
+      sysup = "nh os switch ~/nebula-config"; # застосувати цей флейк (nixos-rebuild switch під капотом)
     };
   };
 

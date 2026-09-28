@@ -2,6 +2,21 @@
 {
   networking.networkmanager.enable = true;
 
+  # Мешева VPN -- прямий SSH/remote-control доступ до earth ззовні без
+  # port-forwarding, доповнює WoL-relay+A50-проєкт (пам'ять
+  # project_orbit_a50_remote_wake_vision): розбудити по WoL і одразу
+  # підключитись через tailnet, а не чекати відкритий порт на роутері.
+  # trustedInterfaces -- щоб nftables/networking.firewall не різав трафік
+  # усередині tailnet (SSH тощо) так само, як зовнішній інтернет.
+  # openFirewall відкриває UDP для NAT-traversal (direct-з'єднання без
+  # relay-серверів Tailscale, де це можливо).
+  #
+  # Передумова, яку Nix не покриває (одноразово вручну): `sudo tailscale up`
+  # -- інтерактивна авторизація через tailscale.com акаунт.
+  services.tailscale.enable = true;
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  services.tailscale.openFirewall = true;
+
   # Wake-on-LAN (магічний пакет). Прошите через systemd-udevd .link-файл — діє на рівні
   # мережевої карти незалежно від NetworkManager, тому вмикається без конфліктів.
   # Передумова в BIOS: "Resume By PCI-E Device" має бути увімкнено.

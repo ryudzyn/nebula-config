@@ -2,7 +2,6 @@
 
 {
   imports = [
-    # Тут ми будемо підключати наші системні модулі (ядро, звук, ігри)
     ./hardware.nix
     ../../core/bootloader.nix
     ../../core/system.nix
@@ -17,9 +16,10 @@
     ../../core/x11-greetd-sessions.nix
   ];
 
-  # Встановлюємо ім'я нашого корабля в мережі
   networking.hostName = "earth";
-  
-  # Версія стану системи
-  system.stateVersion = "23.11"; 
+
+  # НЕ підвищувати "просто так" при апдейті nixpkgs -- це версія формату
+  # stateful-даних (бази даних тощо), не версія NixOS, яку ми фактично
+  # використовуємо; змінювати лише за прямою вказівкою release notes.
+  system.stateVersion = "23.11";
 }

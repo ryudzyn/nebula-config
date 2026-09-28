@@ -30,6 +30,38 @@ let
     fi
   '';
 
+  # Анотований скріншот -- окремий від Noctalia-івського screenshot-region/
+  # -fullscreen (той без анотацій, просто в буфер). grim+slurp той самий
+  # конвеєр, що й у nebula-ocr-wl, але кадр пайпиться напряму в satty замість
+  # tesseract; satty сам зберігає у файл і копіює в буфер (Enter/Ctrl+C) через
+  # --copy-command.
+  nebula-screenshot-satty = pkgs.writeShellScriptBin "nebula-screenshot-satty" ''
+    ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"
+    ${pkgs.grim}/bin/grim -g "$(${pkgs.slurp}/bin/slurp)" - | ${pkgs.satty}/bin/satty \
+      --filename - \
+      --output-filename "$HOME/Pictures/Screenshots/satty-%Y%m%d-%H%M%S.png" \
+      --copy-command ${pkgs.wl-clipboard}/bin/wl-copy
+  '';
+
+  # Toggle-запис екрана: перший виклик стартує wf-recorder у фон і пише pid,
+  # другий (той самий бінд) бачить живий pid і шле SIGINT -- wf-recorder сам
+  # коректно фіналізує mp4 на SIGINT, "kill -9"/обрив файлу не дає.
+  nebula-record-toggle = pkgs.writeShellScriptBin "nebula-record-toggle" ''
+    set -eu
+    pidfile="/tmp/nebula-wf-recorder.pid"
+    outdir="$HOME/Videos/Recordings"
+    ${pkgs.coreutils}/bin/mkdir -p "$outdir"
+    if [ -f "$pidfile" ] && ${pkgs.coreutils}/bin/kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      ${pkgs.coreutils}/bin/kill -INT "$(cat "$pidfile")"
+      rm -f "$pidfile"
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "Запис екрана" "Зупинено"
+    else
+      ${pkgs.wf-recorder}/bin/wf-recorder -f "$outdir/record-$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S).mp4" &
+      echo $! > "$pidfile"
+      ${pkgs.libnotify}/bin/notify-send -t 2000 "Запис екрана" "Почато"
+    fi
+  '';
+
   # Ctrl+D (і всі інші глобальні хоткеї Awakened) не працюють на XWayland:
   # уся детекція клавіш іде через вбудований uiohook-napi 1.5.4, чий
   # load_input_helper() (libuiohook/src/x11/input_helper.c) намагається
@@ -102,7 +134,7 @@ let
       hash = "sha256-aAHFELdlL7cccpzAW9ROHF1hZDAnQGTLLtDonS0CT2Q=";
     };
 
-    appImageContents = pkgs.appimageTools.extractType2 { inherit pname src version; };
+    appImageContents = pkgs.appimageTools.extract { inherit pname src version; };
 
     dontUnpack = true;
     dontConfigure = true;
@@ -180,11 +212,25 @@ in
     pkgs.wl-clipboard
     nebula-ocr-wl
     nebula-color-picker-wl
+    nebula-screenshot-satty
+    nebula-record-toggle
     # rofi/nwg-look вже стоять через crew/bspwm.nix/theming.nix (спільний
     # home-manager профіль, доступні і в Hyprland-сесії); pavucontrol/
     # hyprpicker там нема -- додаю тут.
     pkgs.pavucontrol
     pkgs.hyprpicker
+    pkgs.satty
+    pkgs.wf-recorder
+    # hyprsunset -- Wayland-native нічний фільтр (redshift з crew/bspwm.nix --
+    # X11-лише, під Hyprland не працює), автостарт у hyprland.lua.
+    pkgs.hyprsunset
+    # hyprspace -- плагін overview воркспейсів, hl.plugin.load у hyprland.lua
+    # (шлях через стабільний per-user профіль, не прямий /nix/store-хеш).
+    pkgs.hyprlandPlugins.hyprspace
+    # imv -- нативний Wayland переглядач картинок. nsxiv (core/packages.nix)
+    # лишається X11-лише навмисно (коментар там), тут окремо, тільки для
+    # Hyprland-сесії, де nsxiv тягнув би XWayland.
+    pkgs.imv
     # Калькулятор (super+equal) -- rofi-calc замінено на Qalculate (набагато
     # потужніший: одиниці виміру, наукові функції, константи, конвертація
     # валют), окреме GTK-вікно замість rofi-попапу.

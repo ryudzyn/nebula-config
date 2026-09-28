@@ -6,8 +6,11 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    jack.enable = true;
+    jack.enable = true; # JACK-сумісність -- потрібна ardour/lmms (core/packages.nix, аудіопродакшн)
 
+    # Малий буфер (256 фреймів @ 48kHz ≈ 5.3мс) замість дефолтного -- нижча
+    # затримка для живого запису/моніторингу в ardour, ціна -- вищий ризик
+    # xrun'ів на важкому навантаженні (прийнятно для цього заліза).
     extraConfig.pipewire."92-low-latency" = {
       "context.properties" = {
         "default.clock.rate" = 48000;
