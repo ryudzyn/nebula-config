@@ -1,6 +1,6 @@
 # Nebula OS
 
-Особистий NixOS flake-конфіг: один хост `earth` (AMD/RX590 десктоп) + Home Manager профіль
+Особистий NixOS flake-конфіг: один хост `earth` (Intel i5-9400 + Arc A770 десктоп) + Home Manager профіль
 `ryudzyn`, зібрані разом в один flake. Детальніше про архітектуру -- в `CLAUDE.md`.
 
 ## Публічний чи приватний?

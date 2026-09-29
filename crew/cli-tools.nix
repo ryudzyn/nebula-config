@@ -25,7 +25,10 @@
 
   programs.btop = {
     enable = true;
-    package = pkgs.btop.override { rocmSupport = true; }; # rocm — бо в тебе AMD, не CUDA
+    # rocmSupport (AMD) прибрано разом із заміною заліза AMD RX590 -> Intel
+    # i5-9400 + Arc A770 (2026-09-29) -- btop підтримує лише
+    # cudaSupport/rocmSupport як build-флаги (перевірено джерело пакета),
+    # окремого Intel-флага нема, тож дефолтна збірка без override.
   };
   programs.cava.enable = true; # аудіо-візуалізатор у терміналі (спектр-аналізатор)
   programs.direnv = {

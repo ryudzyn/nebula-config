@@ -46,17 +46,32 @@ hl.on("hyprland.start", function()
     -- -- стартувати сам noctalia.service напряму, в обхід таргету.
     hl.exec_cmd("dbus-update-activation-environment --systemd --all")
     hl.exec_cmd("systemctl --user start noctalia.service")
+    -- xdg-desktop-portal.service -- та сама історія з "мертвим"
+    -- graphical-session.target, тільки гірша: юніт має Requisite=
+    -- (не PartOf=/After=, як noctalia.service), тому звичайний
+    -- `systemctl --user start` миттєво провалюється з "Dependency failed"
+    -- щоразу, коли БУДЬ-ЯКИЙ застосунок пробує достукатись до
+    -- org.freedesktop.portal.Desktop через D-Bus-активацію (Discord
+    -- screen-share мовчки "не реагував" саме через це -- сам D-Bus-виклик
+    -- ніколи не доходив до живого сервісу; live виявлено 2026-09-29).
+    -- --job-mode=ignore-dependencies обходить саме Requisite-перевірку.
+    hl.exec_cmd("systemctl --user start --job-mode=ignore-dependencies xdg-desktop-portal.service")
     hl.exec_cmd(terminal)
     -- Фіксована тепла температура замість розкладу день/ніч -- hyprsunset
     -- сам по собі без конфіг-файлу не знає, коли вмикати/вимикати профіль;
     -- розклад можна додати пізніше через ~/.config/hypr/hyprsunset.conf,
     -- якщо цього виявиться мало.
     hl.exec_cmd("hyprsunset -t 4500")
-    -- hyprspace -- шлях через стабільний per-user профіль (той самий, що й
-    -- /etc/profiles/per-user/ryudzyn/etc/profile.d/... у
-    -- core/x11-greetd-sessions.nix), не прямий /nix/store/<хеш>-hyprspace,
-    -- який змінюється щоразу при апдейті.
-    hl.plugin.load("/etc/profiles/per-user/ryudzyn/lib/libhyprspace.so")
+    -- Агент автентифікації polkit -- без нього немає GUI-діалогу пароля для
+    -- pkexec/"Format" у GNOME Disks тощо (живо виявлено 2026-09-29, деталі в
+    -- default.nix біля pkgs.hyprpolkitagent). Через systemd user-юніт пакета
+    -- (systemd.user.packages у default.nix), не напряму по шляху бінарника
+    -- -- перша спроба (жорсткий шлях на libexec/) провалилась, бо цей
+    -- каталог не потрапляє в per-user профіль (на відміну від lib/, як у
+    -- hyprspace). WantedBy=graphical-session.target у самому юніті не
+    -- спрацьовує тут (та сама причина, що й для noctalia.service вище),
+    -- тому старт явний.
+    hl.exec_cmd("systemctl --user start hyprpolkitagent.service")
 end)
 
 -- Awakened PoE Trade -- встановлений, оверлей/тултіп працює (no_blur,
@@ -198,9 +213,6 @@ local binds = {
     { key = "SUPER + SHIFT + S", desc = "Скріншот ділянки → буфер (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg screenshot-region") },
     -- Запис екрана (wf-recorder) -- той самий бінд стартує й зупиняє.
     { key = "SUPER + CTRL + R", desc = "Запис екрана (toggle, wf-recorder)", action = hl.dsp.exec_cmd("nebula-record-toggle") },
-    -- Overview воркспейсів (hyprspace) -- dispatcher плагіна, не в типізованому
-    -- hl.dsp, тож через hyprctl напряму.
-    { key = "SUPER + O", desc = "Overview воркспейсів (hyprspace)", action = hl.dsp.exec_cmd("hyprctl dispatch overview:toggle") },
 
     -- Special workspace ("scratchpad") -- прихована робоча область, куди можна
     -- закинути будь-яке вікно і потім показати/сховати одним хоткеєм, як

@@ -1,6 +1,24 @@
 # core/packages.nix
 { config, pkgs, self, inputs, ... }:
-
+let
+  # Discord screen-share на Wayland давало чорний кадр (портал і аудіо
+  # працюють, але жодного PipeWire відео-вузла не з'являлося) -- живо
+  # підтверджено 2026-09-29 і на discord-canary, і на звичайному discord.
+  # Причина: nixpkgs-івська обгортка (pkgs/by-name/di/discord/linux.nix)
+  # хардкодить --enable-features=WaylandWindowDecorations, але ніколи не
+  # додає WebRTCPipeWireCapturer -- без нього Chromium-івський
+  # desktopCapturer мовчки не йде шляхом PipeWire/portal. Chromium бере
+  # ОСТАННЄ входження --enable-features (не об'єднує), тож дописування
+  # через officially-supported `commandLineArgs` (а не патч файлу в сторі)
+  # повністю підмінює список фіч для цього прапорця, залишаючи решту як є.
+  # Живо перевірено: прапорець коректно потрапляє у зібраний wrapper;
+  # повний E2E-тест (реальний клік "Поділитись екраном") ще не зроблено --
+  # немає інструменту симуляції кліків миші під Wayland (wtype/ydotool/
+  # wlrctl) у системі, щоб перевірити самостійно без користувача.
+  discordPipewireFlags = "--enable-features=WaylandWindowDecorations,WebRTCPipeWireCapturer";
+  discord-canary-pipewire = pkgs.discord-canary.override { commandLineArgs = discordPipewireFlags; };
+  discord-pipewire = pkgs.discord.override { commandLineArgs = discordPipewireFlags; };
+in
 {
   environment.systemPackages = with pkgs; [
     git
@@ -12,11 +30,11 @@
     inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default # Firefox-форк, окремий flake-вхід
     retroarch # фронтенд емуляції консолей (libretro-ядра)
     xwayland-satellite # Xwayland-сумісність для halley (сам не тягне вбудований Xwayland)
-    discord-canary
+    discord-canary-pipewire
     # Звичайний (stable) Discord поряд з Canary — для A/B-тесту підвисання
     # курсора під час стріму (2026-09-13, TODO.md?): Canary — нічна збірка,
     # історично більше багів навколо Linux screen-share, ніж у stable.
-    discord
+    discord-pipewire
     nemo-with-extensions # файловий менеджер (Cinnamon Nemo) з розширеннями -- стрічка шляху, архіви тощо
     prismlauncher # лаунчер Minecraft (мультиінстанс, моди)
     mako # нотифікації для halley-сесії (dunst -- X11/bspwm-еквівалент, crew/bspwm.nix)
@@ -88,7 +106,6 @@
     ethtool
     wget
     ncdu
-    lact # GUI+daemon керування AMD GPU (фан-крива, ліміти потужності) -- AMD-only, RX 590
     nh # обгортка над nixos-rebuild, той самий `sysup`-аліас з crew/terminal/zsh.nix
     comma # `, <pkg>` -- одноразовий запуск пакета з nixpkgs без встановлення в профіль
   ];
@@ -100,20 +117,22 @@
     plugins = with pkgs.obs-studio-plugins; [
       wlrobs                     # захоплення екрана напряму, без portal/PipeWire
       obs-pipewire-audio-capture # захоплення звуку конкретних застосунків
-      obs-vaapi                  # апаратний енкодинг на AMD (в тебе RX 590)
+      obs-vaapi                  # апаратний енкодинг -- тепер на Intel Arc A770 (заміна RX590, 2026-09-29)
     ];
   };
-
-  systemd.packages = [ pkgs.lact ];
-  systemd.services.lactd.wantedBy = [ "multi-user.target" ];
 
   hardware.graphics = {
   enable = true;
   enable32Bit = true;
-  # ROCm OpenCL ICD — потрібен DaVinci Resolve для GPU-прискорення на AMD.
-  # RX 590 (Polaris10/gfx803) офіційно поза підтримкою свіжого ROCm — тож не
-  # гарантія, що rocminfo побачить картку, перевіряти тільки живим тестом.
-  extraPackages = [ pkgs.rocmPackages.clr.icd ];
+  # Заміна заліза AMD RX590 -> Intel i5-9400 + Arc A770 (2026-09-29):
+  # rocmPackages.clr.icd (AMD-only ROCm OpenCL) прибрано, замість нього --
+  # Intel-специфічні драйвери. intel-media-driver -- VAAPI (iHD) для DG2/Arc
+  # та новіших Gen, потрібен obs-vaapi вище й апаратному декодуванню відео
+  # (mpv/mpvpaper). intel-compute-runtime -- OpenCL (NEO), той самий
+  # прошарок, що ROCm ICD давав для AMD -- потрібен DaVinci Resolve для
+  # GPU-прискорення. Обидва -- живий тест ще не проводили (нове залізо
+  # щойно встановлене), перевірити vainfo/clinfo після switch.
+  extraPackages = [ pkgs.intel-media-driver pkgs.intel-compute-runtime ];
 };
 
 programs.steam.enable = true;

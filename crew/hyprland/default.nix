@@ -5,24 +5,6 @@ let
   # CLAUDE.md), а override -- це два рядки, не варте крос-модульного імпорту.
   tesseract-ocr = pkgs.tesseract.override { enableLanguages = [ "eng" "ukr" ]; };
 
-  # nixpkgs-івський hyprlandPlugins.hyprspace ще прибитий до коміту від
-  # 2026-05-28 (Hyprland 0.55), який не збирається проти Hyprland 0.56.2 --
-  # апстрім прибрав/переніс managers/animation/AnimationManager.hpp у новому
-  # API рефакторингу (issue KZDKM/hyprspace#239). Апстрімний main так і не
-  # оновили (PR #240/#241 висять невмерджені), тому підміняю джерело на форк
-  # drkdydr (PR #241) -- найбільш повний порт під 0.56.1/0.56.2, з тестами й
-  # описаними crash-фіксами. Прибрати цей override, коли KZDKM/hyprspace#241
-  # (або еквівалент) змерджать у апстрімний main і nixpkgs підхопить новий rev.
-  hyprspace-0-56 = pkgs.hyprlandPlugins.hyprspace.overrideAttrs (old: {
-    version = "0-unstable-2026-09-fork-drkdydr-0.56.2";
-    src = pkgs.fetchFromGitHub {
-      owner = "drkdydr";
-      repo = "hyprspace";
-      rev = "07935bda42b25f2af326882c1c747891b5f93bbb";
-      hash = "sha256-c+ziTxUDRs+R98ym50Wh15MYYBuSuYA4zdGkRxBqHoY=";
-    };
-  });
-
   # Wayland-порт nebula-ocr з crew/bspwm.nix: maim -s -> grim+slurp,
   # xclip -> wl-copy. Та сама логіка/notify-send-патерн.
   nebula-ocr-wl = pkgs.writeShellScriptBin "nebula-ocr-wl" ''
@@ -545,11 +527,17 @@ in
     # hyprsunset -- Wayland-native нічний фільтр (redshift з crew/bspwm.nix --
     # X11-лише, під Hyprland не працює), автостарт у hyprland.lua.
     pkgs.hyprsunset
-    # hyprspace -- плагін overview воркспейсів, hl.plugin.load у hyprland.lua
-    # (шлях через стабільний per-user профіль, не прямий /nix/store-хеш).
-    # Джерело підмінене на форк з фіксом під Hyprland 0.56.2 -- див. коментар
-    # біля hyprspace-0-56 вище.
-    hyprspace-0-56
+    # hyprpolkitagent -- GUI-агент автентифікації polkit для Hyprland-сесії.
+    # Живо виявлено 2026-09-29: без нього тут крутиться лише сам polkitd
+    # (бекенд), а будь-який запит підвищення прав (pkexec, "Format" у GNOME
+    # Disks тощо) не показує діалог пароля взагалі -- просто мовчки не
+    # спрацьовує. Перша спроба (жорсткий шлях на libexec/ у per-user
+    # профілі, за аналогією з hyprspace) не спрацювала: на відміну від
+    # lib/, каталог libexec/ пакета НЕ потрапляє в per-user профіль
+    # home-manager взагалі (живо перевірено -- шляху просто нема). Пакет
+    # сам постачає systemd user-юніт (нижче через systemd.user.packages),
+    # це і є правильний шлях.
+    pkgs.hyprpolkitagent
     # imv -- нативний Wayland переглядач картинок. nsxiv (core/packages.nix)
     # лишається X11-лише навмисно (коментар там), тут окремо, тільки для
     # Hyprland-сесії, де nsxiv тягнув би XWayland.
@@ -573,4 +561,13 @@ in
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/hyprland.lua";
   home.file.".config/hypr/tweaks.lua".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/tweaks.lua";
+
+  # hyprpolkitagent постачає власний share/systemd/user/hyprpolkitagent.service
+  # -- systemd.user.packages лінкує його в per-user systemd, так стає видимим
+  # для `systemctl --user` (той самий підхід, що вже є для noctalia.service
+  # нижче в hyprland.lua). WantedBy=graphical-session.target у самому юніті
+  # НЕ спрацьовує на цьому Hyprland-сетапі (той самий давно відомий нюанс,
+  # що й з noctalia.service -- таргет ніколи сам не активується), тому старт
+  # усе одно явний, через hl.exec_cmd у hyprland.lua.
+  systemd.user.packages = [ pkgs.hyprpolkitagent ];
 }

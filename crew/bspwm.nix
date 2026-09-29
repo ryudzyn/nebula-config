@@ -186,12 +186,23 @@ let
   # інфою (CPU/GPU temp, GPU usage/fan, RAM) замість окремих постійних
   # GPU/temp-модулів на панелі (щоб не перевантажувати панель інформацією).
   # sensors -j + jq — чистіший парсинг, ніж регулярки по голому виводу
-  # sensors; фільтр по назві чипа ("k10temp"/"amdgpu"), а не по PCI bus id
-  # (00c3/0100 у сирому виводі sensors) — назва чипа надійніша прив'язка,
-  # хоч bus id й не мав би змінюватись на фіксованому десктопі.
-  # /sys/class/drm/card*/device/gpu_busy_percent — wildcard, бо на цій
-  # машині GPU виявилась під card1, не card0 (перевірено живим `cat`), і
-  # опора саме на "*" безпечніша за хардкод конкретного номера card.
+  # sensors; фільтр по назві чипа, а не по PCI bus id (00c3/0100 у сирому
+  # виводі sensors) — назва чипа надійніша прив'язка, хоч bus id й не мав
+  # би змінюватись на фіксованому десктопі.
+  # Заміна заліза AMD RX590 -> Intel i5-9400 + Arc A770 (2026-09-29):
+  # AMD-чипи "k10temp"/"amdgpu" замінені на "coretemp"/"i915" (Arc A770 тут
+  # обслуговується драйвером i915, не новішим xe -- живо перевірено через
+  # lspci -k; якщо колись перемкнеться на xe, назва чипа в sensors теж
+  # може змінитись на "xe-pci-...", перевірити живим тестом при апдейті
+  # ядра). ВАЖЛИВО: coretemp і i915 ОБИДВА мають піделемент, буквально
+  # названий "temp1" (раніше було unique lookup через `has("temp1")`,
+  # що працювало, поки лише один чип мав такий ключ -- тепер колізія,
+  # тому обидва запити явно фільтрують по назві чипа, той самий підхід,
+  # що вже був для GPU).
+  # /sys/class/drm/card*/device/gpu_busy_percent — на i915-драйвері цього
+  # файлу нема (перевірено живим `ls`, тільки gt_*_freq_mhz), тому
+  # gpu_busy лишається порожнім (`?` fallback) на цьому залізі; i915 не
+  # дає простого відсоткового завантаження через sysfs, як amdgpu.
   # LC_ALL=C обов'язковий: під живою uk_UA-локаллю системи `free -h`
   # локалізує заголовок стовпця в "Пам.:" замість "Mem:" (awk '/^Mem:/'
   # мовчки не знаходив нічого, RAM-рядок виходив порожнім), а bash-івський
@@ -201,9 +212,9 @@ let
   nebula-sysinfo = pkgs.writeShellScriptBin "nebula-sysinfo" ''
     export LC_ALL=C
     json=$(sensors -j)
-    cpu_temp=$(echo "$json" | jq -r '[.[] | select(has("temp1")) | .temp1.temp1_input][0] // empty')
-    gpu_temp=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("amdgpu")) | .value.edge.temp1_input')
-    gpu_fan=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("amdgpu")) | .value.fan1.fan1_input')
+    cpu_temp=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("coretemp")) | .value."Package id 0".temp1_input')
+    gpu_temp=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("i915")) | .value.temp1.temp1_input')
+    gpu_fan=$(echo "$json" | jq -r 'to_entries[] | select(.key | startswith("i915")) | .value.fan1.fan1_input')
     gpu_busy=$(cat /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1)
     mem_summary=$(free -h | awk '/^Mem:/{print $3"/"$2}')
     cpu_top=$(ps -eo comm,%cpu --sort=-%cpu --no-headers | head -5 | awk '{printf "%-15s %5s%%\n", $1, $2}')

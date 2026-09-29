@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Nebula OS" — a personal NixOS flake config (single host: `earth`, an AMD/RX590 desktop) plus a
+"Nebula OS" — a personal NixOS flake config (single host: `earth`, an Intel i5-9400 + Arc A770
+desktop as of 2026-09-29, previously AMD/RX590) plus a
 Home Manager user profile (`ryudzyn`), managed together as one flake. All prose comments in the
 `.nix` files are in Ukrainian.
 

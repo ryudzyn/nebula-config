@@ -2578,3 +2578,156 @@ on these overlay rules.
   bug, and has nothing to do with the compositor. Reverted `follow_mouse` back to Hyprland's default.
   **The fix is behavioral, not config**: keep holding Ctrl while moving the mouse onto the popup to
   interact with it, release once there.
+
+## Follow-up #42 (2026-09-29): hardware swap AMD RX590 -> Intel i5-9400 + Arc A770, BIOS update,
+VT-x/Resizable BAR, Discord portal fix — and a still-open Arc A770 DMA-BUF capture bug
+
+**Hardware swap fully migrated in config**: `hosts/earth/hardware.nix` regenerated (`kvm-amd` ->
+`kvm-intel`, AMD -> Intel microcode), `core/packages.nix` (`rocmPackages.clr.icd` -> `intel-media-driver`
++ `intel-compute-runtime`, `lact` removed — AMD-only, no Intel equivalent), `crew/cli-tools.nix`
+(`btop.override { rocmSupport }` removed — no Intel flag exists for btop), `crew/bspwm.nix`
+(polybar sysinfo popup: `sensors -j` chip names `k10temp`/`amdgpu` -> `coretemp`/`i915` — **live
+caught a real bug**: both `coretemp` and `i915` chips have a sub-object literally named `temp1`,
+so the old `has("temp1")` structural-shape lookup for CPU temp silently started picking up the
+*GPU's* temp1 instead; both queries now filter explicitly by chip name). `CLAUDE.md`/`README.md`
+updated. All live-verified post-switch: `coretemp`/`i915` sensor split correct (29°C CPU vs 48°C
+GPU), `intel-media-driver`/`intel-compute-runtime` present.
+
+**BIOS updated 1002 -> 2208** (ASUS PRIME H310M-R R2.0, via EZ Flash 3 from a spare USB stick,
+contents backed up/restored around the flash — see chat, not repo-relevant) — version 2201 added
+Resizable BAR support (marketed for RTX 30-series but it's a plain PCIe spec feature, works for
+Arc too). **VT-x and Resizable BAR enabled in BIOS and live-confirmed**: `/dev/kvm` now exists
+(`kvm_intel` loaded), GPU BAR (Region 2) grew from the default 256M window to the full 16G.
+
+**hyprspace removed entirely** (plugin, `hl.plugin.load` autostart, package override, `SUPER+O`
+bind) — root-caused as fundamentally unbindable on this Lua-native Hyprland build, not a syntax
+issue: `hl.dsp` is a closed, typed set covering only Hyprland's own built-in dispatchers; there is
+no escape hatch for a plugin-registered runtime dispatcher like `overview:toggle`. Tried
+`hl.dsp.exec_raw` (wrong guess — that's for executing external *programs*, not Hyprland
+dispatchers, confirmed by reading the shipped `hl.meta.lua` Lua-stub/type-definitions file at
+`<hyprland-pkg>/share/hypr/stubs/hl.meta.lua`, which is the authoritative doc for this whole
+custom `hl.*` API and should be the first place to check for any future "is X possible via hl.*"
+question), `hl.dispatch("string")` (rejected, requires a typed `HL.Dispatcher` object), and even a
+raw `dispatch overview:toggle` write straight to the Hyprland IPC socket via `socat`, bypassing
+`hyprctl` entirely (still intercepted and evaluated as Lua by the compositor itself — confirms
+this is baked into the fork, not a CLI-wrapper quirk).
+
+**`hyprpolkitagent` added** — GUI polkit authentication agent, missing entirely before (only
+`polkitd`, the backend, was running; any privilege-escalation prompt — `pkexec`, GNOME Disks
+"Format" — silently did nothing, no dialog, no error). First attempt (hardcoded
+`/etc/profiles/per-user/ryudzyn/libexec/hyprpolkitagent` path in `hl.exec_cmd`, mirroring the
+`hyprspace` `lib/libhyprspace.so` pattern) **failed live**: unlike `lib/`, a package's `libexec/`
+directory does not get merged into the home-manager per-user profile at all. Fixed properly via
+`systemd.user.packages = [ pkgs.hyprpolkitagent ]` (installs the package's own
+`hyprpolkitagent.service`) + `systemctl --user start hyprpolkitagent.service` in
+`hl.on("hyprland.start")` — same category as the existing `noctalia.service` workaround below,
+confirmed working live via `pkexec true` popping the "Authenticating for unix-user" dialog.
+
+**Discord screen-share black-screen root-caused and fixed, two separate bugs stacked on each
+other:**
+1. nixpkgs' `discord`/`discord-canary` wrapper (`pkgs/by-name/di/discord/linux.nix`) hardcodes
+   `--enable-features=WaylandWindowDecorations` but never adds `WebRTCPipeWireCapturer` — without
+   it, Chromium's `desktopCapturer` silently skips the PipeWire/portal path entirely. Fixed via
+   the package's own supported `commandLineArgs` override (not a store-path patch): Chromium takes
+   the *last* `--enable-features` occurrence, so appending a second, more complete list via
+   `commandLineArgs` fully wins. Applied to both `discord` and `discord-canary`
+   (`discord-canary-pipewire`/`discord-pipewire` in `core/packages.nix`). Live-confirmed the flag
+   lands correctly in the built wrapper both times.
+2. Even with the flag, screen-share "Make Selection" did *nothing* (zero D-Bus traffic on
+   `org.freedesktop.portal.ScreenCast`, zero PipeWire video nodes, confirmed with `dbus-monitor` +
+   `pw-cli` across several live attempts) — root cause: `xdg-desktop-portal.service`'s unit has
+   `Requisite=graphical-session.target`, and `graphical-session.target` **never activates itself**
+   on this Hyprland/NixOS setup (the exact same long-known issue documented above for
+   `noctalia.service`, except `noctalia.service` only has `PartOf=`/`After=`, so a plain
+   `systemctl --user start noctalia.service` already worked around it — `xdg-desktop-portal`'s
+   harder `Requisite=` needs `--job-mode=ignore-dependencies` on top). Fixed by adding
+   `systemctl --user start --job-mode=ignore-dependencies xdg-desktop-portal.service` to
+   `hl.on("hyprland.start")`, live-confirmed: "Make Selection" now actually starts a stream.
+   **`graphical-session.target` not self-activating on this setup is now a recurring, known
+   footgun — any future portal-dependent or `WantedBy=graphical-session.target` service added here
+   needs the same explicit `systemctl --user start` (with `--job-mode=ignore-dependencies` if the
+   unit uses `Requisite=` rather than `PartOf=`) in the autostart block, don't assume it "just
+   works" from the `[Install]` section.**
+
+**STILL OPEN, not fixed**: once the stream actually starts, the captured video is corrupted
+(garbled/green glitch frames, confirmed by viewers on the other end — see chat screenshots).
+Disabling Discord's hardware-accelerated encoding made no difference, ruling out Discord's own
+encoder — the corruption is upstream, in the captured frame data itself. A parallel, independent
+symptom of what's probably the same root cause: OBS's `wlrobs` plugin (direct
+`zwlr_screencopy_manager_v1` protocol, *not* portal/PipeWire — a genuinely separate code path from
+Discord's) **segfaults** the instant its `Wayland output(dmabuf)` source is activated —
+`journalctl -k` shows a clean null-pointer crash *inside `libwayland-client.so` itself* (not an
+i915/Mesa driver error; the kernel log around it is completely unremarkable, GPU init looks fine).
+Two different consumers of Hyprland's DMA-BUF screencopy output both fail in different ways
+(crash vs. corruption) right after the AMD RX590 -> Intel Arc A770 swap — the working theory is
+Arc's DMA-BUF tiling/modifier layout differs enough from AMD's that both `wlrobs` and
+`xdg-desktop-portal-hyprland`'s PipeWire path mishandle it. Ruled out a stale-package red herring
+first: two different `obs-studio-plugins` builds exist in the store linking `wlrobs` against two
+different `wayland` versions (1.25.0 vs 1.26.0), but `nix-store -q --referrers` confirmed only the
+1.26.0-linked one is actually referenced by the current `wrapped-obs-studio-32.2.2` — not a live
+ABI split, just store cruft from the nixpkgs bump, worth a `nix-collect-garbage` eventually but
+not the bug.
+
+**Next thing to try, not yet attempted (explicitly deferred by user choice, needs a real
+logout/login to test — too disruptive for that session)**: `WLR_DRM_NO_MODIFIERS=1` as a
+system-wide `environment.sessionVariables` entry. This is wlroots' own well-known escape hatch for
+exactly this class of bug — forces the compositor to allocate simple linear DMA-BUF buffers
+instead of vendor-specific tiled/compressed ones, sidestepping modifier-negotiation bugs in
+downstream consumers at some performance cost. **Do not set this on the OBS/Discord *client*
+process** (tried once by mistake — it's a no-op there since the client doesn't do the DRM buffer
+allocation, only the compositor does). If tried and it doesn't help, this is likely a genuine
+upstream immaturity issue (Arc A770 is a fairly recent card; `i915`/`xe`/Mesa DMA-BUF handling for
+it is still actively evolving) rather than anything fixable from this repo — treat it the same way
+as the RX590 mouse-stutter issue was treated: park it, don't keep re-litigating the same dead end.
+
+**`WLR_DRM_NO_MODIFIERS=1` tried (2026-09-29, `core/desktop.nix`) — no effect**, live-confirmed the
+variable actually reaches Hyprland's process environment. **`xe` kernel driver also tried** (forced
+via `i915.force_probe=!56a0 xe.force_probe=56a0`, live-confirmed via `lspci -k`) — **no effect on
+the `wlrobs` segfault** (identical crash, same faulting offset in `libwayland-client.so` on both
+drivers) and made the Discord symptom *worse* (stream didn't load at all for viewers, vs.
+garbled-but-present frames on `i915`) — reverted back to `i915`, kernel param removed. Both
+hypotheses now ruled out; don't re-try either without new evidence.
+
+**Filed upstream, then retracted/closed**: [hyprwm/xdg-desktop-portal-hyprland#438](https://github.com/hyprwm/xdg-desktop-portal-hyprland/issues/438)
+was filed for the Discord/PipeWire corruption, then closed by us once further testing (below)
+proved it was the wrong project entirely — **the capture side is NOT the bug**. A `wlrobs` report
+was also drafted and submitted to SourceHut, but the maintainer/community response there was
+unhelpfully pedantic — abandoned, not pursuing further on that tracker. The `wlrobs` segfault
+itself is still real and still open, just not tracked upstream anywhere; if revisiting, don't
+re-file on SourceHut without a good reason to expect a different reception.
+
+**Root cause re-narrowed (2026-09-29, later same day) — capture is clean, corruption is
+downstream**: live-tested a plain `getDisplayMedia()` page in Google Chrome (`file://` HTML with a
+`<video>` preview, no portal/Discord involved) — **local preview is clean**. Same for OBS's own
+PipeWire-based screen source (as opposed to the `wlrobs` plugin, which segfaults per the entry
+above) and even for **Discord's own local self-view during an active stream** — all three show a
+clean captured frame. **Only the remote viewer on the Discord call sees corrupted/garbled video.**
+This conclusively rules out the whole capture pipeline (portal, PipeWire, DMA-BUF, Hyprland,
+Mesa, kernel driver) — none of it is the bug. The corruption happens somewhere between "clean
+frame captured" and "remote viewer receives it": the WebRTC video **encoder** or the **network/
+bitrate** path, both entirely outside Hyprland/portal territory. Also notable: `intel-media-driver`
+(added earlier the same day) now makes Discord's H264/VP8/AV1 hardware encoder codecs initialize
+without error (`renderer_js.log` no longer shows the earlier "No encoder available, falling back
+to another codec" message) — so VAAPI hardware encode is now actually active for the first time,
+which may itself be relevant (an immature Arc VAAPI *encode* path producing bad output despite
+initializing cleanly would fit this symptom exactly). **Next step, not yet tried**: re-test with
+Discord's hardware-accelerated encoding toggled off again — the earlier test of that toggle (see
+the black-screen/portal section above) was done *before* `intel-media-driver` existed, when the
+hardware encoder wasn't actually available at all, so that earlier "no difference" result no
+longer means what it seemed to at the time. Don't reuse that old conclusion — redo the toggle test
+fresh.
+
+**Toggle re-tested fresh (2026-09-29, same session) — still no difference with hardware encoding
+off.** This rules out the encoder implementation (hardware vs. software) entirely — both produce
+the same corruption, so whatever's wrong happens *before* either encoder sees the frame. Combined
+with local preview always being clean, this points specifically at Chromium's own capture-to-encode
+conversion step (PipeWire DMA-BUF texture → I420/NV12 for the encoder pipeline) — a separate code
+path from the direct-texture preview display, and apparently buggy for Arc's buffer layout. This is
+a Chromium bug, not ours to fix from this repo. Found a very likely match already filed upstream:
+[issues.chromium.org/issues/424751070](https://issues.chromium.org/issues/424751070) ("Hardware
+accelerated video decode glitches on Intel Arc") — login-gated, couldn't read details or dedupe
+properly; user was pointed at it to check/comment under their own Google account. **Parking this
+for real now** — capture pipeline (Hyprland/portal/PipeWire/kernel/Mesa) is fully cleared, encoder
+choice is cleared, this is squarely a Chromium-on-Arc issue to wait out, same as the wlrobs segfault
+above. Don't re-litigate without new evidence (a Chromium version bump, or confirmation from that
+issue thread).

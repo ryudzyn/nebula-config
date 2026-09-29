@@ -26,6 +26,24 @@ in
     themePackages = [ plymouth-hud-space ];
   };
 
+  # Живий тест 2026-09-29 (TODO.md Follow-up #42): пробували примусово
+  # перемкнути Arc A770 з `i915` на новіший `xe` (гіпотеза -- інший шлях
+  # DMA-BUF-експорту вирішить биті кадри захоплення екрана). РЕЗУЛЬТАТ:
+  # НЕ допомогло -- wlrobs (OBS) падає з тим самим сегфолтом у
+  # libwayland-client (той самий офсет a0cc, живо звірено), а Discord на
+  # `xe` став ГІРШЕ (стрім взагалі не вантажиться для глядачів, замість
+  # спотвореної картинки на i915). Відкочено назад на дефолтний `i915`.
+  # WLR_DRM_NO_MODIFIERS=1 (нижче) теж уже пробували окремо -- не
+  # допомогло. Обидва варіанти виключені, шукати далі не тут.
+  #
+  # Наступна спроба (2026-09-29): вимкнути display C-states і Panel Self
+  # Refresh на i915 -- відомий клас нестабільності дисплея саме на Arc,
+  # знайдено в реальному робочому Hyprland+Intel конфізі (ChrisLAS/hyprvibe)
+  # і підтверджено спільнотою як типовий воркераунд для "битих"/зависаючих
+  # кадрів на цій архітектурі. Ціна -- трохи вище споживання GPU (не
+  # критично на десктопі, на відміну від ноутбука).
+  boot.kernelParams = [ "i915.enable_dc=0" "i915.enable_psr=0" ];
+
   # Hyprland — кінцева мета міграції (не тимчасовий тест поруч з bspwm).
   # Сам собою реєструє свою wayland-сесію (services.displayManager.sessionPackages)
   # і власний xdg-desktop-portal-hyprland (xdg.portal.extraPortals +
@@ -68,6 +86,18 @@ in
 
   services.displayManager.sessionPackages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.halley ];
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
+  # wlroots-івський обхідний прийом для DMA-BUF-захоплення екрана на Arc A770
+  # (заміна заліза 2026-09-29, деталі в TODO.md Follow-up #42): і `wlrobs`
+  # (OBS), і PipeWire-шлях Discord показують биті/спотворені кадри або
+  # падають з сегфолтом у libwayland-client -- швидше за все, через інший
+  # формат тайлінгу DMA-BUF-буферів на Arc порівняно з AMD RX590. Змушує
+  # Hyprland (композитор, не клієнт!) виділяти прості лінійні буфери замість
+  # вендор-специфічного тайлінгу -- ціна: трохи менша ефективність
+  # рендерингу, натомість коректність захоплення екрана. Треба на рівні
+  # системної сесійної змінної (не home.sessionVariables/hl.env у
+  # hyprland.lua) -- має подіяти ще ДО того, як сам композитор
+  # ініціалізує DRM-бекенд, а не пізніше, коли він уже запущений.
+  environment.sessionVariables.WLR_DRM_NO_MODIFIERS = "1";
 
   xdg.portal = {
     enable = true;
