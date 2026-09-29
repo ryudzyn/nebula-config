@@ -167,99 +167,166 @@ hl.window_rule({
 -- фікс -- переписати UI на GTK + layer-shell (нативний Wayland), окремий,
 -- більший follow-up.
 
--- Основні
-hl.bind("SUPER + Return", hl.dsp.exec_cmd(terminal))
-hl.bind("SUPER + D", hl.dsp.exec_cmd("noctalia msg panel-toggle launcher"))
--- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix
--- біндить те саме на super+p через sxhkd, але sxhkd -- X11-демон з bspwm-сесії,
--- на Hyprland він не піднятий; тут окремий, нативний Hyprland-бінд, який не
--- залежить від фокус-трекінгу XWayland/electron-overlay-window взагалі).
-hl.bind("SUPER + P", hl.dsp.exec_cmd("poe-price-check"))
-hl.bind("SUPER + Q", hl.dsp.window.close())
-hl.bind("SUPER + F", hl.dsp.window.fullscreen({}))
-hl.bind("SUPER + SHIFT + Space", hl.dsp.window.float({}))
--- Pin -- закріпити плаваюче вікно поверх усіх воркспейсів (той самий
--- super+shift+p, що й always-on-top у crew/bspwm.nix). Не floating-вікно
--- pin просто ігнорує -- спершу SUPER+SHIFT+Space.
-hl.bind("SUPER + SHIFT + P", hl.dsp.window.pin())
+-- Єдиний список біндів: кожен запис одразу несе опис для довідки нижче
+-- (nebula-keybind-help-hypr), той самий принцип, що й `keybinds` у
+-- crew/bspwm.nix -- опис і реальний бінд генеруються з одного джерела, тож
+-- ніколи не розійдуться. Робочі простори 1-9 (цикл нижче) свідомо лишені
+-- окремо -- 18 однакових по формі записів тут тільки заважали б читати.
+local binds = {
+    -- Основні
+    { key = "SUPER + Return", desc = "Термінал (wezterm)", action = hl.dsp.exec_cmd(terminal) },
+    { key = "SUPER + D", desc = "Запуск застосунків (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle launcher") },
+    -- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix
+    -- біндить те саме на super+p через sxhkd, але sxhkd -- X11-демон з bspwm-сесії,
+    -- на Hyprland він не піднятий; тут окремий, нативний Hyprland-бінд, який не
+    -- залежить від фокус-трекінгу XWayland/electron-overlay-window взагалі).
+    { key = "SUPER + P", desc = "poe-price-check (прайс-чекер PoE)", action = hl.dsp.exec_cmd("poe-price-check") },
+    { key = "SUPER + Q", desc = "Закрити вікно", action = hl.dsp.window.close() },
+    { key = "SUPER + F", desc = "Fullscreen для вікна", action = hl.dsp.window.fullscreen({}) },
+    { key = "SUPER + SHIFT + Space", desc = "Toggle floating для вікна", action = hl.dsp.window.float({}) },
+    -- Pin -- закріпити плаваюче вікно поверх усіх воркспейсів (той самий
+    -- super+shift+p, що й always-on-top у crew/bspwm.nix). Не floating-вікно
+    -- pin просто ігнорує -- спершу SUPER+SHIFT+Space.
+    { key = "SUPER + SHIFT + P", desc = "Pin — закріпити плаваюче вікно поверх усіх воркспейсів", action = hl.dsp.window.pin() },
 
--- Скріншоти -- Noctalia сама це вміє (noctalia msg), той самий набір, що й
--- maim/xclip-біндами в crew/bspwm.nix (Print/super+shift+s).
-hl.bind("Print", hl.dsp.exec_cmd("noctalia msg screenshot-fullscreen"))
-hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("noctalia msg screenshot-region"))
--- Анотований скріншот (satty) -- окремо від Noctalia-скріншотів вище, ті
--- без розмітки/стрілок/блюру.
-hl.bind("SUPER + SHIFT + G", hl.dsp.exec_cmd("nebula-screenshot-satty"))
--- Запис екрана (wf-recorder) -- той самий бінд стартує й зупиняє.
-hl.bind("SUPER + CTRL + R", hl.dsp.exec_cmd("nebula-record-toggle"))
--- Overview воркспейсів (hyprspace) -- dispatcher плагіна, не в типізованому
--- hl.dsp, тож через hyprctl напряму.
-hl.bind("SUPER + O", hl.dsp.exec_cmd("hyprctl dispatch overview:toggle"))
+    -- Скріншоти. 2026-09-29: Print віддано під анотований скріншот (satty) --
+    -- той, яким реально користуються найчастіше -- а звичайний повноекранний
+    -- через Noctalia переїхав на super+Print, щоб не губився. super+shift+g
+    -- звільнено під землю (nebula-earth-toggle-wl) нижче.
+    { key = "Print", desc = "Анотований скріншот ділянки (satty)", action = hl.dsp.exec_cmd("nebula-screenshot-satty") },
+    { key = "SUPER + Print", desc = "Скріншот всього екрана (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg screenshot-fullscreen") },
+    { key = "SUPER + SHIFT + S", desc = "Скріншот ділянки → буфер (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg screenshot-region") },
+    -- Запис екрана (wf-recorder) -- той самий бінд стартує й зупиняє.
+    { key = "SUPER + CTRL + R", desc = "Запис екрана (toggle, wf-recorder)", action = hl.dsp.exec_cmd("nebula-record-toggle") },
+    -- Overview воркспейсів (hyprspace) -- dispatcher плагіна, не в типізованому
+    -- hl.dsp, тож через hyprctl напряму.
+    { key = "SUPER + O", desc = "Overview воркспейсів (hyprspace)", action = hl.dsp.exec_cmd("hyprctl dispatch overview:toggle") },
 
--- Special workspace ("scratchpad") -- прихована робоча область, куди можна
--- закинути будь-яке вікно і потім показати/сховати одним хоткеєм, як
--- випадаюча панель. super+shift+s вже зайнятий скріншотом (офіційний
--- дефолтний приклад Hyprland біндить саме на нього move-в-special), тож
--- переміщення туди -- на super+ctrl+s.
-hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"))
-hl.bind("SUPER + CTRL + S", hl.dsp.window.move({ workspace = "special:magic" }))
+    -- Special workspace ("scratchpad") -- прихована робоча область, куди можна
+    -- закинути будь-яке вікно і потім показати/сховати одним хоткеєм, як
+    -- випадаюча панель. super+shift+s вже зайнятий скріншотом (офіційний
+    -- дефолтний приклад Hyprland біндить саме на нього move-в-special), тож
+    -- переміщення туди -- на super+ctrl+s.
+    { key = "SUPER + S", desc = "Показати/сховати special workspace (scratchpad)", action = hl.dsp.workspace.toggle_special("magic") },
+    { key = "SUPER + CTRL + S", desc = "Перекинути вікно у special workspace", action = hl.dsp.window.move({ workspace = "special:magic" }) },
 
--- Переміщення/зміна розміру вікна мишею: SUPER + ЛКМ тягне, SUPER + ПКМ
--- ресайзить (mouse:272/273 -- стандартні коди кнопок з офіційного
--- дефолтного hyprland.lua, mouse=true обов'язковий для mouse-біндів).
-hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
+    -- Переміщення/зміна розміру вікна мишею: SUPER + ЛКМ тягне, SUPER + ПКМ
+    -- ресайзить (mouse:272/273 -- стандартні коди кнопок з офіційного
+    -- дефолтного hyprland.lua, mouse=true обов'язковий для mouse-біндів).
+    { key = "SUPER + mouse:272", desc = "Тягнути вікно мишею", action = hl.dsp.window.drag(), opts = { mouse = true } },
+    { key = "SUPER + mouse:273", desc = "Ресайз вікна мишею", action = hl.dsp.window.resize(), opts = { mouse = true } },
 
--- Порт решти кастомних bspwm-біндів (crew/bspwm.nix) під Hyprland. Де
--- Noctalia сама вміє те саме (noctalia msg) -- береться саме воно, а не
--- окремий X11-інструмент/скрипт: лок, power-menu, dpms, theme, wallpaper,
--- caffeine (=nebula-awake), clipboard-історія, window switcher.
-hl.bind("SUPER + Escape", hl.dsp.exec_cmd("noctalia msg session lock"))
-hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd("noctalia msg panel-toggle session"))
-hl.bind("SUPER + SHIFT + Escape", hl.dsp.exec_cmd("noctalia msg dpms-off"))
-hl.bind("SUPER + N", hl.dsp.exec_cmd("noctalia msg theme-mode-toggle"))
-hl.bind("SUPER + W", hl.dsp.exec_cmd("noctalia msg panel-toggle wallpaper"))
-hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("noctalia msg caffeine-toggle"))
-hl.bind("SUPER + V", hl.dsp.exec_cmd("noctalia msg panel-toggle clipboard"))
-hl.bind("SUPER + Tab", hl.dsp.exec_cmd("noctalia msg window-switcher"))
+    -- Порт решти кастомних bspwm-біндів (crew/bspwm.nix) під Hyprland. Де
+    -- Noctalia сама вміє те саме (noctalia msg) -- береться саме воно, а не
+    -- окремий X11-інструмент/скрипт: лок, power-menu, dpms, theme, wallpaper,
+    -- caffeine (=nebula-awake), clipboard-історія, window switcher.
+    { key = "SUPER + Escape", desc = "Заблокувати екран (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg session lock") },
+    { key = "SUPER + SHIFT + E", desc = "Меню живлення (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle session") },
+    { key = "SUPER + SHIFT + Escape", desc = "Вимкнути монітор (dpms)", action = hl.dsp.exec_cmd("noctalia msg dpms-off") },
+    { key = "SUPER + N", desc = "Перемкнути світлу/темну тему", action = hl.dsp.exec_cmd("noctalia msg theme-mode-toggle") },
+    { key = "SUPER + W", desc = "Вибір шпалер (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle wallpaper") },
+    { key = "SUPER + SHIFT + A", desc = "Keep-awake — тумблер (caffeine)", action = hl.dsp.exec_cmd("noctalia msg caffeine-toggle") },
+    { key = "SUPER + V", desc = "Історія буфера обміну (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle clipboard") },
+    { key = "SUPER + Tab", desc = "Список відкритих вікон (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg window-switcher") },
 
--- Немає нативного еквіваленту в Noctalia -- лишаються окремими
--- інструментами/скриптами (nwg-look конфігурує GTK-тему застосунків
--- взагалі, не саму Noctalia, тож не замінюється).
-hl.bind("SUPER + SHIFT + O", hl.dsp.exec_cmd("nebula-ocr-wl"))
-hl.bind("SUPER + SHIFT + X", hl.dsp.exec_cmd("nebula-color-picker-wl"))
-hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("nwg-look"))
-hl.bind("SUPER + SHIFT + V", hl.dsp.exec_cmd("pavucontrol"))
--- surf замість xdg-open -- окреме вікно без вкладок/адресного рядка
--- браузера, той самий готовий HTML/CSS/JS без переписування.
-hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd(
-    "surf file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
-))
-hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd(
-    "sh -c 'cd ~/Applications/SwiftpointX1 && ./\"Swiftpoint X1 Control Panel\"'"
-))
-hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd(
-    'wezterm start --always-new-process -- sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'
-))
-hl.bind("SUPER + Equal", hl.dsp.exec_cmd("qalculate-gtk"))
+    -- Немає нативного еквіваленту в Noctalia -- лишаються окремими
+    -- інструментами/скриптами (nwg-look конфігурує GTK-тему застосунків
+    -- взагалі, не саму Noctalia, тож не замінюється).
+    { key = "SUPER + SHIFT + O", desc = "OCR виділеної ділянки екрана → буфер", action = hl.dsp.exec_cmd("nebula-ocr-wl") },
+    { key = "SUPER + SHIFT + X", desc = "Піпетка кольору → hex у буфер", action = hl.dsp.exec_cmd("nebula-color-picker-wl") },
+    -- Пікер живих космічних шпалер (Земля/чорна діра/вимкнути) -- Wayland-
+    -- порт bspwm-івського nebula-earth-toggle (там був простий xplanet-
+    -- тогл), деталі в crew/hyprland/default.nix біля скрипта.
+    { key = "SUPER + SHIFT + G", desc = "Космічна шпалера: Земля / чорна діра / вимкнути", action = hl.dsp.exec_cmd("nebula-space-wallpaper-wl") },
+    -- Наступний ракурс для АКТИВНОЇ шейдер-шпалери (0°/90°/180°/270°, цикл).
+    -- glpaper не приймає live-uniform -- перезапуск із новим CAM_OFFSET, тому
+    -- коротка пауза/стрибок анімації при кожному натисканні неминучий
+    -- (деталі в default.nix біля nebula-space-wallpaper-rotate).
+    { key = "SUPER + G", desc = "Космічна шпалера: наступний ракурс камери (тільки для шейдерів)", action = hl.dsp.exec_cmd("nebula-space-wallpaper-rotate") },
+    -- Game mode -- Wayland-порт bspwm-івського nebula-gamemode-toggle:
+    -- picom вимкнути не можна (Hyprland сам композитор), тож вимикаємо
+    -- blur/анімації через hyprctl keyword; сповіщення -- через Noctalia
+    -- (dunst під Hyprland не піднятий). Деталі в default.nix.
+    { key = "SUPER + SHIFT + F", desc = "Game mode — вимкнути blur/анімації/сповіщення заради FPS (toggle)", action = hl.dsp.exec_cmd("nebula-gamemode-toggle-wl") },
+    { key = "SUPER + SHIFT + T", desc = "Налаштування GTK-теми (nwg-look)", action = hl.dsp.exec_cmd("nwg-look") },
+    { key = "SUPER + SHIFT + V", desc = "Мікшер гучності (pavucontrol)", action = hl.dsp.exec_cmd("pavucontrol") },
+    -- surf замість xdg-open -- окреме вікно без вкладок/адресного рядка
+    -- браузера, той самий готовий HTML/CSS/JS без переписування.
+    { key = "SUPER + SHIFT + R", desc = "Рулетка (жарт-застосунок)", action = hl.dsp.exec_cmd(
+        "surf file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
+    ) },
+    { key = "SUPER + SHIFT + M", desc = "Панель керування мишею Swiftpoint X1", action = hl.dsp.exec_cmd(
+        "sh -c 'cd ~/Applications/SwiftpointX1 && ./\"Swiftpoint X1 Control Panel\"'"
+    ) },
+    { key = "SUPER + SHIFT + C", desc = "Запуск Ascension-мода (dev-клієнт)", action = hl.dsp.exec_cmd(
+        'wezterm start --always-new-process -- sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'
+    ) },
+    { key = "SUPER + Equal", desc = "Калькулятор (Qalculate)", action = hl.dsp.exec_cmd("qalculate-gtk") },
 
--- Медіа/яскравість -- ті самі команди, що й у crew/bspwm.nix, портативні
--- (wpctl/brightnessctl не залежать від X11/bspwm).
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"))
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"))
-hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"))
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set 5%+"))
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
+    -- Медіа/яскравість -- ті самі команди, що й у crew/bspwm.nix, портативні
+    -- (wpctl/brightnessctl не залежать від X11/bspwm).
+    { key = "XF86AudioRaiseVolume", desc = "Гучність +5%", action = hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+") },
+    { key = "XF86AudioLowerVolume", desc = "Гучність -5%", action = hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-") },
+    { key = "XF86AudioMute", desc = "Toggle mute", action = hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") },
+    { key = "XF86MonBrightnessUp", desc = "Яскравість +5%", action = hl.dsp.exec_cmd("brightnessctl set 5%+") },
+    { key = "XF86MonBrightnessDown", desc = "Яскравість -5%", action = hl.dsp.exec_cmd("brightnessctl set 5%-") },
 
--- Фокус між вікнами
-hl.bind("SUPER + Left", hl.dsp.focus({ direction = "l" }))
-hl.bind("SUPER + Right", hl.dsp.focus({ direction = "r" }))
-hl.bind("SUPER + Up", hl.dsp.focus({ direction = "u" }))
-hl.bind("SUPER + Down", hl.dsp.focus({ direction = "d" }))
+    -- Фокус між вікнами -- стрілки й vim-стиль паралельно (bspwm мав і те, й
+    -- те; Hyprland до цього мав лише стрілки -- hjkl додано для паритету).
+    { key = "SUPER + Left", desc = "Фокус ліворуч", action = hl.dsp.focus({ direction = "l" }) },
+    { key = "SUPER + Right", desc = "Фокус праворуч", action = hl.dsp.focus({ direction = "r" }) },
+    { key = "SUPER + Up", desc = "Фокус вгору", action = hl.dsp.focus({ direction = "u" }) },
+    { key = "SUPER + Down", desc = "Фокус вниз", action = hl.dsp.focus({ direction = "d" }) },
+    { key = "SUPER + H", desc = "Фокус ліворуч (vim-стиль)", action = hl.dsp.focus({ direction = "l" }) },
+    { key = "SUPER + L", desc = "Фокус праворуч (vim-стиль)", action = hl.dsp.focus({ direction = "r" }) },
+    { key = "SUPER + K", desc = "Фокус вгору (vim-стиль)", action = hl.dsp.focus({ direction = "u" }) },
+    { key = "SUPER + J", desc = "Фокус вниз (vim-стиль)", action = hl.dsp.focus({ direction = "d" }) },
+
+    -- Поміняти вікна місцями (bspwm: super+shift+hjkl, bspc node -s) --
+    -- hl.window.swap({direction=...}), живий C++-бінд Hyprland, не через
+    -- hyprctl dispatch.
+    { key = "SUPER + SHIFT + H", desc = "Поміняти вікна місцями — ліворуч", action = hl.dsp.window.swap({ direction = "l" }) },
+    { key = "SUPER + SHIFT + L", desc = "Поміняти вікна місцями — праворуч", action = hl.dsp.window.swap({ direction = "r" }) },
+    { key = "SUPER + SHIFT + K", desc = "Поміняти вікна місцями — вгору", action = hl.dsp.window.swap({ direction = "u" }) },
+    { key = "SUPER + SHIFT + J", desc = "Поміняти вікна місцями — вниз", action = hl.dsp.window.swap({ direction = "d" }) },
+
+    -- Змінити розмір вікна з клавіатури (bspwm: super+ctrl+hjkl, bspc node -z
+    -- по кутах; тут простіше -- hl.window.resize приймає дельту в пікселях
+    -- по x/y, relative=true). Ресайз мишею (SUPER+ПКМ) вище лишається для
+    -- точного підбору розміру, це -- для швидких кроків без миші.
+    { key = "SUPER + CTRL + H", desc = "Зменшити ширину вікна", action = hl.dsp.window.resize({ x = -20, y = 0, relative = true }) },
+    { key = "SUPER + CTRL + L", desc = "Збільшити ширину вікна", action = hl.dsp.window.resize({ x = 20, y = 0, relative = true }) },
+    { key = "SUPER + CTRL + K", desc = "Зменшити висоту вікна", action = hl.dsp.window.resize({ x = 0, y = -20, relative = true }) },
+    { key = "SUPER + CTRL + J", desc = "Збільшити висоту вікна", action = hl.dsp.window.resize({ x = 0, y = 20, relative = true }) },
+}
+
+for _, b in ipairs(binds) do
+    hl.bind(b.key, b.action, b.opts)
+end
 
 -- Робочі простори 1-9: SUPER — перейти, SUPER+SHIFT — перекинути вікно
 for i = 1, 9 do
     hl.bind("SUPER + " .. i, hl.dsp.focus({ workspace = i }))
     hl.bind("SUPER + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
+
+-- nebula-keybind-help-hypr: показує весь список біндів (той самий binds
+-- вище + окремий рядок для циклу робочих просторів) через fuzzel --dmenu
+-- (Wayland-нативний, на відміну від rofi в crew/bspwm.nix) -- лише ПОКАЗУЄ
+-- текст, нічого не виконує з вибору, той самий принцип, що й
+-- nebula-keybind-help у crew/bspwm.nix.
+local helpfile = "/tmp/nebula-hypr-keybinds.txt"
+local helpf = io.open(helpfile, "w")
+if helpf then
+    for _, b in ipairs(binds) do
+        helpf:write(b.key .. "  →  " .. b.desc .. "\n")
+    end
+    helpf:write("SUPER + 1-9  →  Перемкнутись на робочий простір 1-9\n")
+    helpf:write("SUPER + SHIFT + 1-9  →  Перекинути вікно на робочий простір 1-9\n")
+    helpf:write("SUPER + SHIFT + /  →  Цей список комбінацій\n")
+    helpf:close()
+end
+hl.bind("SUPER + SHIFT + slash", hl.dsp.exec_cmd(
+    "sh -c 'cat " .. helpfile .. " | fuzzel --dmenu -p Keybinds: > /dev/null 2>&1'"
+))
 
