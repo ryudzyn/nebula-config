@@ -99,6 +99,27 @@ in
   # ініціалізує DRM-бекенд, а не пізніше, коли він уже запущений.
   environment.sessionVariables.WLR_DRM_NO_MODIFIERS = "1";
 
+  # INTEL_DEBUG=noccs-modifier (2026-09-30) -- ЖИВО ПЕРЕВІРЕНО, НЕ ДОПОМОГЛО.
+  # Точна діагностика трансляції в Vesktop (той самий Electron/Chromium
+  # рушій, що й stock Discord): WebRTC-шний desktop_capture валиться з
+  # "Error creating EGLImage - EGL_BAD_MATCH" на DMA-BUF модифікаторі
+  # 72057594037927948 = I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC (DG2 = Arc
+  # Alchemist, підтверджено в dmesg) -- CCS-стиснений формат, який
+  # Chromium-івський EGL-імпорт не вміє прочитати. Гіпотеза була: цей
+  # прапорець Mesa/iris (на відміну від WLR_DRM_NO_MODIFIERS вище -- та
+  # змінна wlroots, Hyprland на власному рендер-беку її просто ігнорує)
+  # прибере CCS-модифікатори з вибору Mesa. Живо перевірено після sysup +
+  # повний релогін (обов'язково -- Mesa/EGL контекст ініціалізується раз на
+  # старті компоузитора): і в процесі Hyprland, і в процесі Vesktop змінна
+  # підтверджено присутня (live-verified через /proc/PID/environ), МОДИФІКАТОР
+  # ЛИШИВСЯ ТОЙ САМИЙ побайтово, помилка не зникла. Так само не допомогло
+  # quirks.skip_non_kms_dmabuf_formats і кілька вікон одночасно на екрані
+  # (гіпотеза "single-client passthrough" теж відпала). Модифікатор обирається
+  # десь нижче рівня, який ці прапорці контролюють -- де саме, ще не з'ясовано.
+  # Лишаю змінну як задокументований мертвий кінець (шкоди не помічено), не як
+  # робочий фікс -- TODO.md Follow-up #42 для повної хронології.
+  environment.sessionVariables.INTEL_DEBUG = "noccs-modifier";
+
   xdg.portal = {
     enable = true;
     extraPortals = [

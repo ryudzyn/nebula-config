@@ -2731,3 +2731,137 @@ for real now** — capture pipeline (Hyprland/portal/PipeWire/kernel/Mesa) is fu
 choice is cleared, this is squarely a Chromium-on-Arc issue to wait out, same as the wlrobs segfault
 above. Don't re-litigate without new evidence (a Chromium version bump, or confirmation from that
 issue thread).
+
+**Practical resolution (user decision, 2026-09-30)**: screen-sharing in browser-tab Discord
+(discord.com, confirmed clean for remote viewers) sidesteps the Electron-app-specific bug entirely
+-- the browser is open all the time anyway. Daily driver is now browser Discord for calls/streams,
+desktop app for everything else. The underlying Chromium-on-Arc bug is still unfixed/unparked as
+above, this is just the workflow workaround, not a technical fix.
+
+## Follow-up #43 (2026-09-30): two real Hyprland bugs found and fixed (cursor + black screen), the
+Arc A770 corruption bug root-caused further (and it's Chromium-vs-Gecko, not desktop-vs-browser),
+Vesktop tried and hits the identical bug, Firefox/Zen audio-in-screenshare is a hard upstream limit
+
+**Bug #1 (FIXED): cursor invisible in any screen-share.** `xdg-desktop-portal-hyprland` defaults to
+`cursor_mode=hidden` -- no cursor drawn into the captured frame at all, cursor only sent as a
+separate PipeWire "metadata" stream that the consumer must render itself. OBS supports metadata-mode
+cursor rendering (why it always "just worked" there); Chromium/Firefox do not, so browser-tab and
+Electron-app captures alike showed zero cursor. Fix: `crew/hyprland/default.nix` now writes
+`~/.config/hypr/xdph.conf` with `screencopy { cursor_mode = 2 }` ("embedded" -- portal bakes the
+cursor into the frame itself on the compositor side, works for any consumer regardless of
+metadata-mode support). **Live-verified working** (real screen-share, cursor visible to the other
+side) after a manual `systemctl --user restart xdg-desktop-portal-hyprland` to pick up the new file
+without a full relogin.
+
+**Bug #2 (FIXED): full black screen, ONLY the cursor visible, and only on some workspaces.** Hit
+this chasing bug #1 -- after a spontaneous reboot (dust-cleaning), screen-share suddenly showed a
+solid black frame with just the cursor moving, both locally AND to the remote viewer, and *only*
+picked up real content on the one workspace that had multiple windows open at once. Root cause:
+Hyprland's `render:direct_scanout` -- when an output has exactly one surface to show (a single
+fullscreen/maximized client, or even just the background wallpaper layer with no foreground client),
+Hyprland skips compositing and hands that buffer straight to KMS for efficiency, bypassing the
+shared render buffer that screencopy/PipeWire actually reads from. Hyprland 0.56.2 (the version
+running here) added correct cursor compositing *on top of* direct scanout as a separate code path --
+which is exactly why the cursor kept working while everything else went black. Community-confirmed
+match: [Hyprland discussion #14843](https://github.com/hyprwm/Hyprland/discussions/14843) and
+[issue #4579](https://github.com/hyprwm/Hyprland/issues/4579) ("black screen with just a cursor").
+Fix: `crew/hyprland/tweaks.lua` now sets `render.direct_scanout = false` via `hl.config(...)`.
+**Live-verified working** via `hyprctl reload` (this file is a direct out-of-store symlink, no
+switch needed) -- confirmed `hyprctl getoption render:direct_scanout` reads back `0`/`set: true`,
+and content is no longer black on any workspace after.
+
+**Note: bugs #1 and #2 are NOT what caused the original Arc A770 corruption bug from Follow-up
+#42.** Tested directly -- with both fixes live, the desktop Chromium-family video-corruption bug
+is completely unchanged. They were two separate, coincidentally-discovered issues.
+
+**Audio-in-screenshare investigated (forgotten follow-up question from the cursor discussion):
+Firefox/Zen cannot do it on Linux, full stop, not a config problem.** `getDisplayMedia({audio:
+true})` for system/desktop audio only returns an audio track on Chromium-family browsers on Linux
+(Chrome, Edge, Brave, etc.) -- Firefox (and Zen, same Gecko engine) ignores the audio constraint
+entirely on Linux, a long-standing open Mozilla limitation
+([bugzilla #1541425](https://bugzilla.mozilla.org/show_bug.cgi?id=1541425), still unresolved as of
+this check). `pipewire-pulse` is enabled here (`constellations/soundwave.nix`, `pulse.enable =
+true`) so the underlying plumbing for the Chromium path exists -- just pick a Chromium-family
+browser (`google-chrome` is already installed) for calls where sharing desktop audio matters. No
+fix possible from this repo for Zen itself.
+
+**Vesktop tried as a non-Electron-detour candidate for the Follow-up #42 corruption bug -- hits the
+literal identical failure, now with much sharper diagnostics.** Added `pkgs.vesktop` alongside
+stock Discord. Live screen-share attempt fails immediately every time with:
+```
+ERROR:.../webrtc/modules/desktop_capture/linux/wayland/egl_dmabuf.cc:690] Failed to record frame: Error creating EGLImage - EGL_BAD_MATCH
+ERROR:.../webrtc/modules/desktop_capture/linux/wayland/shared_screencast_stream.cc:1080] DMA-BUF modifier 72057594037927948 failed for format 12 (Spa:Enum:VideoFormat:BGRA), marking as failed and renegotiating stream parameters
+TypeError: Video was requested, but no video stream was provided
+```
+Decoded the modifier: `72057594037927948` = `0x10000000000000c` -- top byte `0x01` is the Intel
+vendor tag, low bits `0x0c` (12) = `I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC` (Tile4 + render
+compression + clear-color, a DG2/Arc-Alchemist-specific compressed format; "DG2" independently
+confirmed as this GPU's codename via dmesg in Follow-up #42). Chromium's EGL image import can't
+read this exact compressed variant. This is a **sharper, Vesktop-obtained restatement of the same
+bug already parked in Follow-up #42** -- not a new bug, but proof it's not specific to Discord's
+particular Electron/Chromium build: any Chromium-family WebRTC screen-capture on this GPU hits it.
+**Correction, tested same night with a real remote viewer: `google-chrome` does NOT hit the bug for
+"entire screen" capture.** The prediction above (Chromium-family = doomed) was wrong. Live test:
+`google-chrome-stable` (same flags as `discord-pipewire`'s `commandLineArgs`) sharing "entire
+screen" via `discord.com` in-browser, confirmed clean by the remote viewer -- same portal/PipeWire
+"entire screen" capture path that corrupts in stock Discord and crashes outright in Vesktop, clean
+in plain `google-chrome`. So it's not simply "Chromium engine = broken" -- something specific to how
+Discord's Electron shell and Vesktop's Electron shell drive that capture (build/flag/timing
+differences vs. stock upstream Chromium) triggers it, that a bare Chromium browser doesn't. Root
+cause of *that* difference not investigated further tonight. Practical upshot: **`google-chrome` on
+`discord.com` is a fully viable daily driver for screen-share -- video is clean AND (unlike Zen)
+tab-audio sharing works.** The only real limitation is Chromium-on-Linux's own scope: audio capture
+only works for a "Chrome Tab" source (browser-internal), never for "entire screen"/"window" (no
+system-audio access on Linux at all, any browser) -- so sharing a fullscreen game's audio still
+isn't possible from any browser, only Vesktop/desktop Discord could theoretically do that (and both
+are the ones that crash on video). Zen's only remaining edge is "already the daily browser" -- no
+longer a required workaround for video corruption specifically.
+
+**Four independent mitigation attempts tried live tonight, all confirmed NO EFFECT on this exact
+modifier/error** (the value never changed, byte for byte, across any of them):
+- `WLR_DRM_NO_MODIFIERS=1` (already known ineffective from Follow-up #42 -- it's a wlroots env var,
+  Hyprland has its own non-wlroots render backend and never reads it).
+- `quirks.skip_non_kms_dmabuf_formats = true` (live via `hl.config`) -- the name suggested it should
+  help (this exact option is the documented community fix for a *different* direct-scanout-related
+  black-screen-in-games bug), but it targets KMS scanout-plane format filtering specifically, not
+  the screencopy/PipeWire DMA-BUF export path.
+- `INTEL_DEBUG=noccs-modifier` (`core/desktop.nix`, added and live-tested this session after a real
+  `sysup` + full Hyprland relogin) -- confirmed present via `/proc/PID/environ` in BOTH the Hyprland
+  process and Vesktop's own process, and the modifier still didn't change. This Mesa/iris debug flag
+  evidently doesn't cover whatever code path decides the modifier for buffers Hyprland exports via
+  screencopy. **Left in the config as a documented dead end** (no observed harm), not a working fix.
+- Forcing multiple windows onto the same workspace/output (testing a "single-client buffer
+  passthrough" theory, by analogy with the direct-scanout bug #2 above) -- no effect either; ruled
+  out.
+
+**Where this leaves things**: the corruption bug is specific to Discord's (and Vesktop's) own
+Electron shell, not to the Chromium/WebRTC capture stack in general -- plain `google-chrome` sharing
+the exact same "entire screen" source is clean. Nix-side mitigations (env vars, Hyprland quirks) are
+still a dead end for whatever Discord/Vesktop's Electron build does differently. **Practical
+resolution**: use `google-chrome` on `discord.com` for screen-share calls -- clean video, tab-audio
+works when needed, no known corruption. Keep Zen as the general daily browser (unaffected, this was
+never really about Zen specifically). Desktop Discord/Vesktop remain fine for everything except
+screen-sharing.
+
+**`discord-screenaudio` tried same night -- packaged from scratch, works, but unstable enough to be
+a dead end.** Not in nixpkgs (`nixpkgs#226504` unfulfilled, project archived since 2024-05) --
+packaged as a custom `stdenv.mkDerivation` in `core/packages.nix` (CMake + Qt6 + QtWebEngine +
+`pipewire`, `rohrkabel` git submodule fetched separately via `fetchFromGitHub` and copied into place
+in `postPatch` since a Nix store tarball isn't a real git checkout, `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`
+needed because `rohrkabel`'s `cmake_minimum_required(VERSION 3.1)` is rejected by modern CMake).
+**Built and ran successfully** -- Discord's web UI rendered fine through QtWebEngine, and its
+signature feature (a `discord-screenaudio-virtmic` `Audio/Source/Virtual` PipeWire node, spawned as
+a `--virtmic <target>` subprocess via `rohrkabel`) did get created. But live-tested screen-share
+crashed the GPU process outright mid-encode (`EGL_BAD_CONTEXT` -> `FATAL: NOTREACHED hit ...
+glDeleteTextures without current GL context`) on the first attempt, and on the second attempt after
+a restart, the GPU process instead got stuck in an **infinite EGL_BAD_DISPLAY retry loop** -- froze
+the whole app, no crash and no progress, just constant CPU burn re-attempting `eglMakeCurrent`
+forever. Both are QtWebEngine's own GPU-process-recovery code failing badly on this Arc A770 EGL
+setup, unrelated to the DMA-BUF-modifier bug this whole detour was chasing (never even got far enough
+to test whether *that* bug reproduces here too, since a working screen-share never survived more than
+a few seconds either time). **Verdict: not viable as a daily driver, more fragile than Vesktop/stock
+Discord (which fail cleanly/instantly rather than hanging).** Kept the package built and installed in
+`core/packages.nix` for reference/future retry (project could plausibly get less crashy with a newer
+QtWebEngine someday, or the freeze could be a fixable Mesa/env-var issue not yet investigated) but
+not recommended for actual use tonight. `google-chrome` on `discord.com` remains the one thing that
+actually works cleanly end-to-end (video + tab-audio) -- that's the daily-driver answer, full stop.

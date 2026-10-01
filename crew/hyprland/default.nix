@@ -562,6 +562,23 @@ in
   home.file.".config/hypr/tweaks.lua".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/tweaks.lua";
 
+  # Курсор не видно на боці глядача при трансляції екрана через браузерний
+  # Discord (2026-09-30, живе питання користувача) -- xdg-desktop-portal-
+  # hyprland за замовчуванням шле курсор ОКРЕМИМ PipeWire "metadata"-потоком
+  # (cursor_mode=hidden у самому кадрі), а не вбудовує його в кадр. Це
+  # нормально для споживачів, що вміють малювати metadata-курсор самі (OBS
+  # умів -- звідси й курсор був видно там), але Chromium цього не підтримує,
+  # тож desktopCapturer у браузерному Discord бачить кадр узагалі без
+  # курсора. cursor_mode=2 ("embedded") форсує портал одразу запікати курсор
+  # у сам відеокадр на боці компоузитора -- працює для БУДЬ-якого споживача
+  # незалежно від підтримки metadata-режиму, ціна -- курсор більше не можна
+  # вибірково приховати з боку клієнта (не актуально для нашого юзкейсу).
+  home.file.".config/hypr/xdph.conf".text = ''
+    screencopy {
+      cursor_mode = 2
+    }
+  '';
+
   # hyprpolkitagent постачає власний share/systemd/user/hyprpolkitagent.service
   # -- systemd.user.packages лінкує його в per-user systemd, так стає видимим
   # для `systemctl --user` (той самий підхід, що вже є для noctalia.service

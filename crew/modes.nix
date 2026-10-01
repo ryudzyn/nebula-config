@@ -32,7 +32,7 @@ let
     ${pkgs.dunst}/bin/dunstctl set-paused false
     bspc desktop -f '^2'; steam &
     sleep 0.3
-    bspc desktop -f '^3'; discord-canary &
+    bspc desktop -f '^3'; discord &
     sleep 1
     bspc desktop -f '^2'
   '';
