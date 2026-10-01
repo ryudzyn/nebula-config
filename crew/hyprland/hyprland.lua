@@ -33,6 +33,19 @@ hl.config({
   },
 })
 
+-- hyprland-scroll-overview МУСИТЬ завантажитись ДО require("tweaks") нижче --
+-- живо впіймана помилка: tweaks.lua виставляє plugin.scrolloverview.* через
+-- hl.config, а Hyprland парсить конфіг (і виконує і require, і hl.on-колбеки)
+-- ПОСЛІДОВНО зверху вниз на старті сесії. Коли завантаження плагіна стояло
+-- всередині hl.on("hyprland.start", ...) НИЖЧЕ require("tweaks"), на
+-- холодному старті Hyprland доходив до tweaks.lua раніше, ніж плагін встигав
+-- зареєструвати свої конфіг-ключі -- "unknown config key 'plugin.scrolloverview.*'".
+-- На живому hyprctl reload (без повного рестарту сесії) це не ловилось,
+-- бо плагін там уже залишався завантаженим з попереднього старту.
+-- hyprspace раніше був у hl.on("hyprland.start") саме тому, що сам нічого не
+-- конфігурував через hl.config -- порядок йому був байдужий.
+hl.plugin.load("/etc/profiles/per-user/ryudzyn/lib/libscrolloverview.so")
+
 require("tweaks")
 
 local terminal = "wezterm"
@@ -72,14 +85,6 @@ hl.on("hyprland.start", function()
     -- спрацьовує тут (та сама причина, що й для noctalia.service вище),
     -- тому старт явний.
     hl.exec_cmd("systemctl --user start hyprpolkitagent.service")
-    -- hyprland-scroll-overview -- на відміну від hyprspace (видалений,
-    -- SUPER+O був "unfixable" -- живо підтверджено, що hl.dsp -- закрита
-    -- типізована таблиця без шляху викликати плагінові диспетчери), цей
-    -- плагін сам реєструє виклик у Lua як hl.plugin.scrolloverview.overview(),
-    -- а не через hl.dsp -- тому його реально забіндити з нативного
-    -- Lua-конфіга. Той самий стабільний шлях через per-user профіль
-    -- (lib/ мерджиться, libexec/ -- ні), що й з hyprpolkitagent вище.
-    hl.plugin.load("/etc/profiles/per-user/ryudzyn/lib/libscrolloverview.so")
 end)
 
 -- Awakened PoE Trade -- встановлений, оверлей/тултіп працює (no_blur,
