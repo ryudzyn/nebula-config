@@ -40,6 +40,25 @@ hl.config({
   },
 })
 
+-- hyprland-scroll-overview (SUPER+O у hyprland.lua) -- niri-стиль огляду
+-- робочих просторів. blur=true -- розмиває тільки фонову шпалеру огляду
+-- (узгоджено з decoration.blur вище), wallpaper=2 -- показує і глобальну, і
+-- per-workspace шпалеру, якщо колись з'являться окремі шпалери на воркспейс
+-- (зараз лише глобальна через nebula-space-wallpaper-wl, тож ефекту не дає,
+-- але не шкодить лишити дефолт).
+hl.config({
+  plugin = {
+    scrolloverview = {
+      gesture_distance = 300,
+      scale = 0.5,
+      workspace_gap = 100,
+      layout = "auto",
+      wallpaper = 2,
+      blur = true,
+    },
+  },
+})
+
 hl.animation({ leaf = "windows", enabled = true, speed = 6, bezier = "nebula" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "nebula" })
 hl.animation({ leaf = "fade", enabled = true, speed = 5, bezier = "nebula" })

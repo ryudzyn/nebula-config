@@ -495,6 +495,50 @@ let
     mv "$out/bin/awakened-poe-trade.new" "$out/bin/awakened-poe-trade"
     chmod +x "$out/bin/awakened-poe-trade"
   '';
+  # hyprland-scroll-overview (2026-09-30) -- niri-стиль огляду робочих
+  # просторів прокруткою (SUPER+O у hyprland.lua). На відміну від hyprspace
+  # (видалений -- hl.dsp виявилась закритою типізованою таблицею без шляху
+  # викликати плагінові диспетчери, SUPER+O там був "unfixable"), цей плагін
+  # сам реєструє свою функцію в hl.plugin.<ім'я> -- справжній, задокументований
+  # шлях викликати плагінову дію з нативного Lua-конфіга, не хак. Пакета в
+  # nixpkgs нема (hyprlandPlugins.* перевірено -- відсутній), тому деривація
+  # з нуля через офіційний hyprlandPlugins.mkHyprlandPlugin (той самий
+  # helper, яким у nixpkgs зібрані hy3/hyprsplit/hyprbars тощо) -- гарантує
+  # збірку проти ТОЧНО того Hyprland, що в системі (ABI плагінів прив'язаний
+  # до конкретної збірки). Апстрім має власний flake.nix, але він білдить
+  # проти СВОГО закріпленого github:hyprwm/Hyprland-входу, не нашого --
+  # пряме використання ризикувало б ABI-розсинхроном, тож рецепт (Makefile,
+  # не CMake, попри наявний CMakeLists.txt -- так само, як у власному
+  # flake.nix апстріму) переписаний тут вручну проти pkgs.hyprland.
+  hyprland-scroll-overview = pkgs.hyprlandPlugins.mkHyprlandPlugin {
+    pluginName = "scrolloverview";
+    version = "0-unstable-2026-09-21";
+    src = pkgs.fetchFromGitHub {
+      owner = "yayuuu";
+      repo = "hyprland-scroll-overview";
+      rev = "10eeefa0519e09992b68a1d2949781a876230f5c";
+      sha256 = "15fn7zr3b0xhx1k58cij6gn6syhrbdjh6hdk9rmbp40qki35bnqi";
+    };
+    buildInputs = [ pkgs.lua5_4 ];
+    dontUseCmakeConfigure = true;
+    buildPhase = ''
+      runHook preBuild
+      make all
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out/lib"
+      mv scrolloverview.so "$out/lib/libscrolloverview.so"
+      runHook postInstall
+    '';
+    meta = {
+      description = "Scrollable workspace overview plugin for Hyprland, niri-style";
+      homepage = "https://github.com/yayuuu/hyprland-scroll-overview";
+      license = pkgs.lib.licenses.bsd3;
+      platforms = pkgs.lib.platforms.linux;
+    };
+  };
 in
 {
   # Рішення "Awakened чи poe-price-check" (див. план міграції) прийняте
@@ -550,6 +594,7 @@ in
     # тепер у власному вікні через surf (suckless, мінімальний WebKitGTK,
     # без вкладок/адресного рядка) замість вкладки в основному браузері.
     pkgs.surf
+    hyprland-scroll-overview
   ];
 
   # hyprland.lua/tweaks.lua лишаються звичайними файлами в репо (не в .nix) —
@@ -561,6 +606,11 @@ in
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/hyprland.lua";
   home.file.".config/hypr/tweaks.lua".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/tweaks.lua";
+  # ALT+Tab-overview модуль (hyprland.lua: require("scripts.alttab")) --
+  # Hyprland-івський require() резолвить крапки в шляху відносно ~/.config/hypr/,
+  # тому файл мусить лежати саме в scripts/, не поряд з hyprland.lua.
+  home.file.".config/hypr/scripts/alttab.lua".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nebula-config/crew/hyprland/alttab.lua";
 
   # Курсор не видно на боці глядача при трансляції екрана через браузерний
   # Discord (2026-09-30, живе питання користувача) -- xdg-desktop-portal-
