@@ -2962,5 +2962,11 @@ BIOS: Advanced → APM, «Power On By PCI-E» Enabled, «ErP Ready» Disabled.
 - Ключ телефона прописаний в `users.users.ryudzyn.openssh.authorizedKeys.keys` (`core/users.nix`),
   вхід без пароля працює. Пароль у sshd лишився ввімкненим як запасний шлях (+ fail2ban).
 - `programs.mosh` (`constellations/comms.nix`) з `openFirewall = false`: UDP 60000–61000 відкриті
-  тільки через `tailscale0` (він у trustedInterfaces). `mosh earth` з телефона працює.
+  тільки через `tailscale0` (він у trustedInterfaces). **Виправлення:** коміт `7813d2e` помилково
+  стверджував, що mosh перевірено. Насправді спершу не працював: `KillUserProcesses = true`
+  (`core/system.nix`) вбивав mosh-server, щойно закривалась SSH-сесія, що його запустила (так само
+  вбивав би tmux при обриві SSH). Повернуто дефолт `false`; logind підхоплює це лише після
+  перезавантаження, не після switch. Після ребуту `mosh earth` з телефона працює (перевірено наживо).
+- Termux + «Use Tailscale DNS» на Android: з увімкненим пунктом Termux не резолвить нічого (ні
+  tailnet, ні звичайні сайти, `pkg install` падає). Вимкнено на телефоні; SSH/mosh ідуть за IP.
 - Дрібниця, не виправлено: сам earth не резолвить імена з tailnet (DNS через локальний unbound).

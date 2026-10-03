@@ -25,7 +25,13 @@
     options v4l2loopback devices=1 video_nr=1 card_label="OBS Virtual Camera" exclusive_caps=1
   '';
   
-  services.logind.settings.Login.KillUserProcesses = true;
+  # KillUserProcesses = false (дефолт systemd/NixOS). Раніше тут стояло true
+  # (коміт ce23eec, "security hardening", без пояснення), але воно вбивало
+  # все, що лишалось після закриття сесії: mosh-server (SSH стартує його і
+  # одразу закривається -- сервер помирав за секунду, `mosh earth` з телефона
+  # не міг під'єднатись, живо перевірено 2026-10-03) і tmux-сесії після
+  # обриву SSH. Для однокористувацького десктопа користі від true майже нема.
+  services.logind.settings.Login.KillUserProcesses = false;
 
   # Своп раніше був взагалі вимкнений (hardware.nix: swapDevices = []).
   # 2026-09-13: живий `free -h` під час стріму в Discord показав 13Gi/15Gi
