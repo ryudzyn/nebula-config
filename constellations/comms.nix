@@ -17,16 +17,20 @@
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   services.tailscale.openFirewall = true;
 
-  # Wake-on-LAN (магічний пакет). Прошите через systemd-udevd .link-файл — діє на рівні
-  # мережевої карти незалежно від NetworkManager, тому вмикається без конфліктів.
-  # Передумова в BIOS: "Resume By PCI-E Device" має бути увімкнено.
-  # ВАЖЛИВО: вбудована мережева карта earth (alx/Killer E220x) не має mainline WoL
-  # у драйвері, тож цей прапорець зараз, найімовірніше, no-op на реальному залізі.
-  # Тому окремо замовлено фізичне USB-реле як обхідний шлях (див. пам'ять
-  # project_earth_wol_relay) — цей рядок лишається на майбутнє, якщо
-  # драйвер коли-небудь отримає підтримку, або як безкоштовна спроба про всяк
-  # випадок.
-  networking.interfaces.enp5s0.wakeOnLan.enable = true;
+  # Wake-on-LAN (магічний пакет). Після заміни плати (2026-09-29) вбудована
+  # карта -- Realtek RTL8111 на r8169 (enp6s0), драйвер WoL підтримує, на
+  # відміну від старої Atheros/Killer на alx (через яку замовлялось фізичне
+  # реле, пам'ять project_earth_wol_relay).
+  # Через NetworkManager, а НЕ через networking.interfaces.<if>.wakeOnLan:
+  # той генерує .link з `OriginalName=<if>`, а OriginalName -- це ім'я від
+  # ядра (eth0) ДО перейменування udev, тож правило не матчилось ніколи (так
+  # і було зі старим enp5s0). Тут -- глобальний дефолт для всіх ethernet-
+  # підключень NM, незалежно від назви інтерфейсу: 64 = 0x40 = "magic"
+  # (nm-settings-nmcli, 802-3-ethernet.wake-on-lan). Без нього підключення
+  # має "default", а глобального значення не було -- WoL лишався вимкненим.
+  # Передумова в BIOS (ASUS): Advanced > APM -- "Power On By PCI-E" увімкнено,
+  # ErP вимкнено (інакше живлення мережевої карти в S5 зникає).
+  networking.networkmanager.settings.connection."ethernet.wake-on-lan" = 64;
 
   services.openssh = {
     enable = true;

@@ -2935,3 +2935,18 @@ bubblewrap, тому glycin падає завжди, і шпалера щора�
 `extraCss` (`window { background-image: url(file://…) }`), GTK декодує JPEG сам. Підтверджено наживо: CPU грітера в простої впав з ~95% до ~20%, пам'ять з ~480 до ~164 МБ,
 зависань більше нема. Тимчасову діагностику (cage `-D`, ReGreet `--log-level debug`, mkForce на
 `default_session.command`) прибрано.
+
+## Follow-up #46 (2026-10-03): Wake-on-LAN працює з новою платою — реле більше не потрібне (перевірено наживо)
+
+Після заміни плати вбудована карта — Realtek RTL8111 (`enp6s0`, драйвер `r8169`), не
+Atheros/Killer на `alx` (без WoL у mainline, через що замовлялось фізичне USB-реле).
+`sudo ethtool enp6s0`: `Supports Wake-on: pumbg`, `Wake-on: g`.
+
+Старий конфіг (`networking.interfaces.enp5s0.wakeOnLan.enable`) не працював би на жодній карті:
+інтерфейсу `enp5s0` більше нема, а NixOS генерує `.link` з `OriginalName=<if>`. OriginalName —
+ім'я від ядра (`eth0`) до перейменування udev, тож правило не матчилось ніколи. Замінено на
+глобальний дефолт NetworkManager `ethernet.wake-on-lan=64` (= magic) у `constellations/comms.nix`,
+незалежно від назви інтерфейсу.
+
+BIOS: Advanced → APM, «Power On By PCI-E» Enabled, «ErP Ready» Disabled.
+**Живий тест:** вимкнений earth запустився магічним пакетом з телефона (MAC `a8:5e:45:13:59:f1`).
