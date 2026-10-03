@@ -1,5 +1,5 @@
 # Альтернатива Awakened PoE Trade: без Electron/оверлей-вікна GUI-фреймворку,
-# лише stdlib (urllib + tkinter) + xclip/xdotool як зовнішні бінарники.
+# лише stdlib (urllib) + GTK3/gtk-layer-shell для оверлею + xclip/xdotool як зовнішні бінарники.
 # Той самий офіційний trade API, що й у Awakened — різниця лише в клієнті.
 
 import json
@@ -860,99 +860,125 @@ def copy_to_clipboard(text):
     subprocess.run(["xclip", "-selection", "clipboard"], input=text, text=True)
 
 
-# --- overlay (tkinter, override_redirect -- bspwm його взагалі не бачить,
-# тож не потрібне жодне floating-правило на відміну від Awakened) ---
+# --- overlay (GTK3 + gtk-layer-shell) ---
+# Раніше tkinter з override_redirect: під Hyprland таке вікно не клікалось і,
+# поки було показане, перехоплювало кліки з ІНШИХ workspace на PoE --
+# override_redirect не має Wayland-аналога (hyprwm/Hyprland#2365). Layer-shell
+# surface (як панель Noctalia) -- нативний Wayland-шар поверх усіх вікон, який
+# Hyprland знає і коректно маршрутизує до нього ввід. Keyboard mode ON_DEMAND:
+# клавіатуру отримує лише після кліку по оверлею (поля мін.значення, Escape),
+# тож не забирає її в гри, поки ти просто дивишся на ціну.
+# LD_PRELOAD libgtk-layer-shell задає обгортка в crew/poe-price-check.nix --
+# з 0.9 бібліотека мусить завантажитись раніше за libwayland-client, а з
+# Python через GI це можливо лише так.
+
+_CSS = """
+window {{ background-color: {bg}; }}
+.frame {{ border: 2px solid {accent}; padding: 8px 10px; }}
+.title {{ color: {accent}; font: bold 12pt monospace; }}
+.line {{ color: {fg}; font: 11pt monospace; }}
+.muted {{ color: {muted}; font: 10pt monospace; }}
+.mod {{ color: {fg}; font: 10pt monospace; }}
+.error {{ color: {error}; font: 11pt monospace; }}
+.mods {{ border: 1px solid {muted}; padding: 2px 4px; }}
+button {{ background: {entry_bg}; color: {fg}; border: none; padding: 2px 8px; }}
+button:hover {{ background: {accent}; }}
+button.danger:hover {{ background: {error}; }}
+entry {{ background: {entry_bg}; color: {fg}; border: none; min-height: 0; padding: 0 4px; }}
+check {{ background: {entry_bg}; border: 1px solid {muted}; }}
+check:checked {{ background: {accent}; }}
+scale trough {{ background: {entry_bg}; min-height: 4px; }}
+scale slider {{ background: {fg}; min-width: 10px; min-height: 10px; }}
+"""
 
 
-def _make_root(accent):
-    import tkinter as tk
+def _gtk():
+    import gi
 
-    root = tk.Tk(className="PoePriceCheck")
-    root.overrideredirect(True)
-    root.attributes("-topmost", True)
-    try:
-        root.attributes("-alpha", 0.92)
-    except tk.TclError:
-        pass
-    root.configure(bg=COLORS["bg"])
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    gi.require_version("GtkLayerShell", "0.1")
+    from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
 
-    pad = tk.Frame(root, bg=COLORS["bg"], highlightbackground=accent, highlightthickness=2)
-    pad.pack(padx=1, pady=1)
-    return root, pad
+    return GLib, Gdk, Gtk, GtkLayerShell
 
 
-def _place_top_right(root):
-    root.update_idletasks()
-    width = root.winfo_reqwidth()
-    height = root.winfo_reqheight()
-    screen_w = root.winfo_screenwidth()
-    x = screen_w - width - 24
-    y = 24
-    root.geometry(f"{width}x{height}+{x}+{y}")
+def _make_window(accent):
+    _, Gdk, Gtk, GtkLayerShell = _gtk()
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(_CSS.format(**dict(COLORS, accent=accent)).encode())
+    Gtk.StyleContext.add_provider_for_screen(
+        Gdk.Screen.get_default(),
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
+
+    win = Gtk.Window(title="poe-price-check")
+
+    GtkLayerShell.init_for_window(win)
+    GtkLayerShell.set_namespace(win, "poe-price-check")
+    GtkLayerShell.set_layer(win, GtkLayerShell.Layer.OVERLAY)
+    GtkLayerShell.set_anchor(win, GtkLayerShell.Edge.TOP, True)
+    GtkLayerShell.set_anchor(win, GtkLayerShell.Edge.RIGHT, True)
+    GtkLayerShell.set_margin(win, GtkLayerShell.Edge.TOP, 24)
+    GtkLayerShell.set_margin(win, GtkLayerShell.Edge.RIGHT, 24)
+    GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.ON_DEMAND)
+
+    win.connect("destroy", lambda *_a: Gtk.main_quit())
+    win.connect(
+        "key-press-event",
+        lambda _w, ev: win.destroy() if ev.keyval == Gdk.KEY_Escape else None,
+    )
+
+    frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    frame.get_style_context().add_class("frame")
+    win.add(frame)
+    return win, frame
+
+
+def _label(text, css_class):
+    _, _, Gtk, _ = _gtk()
+    lbl = Gtk.Label(label=text, xalign=0)
+    lbl.set_line_wrap(False)
+    lbl.get_style_context().add_class(css_class)
+    return lbl
+
+
+def _button(text, on_click, danger=False):
+    _, _, Gtk, _ = _gtk()
+    btn = Gtk.Button(label=text)
+    btn.connect("clicked", lambda *_a: on_click())
+    if danger:
+        btn.get_style_context().add_class("danger")
+    return btn
 
 
 def show_overlay(title, lines, is_error, whisper=None):
-    import tkinter as tk
+    GLib, Gdk, Gtk, _ = _gtk()
 
     accent = COLORS["error"] if is_error else COLORS["accent"]
-    root, pad = _make_root(accent)
+    win, frame = _make_window(accent)
 
-    tk.Label(
-        pad,
-        text=title,
-        fg=accent,
-        bg=COLORS["bg"],
-        font=("monospace", 12, "bold"),
-        justify="left",
-        anchor="w",
-    ).pack(fill="x", padx=10, pady=(8, 2))
-
+    frame.pack_start(_label(title, "title"), False, False, 0)
     for line in lines:
-        tk.Label(
-            pad,
-            text=line,
-            fg=COLORS["fg"],
-            bg=COLORS["bg"],
-            font=("monospace", 11),
-            justify="left",
-            anchor="w",
-        ).pack(fill="x", padx=10)
+        frame.pack_start(_label(line, "line"), False, False, 0)
 
     if whisper:
-        # з кнопкою "клік будь-де закриває" вимикаємо: <ButtonPress-1> на
-        # самій кнопці спливає до root-біндингу раніше за <ButtonRelease-1>,
-        # яка викликає command -- вікно закрилось би до копіювання. Замість
-        # цього -- явна кнопка "Закрити", як у show_stat_overlay нижче.
-        btn_row = tk.Frame(pad, bg=COLORS["bg"])
-        btn_row.pack(fill="x", padx=10, pady=(4, 0))
-        tk.Button(
-            btn_row,
-            text="Скопіювати whisper",
-            command=lambda: copy_to_clipboard(whisper),
-            bg=COLORS["entry_bg"],
-            fg=COLORS["fg"],
-            activebackground=accent,
-            relief="flat",
-        ).pack(side="left")
-        tk.Button(
-            btn_row,
-            text="Закрити",
-            command=root.destroy,
-            bg=COLORS["entry_bg"],
-            fg=COLORS["fg"],
-            activebackground=COLORS["error"],
-            relief="flat",
-        ).pack(side="left", padx=(6, 0))
+        # З кнопками "клік будь-де закриває" вимкнено -- інакше клік по самій
+        # кнопці закрив би вікно до копіювання. Явна кнопка "Закрити".
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        btn_row.set_margin_top(4)
+        btn_row.pack_start(_button("Скопіювати whisper", lambda: copy_to_clipboard(whisper)), False, False, 0)
+        btn_row.pack_start(_button("Закрити", win.destroy, danger=True), False, False, 0)
+        frame.pack_start(btn_row, False, False, 0)
     else:
-        root.bind("<Button-1>", lambda _e: root.destroy())
+        win.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        win.connect("button-press-event", lambda *_a: win.destroy())
 
-    tk.Frame(pad, bg=COLORS["bg"], height=8).pack()
-
-    _place_top_right(root)
-
-    root.bind("<Escape>", lambda _e: root.destroy())
-    root.after(7000, root.destroy)
-    root.mainloop()
+    GLib.timeout_add(7000, lambda: win.destroy() or False)
+    win.show_all()
+    Gtk.main()
 
 
 def format_value(v):
@@ -963,176 +989,117 @@ def format_value(v):
 
 def show_stat_overlay(item, mods, league, ninja_line=None, reference_chaos=None):
     """Інтерактивний overlay у стилі Awakened PoE Trade: список розпізнаних
-    модів з чекбоксами й полями мін.значення, автопошук одразу з усіма
-    модами увімкненими, кнопка ручного оновлення після зміни вибору."""
-    import tkinter as tk
+    модів з чекбоксами й полями мін.значення, автопошук одразу після
+    відкриття, кнопка ручного оновлення після зміни вибору."""
+    GLib, _, Gtk, _ = _gtk()
 
-    root, pad = _make_root(COLORS["accent"])
+    win, frame = _make_window(COLORS["accent"])
 
-    tk.Label(
-        pad,
-        text=item["name"],
-        fg=COLORS["accent"],
-        bg=COLORS["bg"],
-        font=("monospace", 12, "bold"),
-        justify="left",
-        anchor="w",
-    ).pack(fill="x", padx=10, pady=(8, 2))
-
+    frame.pack_start(_label(item["name"], "title"), False, False, 0)
     if ninja_line:
-        tk.Label(
-            pad,
-            text=ninja_line,
-            fg=COLORS["muted"],
-            bg=COLORS["bg"],
-            font=("monospace", 10),
-            justify="left",
-            anchor="w",
-        ).pack(fill="x", padx=10)
+        frame.pack_start(_label(ninja_line, "muted"), False, False, 0)
 
-    result_container = tk.Frame(pad, bg=COLORS["bg"])
-    result_container.pack(fill="x", padx=10, pady=(2, 6))
+    result_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    result_box.set_margin_top(2)
+    result_box.set_margin_bottom(6)
+    frame.pack_start(result_box, False, False, 0)
 
     mod_rows = []
     if mods:
-        mods_frame = tk.Frame(pad, bg=COLORS["bg"], highlightbackground=COLORS["muted"], highlightthickness=1)
-        mods_frame.pack(fill="x", padx=10, pady=(0, 4))
+        mods_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        mods_box.get_style_context().add_class("mods")
+        mods_box.set_margin_bottom(4)
+        frame.pack_start(mods_box, False, False, 0)
         for mod in mods:
             n_values = len(mod["values"])
             # 0 значень -- "статичний" мод без числа (checkbox без поля);
             # 1 значення -- звичний числовий мод (checkbox + мін.значення);
             # 2+ значень ("Adds # to # ...") -- фільтр не будуємо, тільки показ.
             filterable = n_values <= 1
-            row = tk.Frame(mods_frame, bg=COLORS["bg"])
-            row.pack(fill="x", pady=1, padx=4)
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            mods_box.pack_start(row, False, False, 0)
 
-            # усі -- вимкнені за замовчуванням: перший автопошук нижче дає
-            # швидку базову ціну за типом/рідкістю (як старий floor-пошук),
-            # а не "0 лотів" -- бо із увімкненими одразу всіма модами з
-            # min=точний ролл шанс знайти лот, що задовольняє геть усі
-            # умови водночас, майже нульовий. Користувач сам відмічає 1-2
-            # моди, які хоче звузити.
-            var = tk.BooleanVar(value=False)
-            cb = tk.Checkbutton(
-                row,
-                variable=var,
-                bg=COLORS["bg"],
-                activebackground=COLORS["bg"],
-                fg=COLORS["fg"],
-                selectcolor=COLORS["bg"],
-                highlightthickness=0,
-            )
-            if not filterable:
-                cb.configure(state="disabled")
-            cb.pack(side="left")
+            # усі -- вимкнені за замовчуванням: перший автопошук дає швидку
+            # базову ціну за типом/рідкістю, а не "0 лотів" (із одразу всіма
+            # модами з min=точний ролл шанс знайти лот майже нульовий).
+            # Користувач сам відмічає 1-2 моди, які хоче звузити.
+            cb = Gtk.CheckButton()
+            cb.set_sensitive(filterable)
+            row.pack_start(cb, False, False, 0)
 
-            val_var = None
+            entry = None
             if n_values == 1:
                 value = mod["values"][0]
-                val_var = tk.StringVar(value=format_value(value))
+                entry = Gtk.Entry(text=format_value(value), width_chars=6, max_width_chars=6)
                 value_range = mod.get("range")
 
                 if value_range is not None:
                     lo, hi = value_range
-                    resolution = 1 if all(v == int(v) for v in (lo, hi, value)) else 0.1
-                    num_var = tk.DoubleVar(value=value)
+                    step = 1 if all(v == int(v) for v in (lo, hi, value)) else 0.1
+                    scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, step)
+                    scale.set_draw_value(False)
+                    scale.set_size_request(80, -1)
+                    scale.set_value(value)
+                    syncing = {"on": False}
 
-                    def on_scale_move(new_val, val_var=val_var):
-                        val_var.set(format_value(float(new_val)))
+                    def on_scale(sc, entry=entry, syncing=syncing):
+                        if syncing["on"]:
+                            return
+                        syncing["on"] = True
+                        entry.set_text(format_value(round(sc.get_value(), 1)))
+                        syncing["on"] = False
 
-                    def on_entry_edit(*_a, num_var=num_var, val_var=val_var):
+                    def on_entry(en, scale=scale, syncing=syncing):
+                        if syncing["on"]:
+                            return
                         try:
-                            parsed = float(val_var.get())
+                            parsed = float(en.get_text())
                         except ValueError:
                             return
-                        if abs(num_var.get() - parsed) > 1e-9:
-                            num_var.set(parsed)
+                        syncing["on"] = True
+                        scale.set_value(parsed)
+                        syncing["on"] = False
 
-                    val_var.trace_add("write", on_entry_edit)
-                    tk.Scale(
-                        row,
-                        variable=num_var,
-                        from_=lo,
-                        to=hi,
-                        resolution=resolution,
-                        orient="horizontal",
-                        length=80,
-                        showvalue=False,
-                        command=on_scale_move,
-                        bg=COLORS["bg"],
-                        fg=COLORS["fg"],
-                        troughcolor=COLORS["entry_bg"],
-                        highlightthickness=0,
-                        sliderrelief="flat",
-                        bd=0,
-                    ).pack(side="left", padx=(2, 4))
+                    scale.connect("value-changed", on_scale)
+                    entry.connect("changed", on_entry)
+                    row.pack_start(scale, False, False, 0)
 
-                entry = tk.Entry(
-                    row,
-                    textvariable=val_var,
-                    width=6,
-                    bg=COLORS["entry_bg"],
-                    fg=COLORS["fg"],
-                    insertbackground=COLORS["fg"],
-                    relief="flat",
-                )
-                entry.pack(side="left", padx=(2, 6))
+                row.pack_start(entry, False, False, 0)
 
-            tk.Label(
-                row,
-                text=mod["line"],
-                fg=COLORS["fg"] if filterable else COLORS["muted"],
-                bg=COLORS["bg"],
-                font=("monospace", 10),
-                anchor="w",
-                justify="left",
-            ).pack(side="left", fill="x")
-
-            mod_rows.append((var, val_var, mod, filterable))
+            row.pack_start(_label(mod["line"], "mod" if filterable else "muted"), False, False, 0)
+            mod_rows.append((cb, entry, mod, filterable))
     else:
-        tk.Label(
-            pad,
-            text="Моди не розпізнано -- пошук лише за типом предмету.",
-            fg=COLORS["muted"],
-            bg=COLORS["bg"],
-            font=("monospace", 10),
-            anchor="w",
-            justify="left",
-        ).pack(fill="x", padx=10, pady=(0, 4))
+        frame.pack_start(
+            _label("Моди не розпізнано -- пошук лише за типом предмету.", "muted"), False, False, 0
+        )
 
     def render_result(lines, is_error):
-        for child in result_container.winfo_children():
-            child.destroy()
+        for child in result_box.get_children():
+            result_box.remove(child)
         for line in lines:
-            tk.Label(
-                result_container,
-                text=line,
-                fg=COLORS["error"] if is_error else COLORS["fg"],
-                bg=COLORS["bg"],
-                font=("monospace", 11),
-                anchor="w",
-                justify="left",
-            ).pack(fill="x")
-        _place_top_right(root)
+            result_box.pack_start(_label(line, "error" if is_error else "line"), False, False, 0)
+        result_box.show_all()
 
     whisper_state = {"value": None}
 
     def run_search():
         stat_filters = []
-        for var, val_var, mod, filterable in mod_rows:
-            if not filterable or not var.get():
+        for cb, entry, mod, filterable in mod_rows:
+            if not filterable or not cb.get_active():
                 continue
-            if val_var is None:
+            if entry is None:
                 stat_filters.append({"id": mod["id"]})
                 continue
             try:
-                min_val = float(val_var.get())
+                min_val = float(entry.get_text())
             except ValueError:
                 continue
             stat_filters.append({"id": mod["id"], "value": {"min": min_val}})
 
         render_result(["Пошук..."], False)
-        root.update()
+        # мережевий запит синхронний -- спершу домалювати "Пошук...".
+        while Gtk.events_pending():
+            Gtk.main_iteration()
         whisper_state["value"] = None
         try:
             result = item_search_stats(item, league, stat_filters, reference_chaos=reference_chaos)
@@ -1142,44 +1109,19 @@ def show_stat_overlay(item, mods, league, ninja_line=None, reference_chaos=None)
             render_result([f"Ліміт запитів API, спробуй через {e.retry_after}с"], True)
         except ApiError as e:
             render_result([str(e)], True)
-        whisper_btn.configure(state="normal" if whisper_state["value"] else "disabled")
+        whisper_btn.set_sensitive(bool(whisper_state["value"]))
 
-    btn_row = tk.Frame(pad, bg=COLORS["bg"])
-    btn_row.pack(fill="x", padx=10, pady=(0, 8))
-    tk.Button(
-        btn_row,
-        text="Оновити пошук",
-        command=run_search,
-        bg=COLORS["entry_bg"],
-        fg=COLORS["fg"],
-        activebackground=COLORS["accent"],
-        relief="flat",
-    ).pack(side="left")
-    whisper_btn = tk.Button(
-        btn_row,
-        text="Whisper",
-        command=lambda: copy_to_clipboard(whisper_state["value"]),
-        state="disabled",
-        bg=COLORS["entry_bg"],
-        fg=COLORS["fg"],
-        activebackground=COLORS["accent"],
-        relief="flat",
-    )
-    whisper_btn.pack(side="left", padx=(6, 0))
-    tk.Button(
-        btn_row,
-        text="Закрити",
-        command=root.destroy,
-        bg=COLORS["entry_bg"],
-        fg=COLORS["fg"],
-        activebackground=COLORS["error"],
-        relief="flat",
-    ).pack(side="left", padx=(6, 0))
+    btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    btn_row.pack_start(_button("Оновити пошук", run_search), False, False, 0)
+    whisper_btn = _button("Whisper", lambda: copy_to_clipboard(whisper_state["value"]))
+    whisper_btn.set_sensitive(False)
+    btn_row.pack_start(whisper_btn, False, False, 0)
+    btn_row.pack_start(_button("Закрити", win.destroy, danger=True), False, False, 0)
+    frame.pack_start(btn_row, False, False, 0)
 
-    root.bind("<Escape>", lambda _e: root.destroy())
-    _place_top_right(root)
-    root.after(100, run_search)
-    root.mainloop()
+    win.show_all()
+    GLib.timeout_add(100, lambda: run_search() or False)
+    Gtk.main()
 
 
 def print_result(title, lines, is_error, whisper=None):

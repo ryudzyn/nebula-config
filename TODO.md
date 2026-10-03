@@ -2970,3 +2970,33 @@ BIOS: Advanced → APM, «Power On By PCI-E» Enabled, «ErP Ready» Disabled.
 - Termux + «Use Tailscale DNS» на Android: з увімкненим пунктом Termux не резолвить нічого (ні
   tailnet, ні звичайні сайти, `pkg install` падає). Вимкнено на телефоні; SSH/mosh ідуть за IP.
 - Дрібниця, не виправлено: сам earth не резолвить імена з tailnet (DNS через локальний unbound).
+
+## Follow-up #48 (2026-10-03): poe-price-check — оверлей переписано з tkinter на GTK3 + gtk-layer-shell (перевірено наживо в PoE1)
+
+Причина: tkinter-вікно з `override_redirect` під Hyprland не клікалось і, поки було показане,
+перехоплювало кліки з інших workspace на PoE. windowrule це не лагодить (override_redirect не має
+Wayland-аналога, hyprwm/Hyprland#2365).
+
+Зроблено:
+- `show_overlay` і `show_stat_overlay` у `crew/poe-price-check/price_check.py` — GTK3 через PyGObject,
+  вікно — layer-shell surface (layer OVERLAY, правий верхній кут, відступи 24px, namespace
+  `poe-price-check`), keyboard mode ON_DEMAND: клавіатуру бере лише після кліку по оверлею, гру не
+  блокує. Поведінка та сама: просте вікно закривається кліком/через 7 с/Escape; інтерактивне —
+  чекбокси модів, мін.значення (+ повзунок, якщо відомий діапазон), «Оновити пошук», «Whisper»,
+  «Закрити». Парсинг/API/ціни не чіпались.
+- `crew/poe-price-check.nix`: `pygobject3` замість `tkinter`; обгортка з `GI_TYPELIB_PATH`
+  (gtk3, gtk-layer-shell, `pango.out` — бо `makeSearchPath` інакше бере вихід `pango-bin` без
+  typelib-ів, gobject-introspection — typelib cairo), `LD_PRELOAD=libgtk-layer-shell.so` (з 0.9 має
+  завантажитись раніше за libwayland-client; з Python інакше ніяк), `GDK_BACKEND=wayland`.
+- Перевірено в окремому headless sway (Hyprland не був запущений): Rare-кільце → layer surface у
+  правому верхньому куті (sway не бачить його як вікно), справжній запит до trade API, кнопки/поля
+  на місці; вікно помилки — з червоною рамкою. Скріншоти через grim.
+
+**Живий тест на Hyprland у PoE1 (2026-10-03):** оверлей клікається і поверх гри, і на інших
+workspace. Фон зроблено суцільним (`{bg}` замість rgba 0.92): на тлі гри текст читався погано.
+Не перевірялось окремо: Escape після кліку і вставка Whisper у чат гри.
+
+**Принагідно — Awakened PoE Trade у PoE1** (повторний тест після прибирання `no_focus`, Follow-up
+#41): `Ctrl+D` працює, вікно ціни з'являється. Кліки по фільтрах у режимі «тримай Ctrl» не
+проходять, а в закріпленому `Ctrl+Alt+D` і в оверлеї `Shift+Space` — проходять. Для роботи з
+фільтрами — `Ctrl+Alt+D`. Причину режиму «тримай Ctrl» не розбирали.
