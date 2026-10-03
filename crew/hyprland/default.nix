@@ -450,6 +450,14 @@ let
       cp ${uiohook-napi-x11-fix}/node.napi.node \
         "$out/share/exiled-exchange-2/resources/app.asar.unpacked/node_modules/uiohook-napi/prebuilds/linux-x64/node.napi.node"
 
+      # Ярлик та іконки з AppImage -- без них EE2 не видно в лончері Noctalia
+      # (2026-10-03, живе питання "а де програмка для PoE2?"). Exec в
+      # оригінальному .desktop -- "AppRun --sandbox", замінюємо на нашу обгортку.
+      install -Dm644 "${appImageContents}/exiled-exchange-2.desktop" "$out/share/applications/exiled-exchange-2.desktop"
+      substituteInPlace "$out/share/applications/exiled-exchange-2.desktop" \
+        --replace-fail "Exec=AppRun --sandbox %U" "Exec=exiled-exchange-2 %U"
+      cp -r "${appImageContents}/usr/share/icons" "$out/share/icons"
+
       runHook postInstall
     '';
 
