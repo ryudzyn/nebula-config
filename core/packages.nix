@@ -82,6 +82,24 @@ let
     # на конфігурації submodule'а).
     cmakeFlags = [ "-DSKIP_KDE=ON" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
   };
+
+  # Zen без звуку у відео (Telegram Web, 2026-10-03): у процесі-декодері (RDD)
+  # вантажився лише вбудований libmozavcodec (VP9/AV1/Opus), без системного
+  # ffmpeg -- H.264/AAC не декодуються, картинка є, звуку нема. Причина:
+  # nixpkgs-івський wrapFirefox перейменував прапорці на withFFmpeg /
+  # withGSSAPI (firefox/wrapper.nix), а zen-browser-flake досі ставить у
+  # passthru старі ffmpegSupport / gssSupport -- обгортка мовчки вважає їх
+  # false і не додає ffmpeg у LD_LIBRARY_PATH. Перезагортаємо unwrapped-пакет
+  # з новими назвами. Версію ffmpeg (8 чи 9) wrapper обирає сам за
+  # browser.version. Прибрати, коли zen-browser-flake оновить passthru.
+  zen-browser = pkgs.wrapFirefox
+    (inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.zen-browser-unwrapped.overrideAttrs (old: {
+      passthru = old.passthru // {
+        withFFmpeg = true;
+        withGSSAPI = true;
+      };
+    }))
+    { pname = "zen-browser"; };
 in
 {
   environment.systemPackages = with pkgs; [
@@ -89,7 +107,7 @@ in
     neovim
     kitty
     vscodium
-    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default # Firefox-форк, окремий flake-вхід
+    zen-browser # Firefox-форк, окремий flake-вхід; перезагорнутий з ffmpeg (див. let вище)
     # google-chrome прибрано (2026-09-30) -- заміна vivaldi-pipewire нижче,
     # той самий Chromium-рушій (чисте відео на discord.com, TODO.md #43), але
     # сучасніший UI -- користувачу не сподобався застарілий вигляд Chrome.
