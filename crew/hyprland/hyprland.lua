@@ -175,14 +175,16 @@ hl.window_rule({
     pin = true,
 })
 
--- zen-browser Picture-in-Picture -- та сама історія: class лишається "zen"
--- (як і головне вікно браузера), тож розрізняє тільки initial_title.
--- Живо підтверджено (2026-09-27): нативний Wayland (xwayland:0), pin не
+-- Picture-in-Picture браузера -- та сама історія: class той самий, що й у
+-- головного вікна, тож розрізняє тільки initial_title. "Picture-in-Picture"
+-- -- заголовок у Zen (живо підтверджено 2026-09-27: нативний Wayland, pin не
 -- ловить клік на інших workspace -- той самий висновок, що й з Discord
--- popout вище (баг hyprwm/Hyprland#4135 специфічний саме для XWayland).
+-- popout вище, баг hyprwm/Hyprland#4135 специфічний саме для XWayland).
+-- "Picture in picture" -- заголовок PiP у Chromium/Vivaldi (vivaldi-pipewire,
+-- core/packages.nix), ще не перевірено наживо.
 hl.window_rule({
-    name  = "zen-pip",
-    match = { initial_title = "^Picture-in-Picture$" },
+    name  = "browser-pip",
+    match = { initial_title = "^(Picture-in-Picture|Picture in picture)$" },
 
     float = true,
     pin = true,

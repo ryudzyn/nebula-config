@@ -3063,3 +3063,29 @@ workspace. Фон зроблено суцільним (`{bg}` замість rgb
 лагодиться. Усі експерименти відкочено: XDPH знову реліз 1.4.1 з nixpkgs, без `force_shm`,
 тимчасовий drop-in із детальним логом видалено. **Рішення для стрімів — Vivaldi на discord.com**
 (чисто, з #43). Повернутись, коли вийде нова версія Discord/Electron або реліз XDPH новіший за 1.4.1.
+
+## Follow-up #50 (2026-10-03): спроба зробити Vivaldi основним браузером — відкочено
+
+Причина спроби: десктопний Discord на Arc A770 стрімить з артефактами (#49), а Vivaldi на discord.com
+— чисто. Vivaldi зробили default-web-browser (`xdg-settings`/`xdg-mime`), режими F1/F2 перевели на
+`vivaldi`, але в користувача виникли проблеми з сервісами Vivaldi — повернулись на Zen (відновлено
+`~/.config/mimeapps.list`, режими знову `zen`). Лишилось лише PiP-правило `browser-pip`, що ловить і
+Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
+
+На майбутнє: `~/.config/mimeapps.list` свідомо НЕ керувати через home-manager `xdg.mimeApps` — файл
+став би read-only, і застосунки, що самі реєструють scheme-handler-и (Telegram, Vesktop, claude-cli),
+перестали б це вміти. Default-браузер міняти через `xdg-settings set default-web-browser`.
+
+## Follow-up #51 (2026-10-03): Zen — немає звуку у відео (Telegram Web)
+
+- Симптом: у Telegram Web відео грає, звуку нема. Поки відео грає, від Zen у PipeWire немає жодного
+  аудіопотоку, `pipewire-pulse` працює — тобто Zen сам не відтворює аудіодоріжку.
+- У процесі-декодері Zen (RDD) вантажився лише вбудований `libmozavcodec` (VP9/AV1/Opus), системного
+  ffmpeg нема → H.264/AAC (звук у відео Telegram) не декодуються.
+- Причина: у nixpkgs `firefox/wrapper.nix` прапорці перейменовано на `withFFmpeg` / `withGSSAPI`, а
+  zen-browser-flake досі ставить у passthru старі `ffmpegSupport` / `gssSupport` — обгортка мовчки
+  вважає їх false і не додає ffmpeg у `LD_LIBRARY_PATH`. Відвалилось після оновлення nixpkgs.
+- Фікс (`core/packages.nix`): `pkgs.wrapFirefox` над `zen-browser-unwrapped` з passthru
+  `withFFmpeg = true; withGSSAPI = true;`. Обгортка тепер тягне ffmpeg 8.1 (`libavcodec.so.62`);
+  Zen 1.22.3b на Firefox 156 — сумісно. Чекає живого тесту. Прибрати, коли zen-browser-flake оновить
+  passthru.
