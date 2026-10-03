@@ -2904,3 +2904,34 @@ actually works cleanly end-to-end (video + tab-audio) -- that's the daily-driver
 **Після `sysup` перевірити:** ReGreet показує тільки Hyprland + Steam; super+F1/F2/F3; яскравість;
 super+p (poe-price-check читає буфер). Перезапуск greetd (`sudo systemctl restart greetd`) потрібен,
 щоб ReGreet перечитав список сесій.
+
+## Follow-up #45 (2026-10-03): ReGreet намертво зависав, якщо довго не входити — шпалера через GStreamer (виправлено, підтверджено)
+
+Симптом зі слів користувача: якщо одразу не увійти, грітер зависає, допомагає тільки ребут.
+
+Що видно в журналах (boots -6, -4, -1 з `journalctl --list-boots`):
+- -6 і -4 (по ~1 хв) закінчились ребутом прямо на грітері. Система при цьому жила
+  (claude-remote-control логував до кінця), greetd не падав. ReGreet після старту не залогував
+  НІЧОГО: жодного вводу, жодної помилки. Зависає його GUI, а не система.
+- -1: грітер сам завершився через ~24 с (`greeter exited without creating a session`), systemd
+  перезапустив greetd (`Restart=on-success`), і з другої спроби вхід вдався.
+- Грітер постійно їсть понад 100% CPU і ~480 МБ RAM, навіть коли просто стоїть.
+- Відкинуто: Plymouth (коректно завершується до старту greetd), падіння GTK з SIGTRAP після
+  простою ([ReGreet #170](https://github.com/rharish101/ReGreet/issues/170), той самий NixOS, але
+  в нас нема ні `traps:` у ядрі, ні coredump'ів regreet), GPU hang (i915 мовчить).
+
+Тимчасова діагностика в `core/desktop.nix`: cage `-D` (лог у `/var/log/regreet/cage.log`; у журнал stderr грітера не потрапляє) + ReGreet
+`--log-level debug`. Linger увімкнено, тож claude-remote-control переживає вихід із сесії і
+замерзлий грітер можна досліджувати наживо (ps/wchan процесів greeter, `journalctl -u greetd -k`).
+
+**Причину знайдено (2026-10-03, наживо на замерзлому грітері після `restart greetd`).** У
+процесі regreet потік `gstglcontext` безперервно їв ~75% CPU (саме він давав ті «100%+ CPU»),
+лог обірвався через секунду після старту. У коді ReGreet 0.5 (`src/gui/component.rs`,
+`setup_background`) `background.path` вантажиться через glycin; якщо це не вдається,
+ReGreet мовчки відкатується на `gtk::MediaFile` з `set_loop(true)`, тобто GStreamer «програє»
+JPG як відео в циклі. Пакет regreet у nixpkgs не має в closure ні glycin-loaders, ні
+bubblewrap, тому glycin падає завжди, і шпалера щоразу йде через GStreamer GL, поки GUI не
+зависне. Фікс у `core/desktop.nix`: прибрано `settings.background`, шпалеру задано через
+`extraCss` (`window { background-image: url(file://…) }`), GTK декодує JPEG сам. Підтверджено наживо: CPU грітера в простої впав з ~95% до ~20%, пам'ять з ~480 до ~164 МБ,
+зависань більше нема. Тимчасову діагностику (cage `-D`, ReGreet `--log-level debug`, mkForce на
+`default_session.command`) прибрано.

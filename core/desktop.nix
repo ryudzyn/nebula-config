@@ -62,8 +62,8 @@ in
   # Космічна тема для ReGreet — та сама adw-gtk3-dark/Papirus-Dark/
   # Bibata-Modern-Classic і та сама nebula-шпалера, що й у crew/default.nix і
   # на робочому столі, щоб грітер виглядав продовженням десктопу, а не дефолтним
-  # Adwaita-екраном. background.fit = "Cover" (а не sample-івський "Contain")
-  # -- заповнює весь екран без чорних смуг, image ширший за екран (3840x2160).
+  # Adwaita-екраном. background-size: cover (а не contain) -- заповнює весь
+  # екран без чорних смуг, image ширший за екран (3840x2160).
   services.displayManager.regreet.theme = {
     name = "adw-gtk3-dark";
     package = pkgs.adw-gtk3;
@@ -76,14 +76,24 @@ in
     name = "Bibata-Modern-Classic";
     package = pkgs.bibata-cursors;
   };
+  # Шпалера — через CSS, а НЕ через settings.background.path (TODO.md
+  # Follow-up #45, причина зависання грітера). ReGreet 0.5 вантажить
+  # background.path через glycin, а пакет у nixpkgs зібраний без
+  # glycin-loaders/bubblewrap — завантаження тихо падає, і ReGreet
+  # відкатується на gtk::MediaFile: GStreamer безкінечно «програє» JPG як
+  # відео в циклі (потік gstglcontext жере ~75% CPU), поки GUI не зависне
+  # намертво. GTK-івський CSS декодує JPEG сам, без glycin і GStreamer.
   services.displayManager.regreet.settings = {
-    background = {
-      path = ../assets/wallpaper/wallpaper.jpg;
-      fit = "Cover";
-    };
     GTK.application_prefer_dark_theme = true;
     appearance.greeting_msg = "Nebula OS — ласкаво просимо";
   };
+  services.displayManager.regreet.extraCss = ''
+    window {
+      background-image: url("file://${../assets/wallpaper/wallpaper.jpg}");
+      background-size: cover;
+      background-position: center;
+    }
+  '';
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   # wlroots-івський обхідний прийом для DMA-BUF-захоплення екрана на Arc A770
