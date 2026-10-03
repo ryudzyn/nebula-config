@@ -9,15 +9,6 @@
     gamescope
   ];
 
-  services.xserver.enable = true;
-  services.xserver.windowManager.bspwm.enable = true;
-  # Дублює core/system.nix — там же ще й у crew/bspwm.nix (setxkbmap); тримати
-  # три копії в синхроні при зміні розкладки.
-  services.xserver.xkb = {
-    layout = "us,ua,de";
-    options = "grp:alt_shift_toggle";
-  };
-
   programs = {
     gamemode.enable = true;
     steam = {

@@ -77,9 +77,9 @@
   ];
 
   # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
-  # у двох місцях — core/games.nix (той самий services.xserver.xkb, окремо для
-  # gamescope-сесії) і crew/bspwm.nix (через setxkbmap у bspwmrc, X11-еквівалент
-  # для сесії без system-рівня). Зміна розкладки — усі три треба правити разом.
+  # в crew/hyprland/hyprland.lua (input.kb_layout/kb_options) — Hyprland не
+  # читає services.xserver.xkb. Зміна розкладки — обидві копії правити разом.
+  # Тут вона лишається заради консолі (console.useXkbConfig вище).
   services.xserver.xkb = {
     # Додаємо німецьку розкладку для зручного набору специфічних літер і текстів
     layout = "us,ua,de";

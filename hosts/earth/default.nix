@@ -13,7 +13,6 @@
     ../../constellations/default.nix
     ../../core/peripherals.nix
     ../../core/security.nix
-    ../../core/x11-greetd-sessions.nix
   ];
 
   networking.hostName = "earth";

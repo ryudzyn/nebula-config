@@ -1,5 +1,5 @@
 # core/packages.nix
-{ config, pkgs, self, inputs, ... }:
+{ config, pkgs, inputs, ... }:
 let
   # Discord screen-share на Wayland давало чорний кадр (портал і аудіо
   # працюють, але жодного PipeWire відео-вузла не з'являлося) -- живо
@@ -51,7 +51,7 @@ let
   # й підкладається в postPatch, той самий трюк, що й з build-time патчами
   # нижче в crew/hyprland/default.nix. SKIP_KDE=ON -- необов'язкові
   # KF6Notifications/XmlGui/GlobalAccel не запаковуємо заради однієї фічі,
-  # notify-send прапорець (--notify-send) використовує вже наявний dunst.
+  # notify-send прапорець (--notify-send) іде в Noctalia.
   discord-screenaudio-rohrkabel = pkgs.fetchFromGitHub {
     owner = "Soundux";
     repo = "rohrkabel";
@@ -88,7 +88,6 @@ in
     git
     neovim
     kitty
-    self.packages.${pkgs.stdenv.hostPlatform.system}.halley # власний Wayland-компоузитор (pkgs/halley), дефолтна greetd-сесія
     vscodium
     inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default # Firefox-форк, окремий flake-вхід
     # google-chrome прибрано (2026-09-30) -- заміна vivaldi-pipewire нижче,
@@ -96,7 +95,6 @@ in
     # сучасніший UI -- користувачу не сподобався застарілий вигляд Chrome.
     vivaldi-pipewire
     retroarch # фронтенд емуляції консолей (libretro-ядра)
-    xwayland-satellite # Xwayland-сумісність для halley (сам не тягне вбудований Xwayland)
     # discord-canary прибрано (2026-09-30) -- стояв поряд зі stable для
     # A/B-тесту проблем зі стрімінгом; причина відпала, коли з'ясувалось, що
     # проблема глибша за конкретну збірку (Chromium-баг на Arc A770,
@@ -111,12 +109,6 @@ in
     discord-screenaudio
     nemo-with-extensions # файловий менеджер (Cinnamon Nemo) з розширеннями -- стрічка шляху, архіви тощо
     prismlauncher # лаунчер Minecraft (мультиінстанс, моди)
-    mako # нотифікації для halley-сесії (dunst -- X11/bspwm-еквівалент, crew/bspwm.nix)
-    # Wayland idle-manager для halley-сесії (пара до nebula-awake в
-    # crew/bspwm.nix, який робить те саме для X11/bspwm через systemd-inhibit) —
-    # halley поки не має власного home-manager-модуля/autostart-конфіга в
-    # цьому репо, тож stasis зараз не підключений жодним конфіг-файлом/юнітом.
-    stasis
     libva-utils # діагностика VAAPI (vainfo) -- апаратне відео-прискорення
     # idea-oss дискантинуйований і позначений insecure в nixpkgs (JetBrains
     # злили Community в єдиний дистрибутив 2025) — jetbrains.idea:
@@ -148,10 +140,8 @@ in
     goldendict-ng
     keepassxc
 
-    # Перегляд медіа/архівів — раніше не було жодного плеєра/переглядача
-    # взагалі. nsxiv, не imv/loupe — той самий нативний X11 підхід, що й
-    # dunst замість mako (crew/bspwm.nix:365), без зайвих Wayland-залежностей
-    # заради сесії, якої зараз немає (imv для Hyprland — crew/hyprland/default.nix).
+    # Перегляд медіа/архівів. nsxiv лишився з bspwm-часів (X11, під Hyprland
+    # іде через XWayland); Wayland-нативний imv — crew/hyprland/default.nix.
     mpv
     syncplay # синхронний перегляд відео з кимось віддалено (той самий mpv-бекенд)
     nsxiv

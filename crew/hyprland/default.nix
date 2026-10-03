@@ -1,8 +1,7 @@
 { config, pkgs, ... }:
 let
-  # Той самий звужений (укр/eng) tesseract, що й crew/bspwm.nix -- окрема
-  # копія тут навмисно, кожен crew-модуль лишається самодостатнім (див.
-  # CLAUDE.md), а override -- це два рядки, не варте крос-модульного імпорту.
+  # Звужений (укр/eng) tesseract -- повний набір мов важить сотні МіБ, а
+  # OCR тут потрібен лише для цих двох.
   tesseract-ocr = pkgs.tesseract.override { enableLanguages = [ "eng" "ukr" ]; };
 
   # Wayland-порт nebula-ocr з crew/bspwm.nix: maim -s -> grim+slurp,
@@ -561,9 +560,9 @@ in
     nebula-space-wallpaper-wl
     nebula-space-wallpaper-rotate
     nebula-gamemode-toggle-wl
-    # rofi/nwg-look вже стоять через crew/bspwm.nix/theming.nix (спільний
-    # home-manager профіль, доступні і в Hyprland-сесії); pavucontrol/
-    # hyprpicker там нема -- додаю тут.
+    # brightnessctl -- XF86MonBrightness*-бінди в hyprland.lua (раніше
+    # тягнувся crew/bspwm.nix, видаленим 2026-10-03).
+    pkgs.brightnessctl
     pkgs.pavucontrol
     pkgs.hyprpicker
     pkgs.satty

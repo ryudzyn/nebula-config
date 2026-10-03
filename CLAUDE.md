@@ -53,35 +53,35 @@ that a new module must be added to or it silently has no effect:
   unbound+AdGuard Home, sound via pipewire, docker/podman, printing/scanning/misc udisks
   services). Aggregated through `constellations/default.nix` — a new constellation module must be
   added to that import list.
-- `crew/` — everything that runs as the `ryudzyn` Home Manager profile: `bspwm.nix` (the sole
-  window manager/session — sway and i3 were retired once bspwm reached feature parity, see below),
-  terminal/shell, CLI tools, theming, the VSCodium profile, Spotify (spicetify, inside
-  `media.nix`), and `modes.nix` (workspace-launcher scripts bound to `Mod4+F1/F2/F3`: work / study
-  / play). Aggregated through `crew/default.nix` — same rule, a new crew module must be added
-  there.
+- `crew/` — everything that runs as the `ryudzyn` Home Manager profile: `hyprland/` (the sole
+  compositor/session — Lua config, live-linked via `mkOutOfStoreSymlink`, see below), `noctalia/`
+  (the shell: bar, launcher, notifications, lock screen), terminal/shell, CLI tools, theming, the
+  VSCodium profile, Spotify (spicetify, inside `media.nix`), and `modes.nix` (workspace-launcher
+  scripts bound to `SUPER+F1/F2/F3` in `hyprland.lua`: work / study / play). Aggregated through
+  `crew/default.nix` — same rule, a new crew module must be added there.
 - `pkgs/halley/` — a `buildRustPackage` derivation for `halley`, a Wayland compositor built from
-  source (github:saltnpepper97/halley) with a checked-in `Cargo.lock`. It's exposed as a flake
-  package and consumed two ways: as the default greetd session (`core/desktop.nix`) and as the
-  `xdg-desktop-portal` implementation for screenshot/screencast (also `core/desktop.nix`), always
-  referenced as `self.packages.${pkgs.stdenv.hostPlatform.system}.halley`. The daily/gaming session
-  is still bspwm (an X11 WM) — halley is greetd's default pick but not the only session on offer;
-  `core/x11-greetd-sessions.nix` generates a private-Xorg xinit session for every enabled
-  `services.xserver.windowManager.*`, which today is just bspwm.
-- `assets/` — wallpapers and a static `roulette.html`, referenced by absolute Nix path from
-  `crew/bspwm.nix` (e.g. `${../assets/wallpaper/wallpaper.jpg}`, `${../assets/cprogram/roulette.html}`).
+  source (github:saltnpepper97/halley) with a checked-in `Cargo.lock`. Still exposed as a flake
+  package (`nix build .#halley`), but since 2026-10-03 it is **not wired into the system** — no
+  greetd session, no portal, not in `systemPackages`.
+- `assets/` — wallpapers, Plymouth theme and a static `roulette.html`, referenced by absolute Nix
+  path (e.g. `${../assets/wallpaper/wallpaper.jpg}`) from `core/desktop.nix` and `crew/hyprland/`.
 
 ### Things to know before adding a module
 
 - Adding a file under `core/`, `constellations/`, or `crew/` does nothing until it's added to the
   relevant `imports` list (`hosts/earth/default.nix`, `constellations/default.nix`,
   `crew/default.nix` respectively) — there's no auto-discovery.
-- `crew/terminal/kitty.nix` and `crew/terminal/starship.nix` are written but deliberately left
-  commented out in `crew/default.nix` pending later work.
-- bspwm (`crew/bspwm.nix`) is the sole WM/session, for both the daily desktop and the
-  Steam/gamescope gaming path (`core/games.nix` enables `services.xserver.windowManager.bspwm`
-  for that path too) — sway and i3 were deleted outright once bspwm reached parity with sway.
-  Don't reintroduce a second X11/Wayland session without checking whether that decision still
-  holds.
-- `self` and `inputs` are threaded through via `specialArgs` in `flake.nix` — modules that need the
-  `halley` package or flake inputs (e.g. `zen-browser`, `spicetify-nix`) take `self`/`inputs` as
-  module arguments rather than importing them another way.
+- `crew/terminal/kitty.nix` is written but deliberately left commented out in
+  `crew/default.nix` pending later work.
+- Hyprland (`crew/hyprland/`) + Noctalia (`crew/noctalia/`) is the sole desktop session; the only
+  other greetd entry is Steam's own gamescope session (`core/games.nix`). The history: sway/i3 were
+  retired for bspwm (2026-08-13), then bspwm (plus `core/x11-greetd-sessions.nix`, polybar, sxhkd,
+  dunst, picom, i3lock) was deleted once the Hyprland port was complete (2026-10-03). There is no
+  X server (`services.xserver.enable` is off) — X11 apps run through XWayland. Don't reintroduce a
+  second X11/Wayland session without checking whether that decision still holds.
+- `hyprland.lua`, `tweaks.lua`, `alttab.lua` and Noctalia's `config.toml` are live symlinks into
+  this checkout — edits apply on `hyprctl reload` without a switch. Hyprland here uses the native
+  Lua config: legacy `hyprctl keyword` is rejected ("Use eval."), so use
+  `hyprctl eval '<lua>'` (e.g. `hl.exec_cmd(...)`, `hl.dispatch(hl.dsp.focus({workspace=2}))`).
+- `self` and `inputs` are threaded through via `specialArgs` in `flake.nix` — modules that need flake
+  inputs (e.g. `zen-browser`, `spicetify-nix`, `noctalia`) take `self`/`inputs` as module arguments rather than importing them another way.

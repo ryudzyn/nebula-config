@@ -2865,3 +2865,42 @@ Discord (which fail cleanly/instantly rather than hanging).** Kept the package b
 QtWebEngine someday, or the freeze could be a fixable Mesa/env-var issue not yet investigated) but
 not recommended for actual use tonight. `google-chrome` on `discord.com` remains the one thing that
 actually works cleanly end-to-end (video + tab-audio) -- that's the daily-driver answer, full stop.
+
+## Follow-up #44 (2026-10-03): bspwm видалено повністю — Hyprland + Noctalia тепер єдина сесія (switch зроблено, користувач підтвердив живо)
+
+Фінальний крок міграції з плану (`~/Downloads/nebula-hyprland-plan.md`, "bspwm видаляється
+повністю в кінці міграції").
+
+**Видалено:**
+- `crew/bspwm.nix` (915 рядків: bspwmrc, sxhkd, polybar, dunst, picom, redshift, i3lock/xidlehook,
+  rofi, clipmenu, nebula-*-скрипти X11) і `core/x11-greetd-sessions.nix` (генератор xinit-сесій,
+  без жодного `windowManager.*` він нічого не генерував би).
+- `core/games.nix`: `services.xserver.enable` + `windowManager.bspwm.enable` + дубль
+  `services.xserver.xkb`. X-сервера більше нема взагалі; gamescope-сесія Steam від нього не
+  залежить. Перевірено через `nix eval`: `hardware.graphics`, `programs.xwayland`,
+  `services.libinput`, шрифти, dconf, polkit — усе лишилось увімкненим (їх вмикають Hyprland/інші
+  модулі, не xserver). `sessionPackages` = Hyprland + steam.desktop.
+- `core/security.nix`: PAM-сервіси `i3lock`/`i3lock-color`. Лок Noctalia ходить у стандартний
+  `login` (перевірено в сорсі: `src/shell/lockscreen/lock_screen.cpp`, `pamService = "login"`).
+- halley відключено від системи (як і вимагав план): прибрано з `services.displayManager.sessionPackages`,
+  `xdg.portal.extraPortals` і `environment.systemPackages`, разом із halley-лише пакетами
+  `xwayland-satellite`, `mako`, `stasis`. Сам `pkgs/halley/` і flake-вихід `.#halley` лишились.
+
+**Перенесено** (Hyprland/інші модулі неявно брали це з bspwm.nix):
+- `brightnessctl` → `crew/hyprland/default.nix` (XF86MonBrightness*-бінди).
+- `xclip` → `crew/poe-price-check.nix` (читання буфера через XWayland); sxhkd-бінд `super+p` прибрано,
+  нативний `hl.bind` у hyprland.lua лишився.
+- `astroterm`, `starfetch` → `crew/default.nix`.
+
+**`crew/modes.nix` (super+F1/F2/F3) переписано під Hyprland і нарешті прив'язано** — у Hyprland-порті
+ці бінди були пропущені (bspc там мовчки не працював). Тепер `hyprctl eval 'hl.exec_cmd(cmd,
+{ workspace = "N silent" })'` — вікно відкривається одразу на своєму workspace без перемикання фокусу,
+тож прибрано і `bspc desktop -f` перед кожним запуском, і `sleep` між ними; DND через
+`noctalia msg notification-dnd-set` замість `dunstctl`. Живо перевірено на поточній сесії
+(kitty на ws 9 у фоні, фокус не зрушив). **Принагідно знайдено старий баг:** bspwm-версія запускала
+`vscodium`, `zen-browser`, `goldendict-ng` — таких бінарників нема (справжні: `codium`, `zen`,
+`goldendict`), тобто ці три застосунки з режимів не відкривались ніколи.
+
+**Після `sysup` перевірити:** ReGreet показує тільки Hyprland + Steam; super+F1/F2/F3; яскравість;
+super+p (poe-price-check читає буфер). Перезапуск greetd (`sudo systemctl restart greetd`) потрібен,
+щоб ReGreet перечитав список сесій.

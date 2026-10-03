@@ -1,6 +1,6 @@
 { pkgs, ... }:
 let
-  # Альтернатива awakened-poe-trade (видалений з crew/bspwm.nix): той самий
+  # Альтернатива awakened-poe-trade: той самий
   # офіційний pathofexile.com/api/trade (перевірено вручну проти реального
   # API -- /data/leagues, /data/static, /exchange, /search+/fetch, усі
   # працюють анонімно, без POESESSID), але без Electron -- лише stdlib
@@ -17,17 +17,12 @@ let
     (builtins.readFile ./poe-price-check/price_check.py);
 in
 {
+  # Бінд super+p -- у crew/hyprland/hyprland.lua (нативний hl.bind).
   home.packages = [
     poe-price-check
     pkgs.xdotool # симулює ctrl+c над наведеним предметом перед читанням буфера
-    # xclip для читання буфера вже тягнеться crew/bspwm.nix
+    # xclip -- читання/запис буфера; PoE іде через XWayland, тож це той самий
+    # X11-буфер, у який гра копіює предмет. Раніше тягнувся crew/bspwm.nix.
+    pkgs.xclip
   ];
-
-  # super+p -- вільний біндинг (не перетинається з ctrl+d/іншими стандартними
-  # хоткеями Awakened PoE Trade, який глобально перехоплював би ctrl+d і зламав
-  # би EOF у терміналах). Вікно результату -- override_redirect (дивись
-  # show_overlay у price_check.py), bspwm його взагалі не бачить і не тайлить,
-  # тому на відміну від Awakened тут не потрібне окреме floating-правило в
-  # crew/bspwm.nix.
-  services.sxhkd.keybindings."super + p" = "poe-price-check";
 }

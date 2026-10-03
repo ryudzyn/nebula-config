@@ -8,7 +8,6 @@
     ./vscodium.nix
     ./theming.nix
     ./modes.nix
-    ./bspwm.nix
     ./poe-price-check.nix
     ./remote-control.nix
     ./hyprland
@@ -18,8 +17,8 @@
     ./gzml.nix
     ./terminal/starship.nix
 
-    # kitty як термінал сам уже підключений напряму через bspwm/hyprland-
-    # біндинги (crew/bspwm.nix, hyprland.lua) без окремого home-manager-
+    # kitty як термінал сам уже підключений напряму через hyprland-
+    # біндинги (hyprland.lua) без окремого home-manager-
     # модуля/конфіга -- цей файл під майбутнє кастомне налаштування (тема,
     # шрифт, курсор), поки не написано.
     # ./terminal/kitty.nix
@@ -66,15 +65,17 @@
   home.username = "ryudzyn";
   home.homeDirectory = "/home/ryudzyn";
   home.packages = with pkgs; [
-    fuzzel # Wayland-нативний app-launcher (Hyprland; у bspwm натомість rofi)
-    nerd-fonts.jetbrains-mono # іконки-гліфи для polybar/nebula-keybind-help/panels
+    fuzzel # Wayland-нативний app-launcher (Hyprland)
+    nerd-fonts.jetbrains-mono # іконки-гліфи для nebula-keybind-help-hypr/panels
     fzf # fuzzy-пошук у терміналі (Ctrl+R в zsh, yazi тощо)
     fd # швидша заміна `find`
     ripgrep # швидша заміна `grep -r`
-    jq # парсинг JSON (nebula-sysinfo в crew/bspwm.nix)
+    jq # парсинг JSON (hyprctl -j у скриптах crew/hyprland/default.nix)
     gh # GitHub CLI
     tldr # короткі приклади замість повних man-сторінок
     duf # наочний `df` (використання дисків)
+    astroterm # планетарій у терміналі -- зорі/планети/сузір'я в реальному часі
+    starfetch # ASCII-рендер сузір'їв у терміналі
   ];
 
   # Дозволяємо Home Manager самому керувати своїми оновленнями

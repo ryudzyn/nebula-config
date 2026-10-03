@@ -2,7 +2,7 @@
 {
   # Розширене налаштування prompt'у -- саме увімкнення (programs.starship.enable)
   # лишається в ./zsh.nix, тут лише settings. Кольори -- та сама палітра
-  # (accent #9d4edd/mauve, bg #1a1a2e), що в polybar/dunst (crew/bspwm.nix),
+  # (accent #9d4edd/mauve, bg #1a1a2e), що й у решті nebula-теми,
   # щоб термінал не випадав зі стилю решти десктопу.
   programs.starship.settings = {
     add_newline = false;

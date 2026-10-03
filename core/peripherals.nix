@@ -39,7 +39,7 @@
 
   # Swiftpoint-миша (Z/Z2/Z3, звичайний і bootloader-режим для прошивки) та
   # Kinetis-bootloader -- без MODE="0666" ці hidraw-пристрої доступні тільки
-  # root, тож crew/bspwm.nix'ів Swiftpoint Control Panel не зміг би до них
+  # root, тож Swiftpoint Control Panel не зміг би до них
   # достукатись з-під звичайного юзера.
   services.udev.extraRules = ''
     KERNEL=="hidraw*", ATTRS{idVendor}=="214e", ATTRS{idProduct}=="0005", MODE="0666", TAG+="Swiftpoint_Z"

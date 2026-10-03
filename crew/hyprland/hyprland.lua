@@ -19,8 +19,8 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 
 hl.config({
   input = {
-    -- Та сама розкладка, що й у core/system.nix (services.xserver.xkb) і
-    -- crew/bspwm.nix — тримати всі три копії в синхроні при зміні розкладки.
+    -- Та сама розкладка, що й у core/system.nix (services.xserver.xkb) —
+    -- тримати обидві копії в синхроні при зміні розкладки.
     kb_layout = "us,ua,de",
     kb_options = "grp:alt_shift_toggle",
     -- follow_mouse=0 -- перевірено вдруге, з живим EE2, PoE все одно
@@ -204,10 +204,9 @@ local binds = {
     -- Основні
     { key = "SUPER + Return", desc = "Термінал (wezterm)", action = hl.dsp.exec_cmd(terminal) },
     { key = "SUPER + D", desc = "Запуск застосунків (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle launcher") },
-    -- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix
-    -- біндить те саме на super+p через sxhkd, але sxhkd -- X11-демон з bspwm-сесії,
-    -- на Hyprland він не піднятий; тут окремий, нативний Hyprland-бінд, який не
-    -- залежить від фокус-трекінгу XWayland/electron-overlay-window взагалі).
+    -- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix);
+    -- нативний Hyprland-бінд, який не залежить від фокус-трекінгу
+    -- XWayland/electron-overlay-window взагалі.
     { key = "SUPER + P", desc = "poe-price-check (прайс-чекер PoE)", action = hl.dsp.exec_cmd("poe-price-check") },
     { key = "SUPER + Q", desc = "Закрити вікно", action = hl.dsp.window.close() },
     { key = "SUPER + F", desc = "Fullscreen для вікна", action = hl.dsp.window.fullscreen({}) },
@@ -216,6 +215,11 @@ local binds = {
     -- super+shift+p, що й always-on-top у crew/bspwm.nix). Не floating-вікно
     -- pin просто ігнорує -- спершу SUPER+SHIFT+Space.
     { key = "SUPER + SHIFT + P", desc = "Pin — закріпити плаваюче вікно поверх усіх воркспейсів", action = hl.dsp.window.pin() },
+
+    -- Режими (crew/modes.nix) -- розкладають набір застосунків по workspace.
+    { key = "SUPER + F1", desc = "Режим «робота» — codium/kitty/zen, сповіщення на паузі", action = hl.dsp.exec_cmd("mode-work") },
+    { key = "SUPER + F2", desc = "Режим «навчання» — anki/goldendict/zen, сповіщення на паузі", action = hl.dsp.exec_cmd("mode-study") },
+    { key = "SUPER + F3", desc = "Режим «гра» — steam/discord, сповіщення увімкнено", action = hl.dsp.exec_cmd("mode-play") },
 
     -- Скріншоти. 2026-09-29: Print віддано під анотований скріншот (satty) --
     -- той, яким реально користуються найчастіше -- а звичайний повноекранний

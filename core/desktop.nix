@@ -1,4 +1,4 @@
-{ config, pkgs, self, ... }:
+{ config, pkgs, ... }:
 let
   # Plymouth-тема "hud_space" (adi1090x/plymouth-themes, pack_3, GPLv3) —
   # анімація відчинення дверей космічного корабля на завантаженні, щоб і
@@ -44,15 +44,16 @@ in
   # критично на десктопі, на відміну від ноутбука).
   boot.kernelParams = [ "i915.enable_dc=0" "i915.enable_psr=0" ];
 
-  # Hyprland — кінцева мета міграції (не тимчасовий тест поруч з bspwm).
+  # Hyprland — єдина десктопна сесія (bspwm видалено 2026-10-03, halley
+  # лишився в pkgs/halley лише як flake-пакет, у greetd/портал не підключений).
   # Сам собою реєструє свою wayland-сесію (services.displayManager.sessionPackages)
   # і власний xdg-desktop-portal-hyprland (xdg.portal.extraPortals +
   # configPackages, для ScreenCast/Screenshot з Noctalia) — нічого з цього не
   # треба дублювати вручну нижче.
   programs.hyprland.enable = true;
 
-  # ReGreet замість tuigreet: показує список сесій (bspwm + Hyprland, зручно
-  # поки Hyprland не стабілізується) і сам пам'ятає останній вибір
+  # ReGreet замість tuigreet: показує список сесій (Hyprland і Steam-івська
+  # gamescope-сесія з core/games.nix) і сам пам'ятає останній вибір
   # (~/.local/state або /var/lib/regreet — на відміну від tuigreet, без
   # --remember-прапорця). enable=true сам вмикає services.greetd і прописує
   # default_session.command (cage + regreet) — окремо його більше не задаємо.
@@ -60,7 +61,7 @@ in
 
   # Космічна тема для ReGreet — та сама adw-gtk3-dark/Papirus-Dark/
   # Bibata-Modern-Classic і та сама nebula-шпалера, що й у crew/default.nix і
-  # crew/bspwm.nix, щоб грітер виглядав продовженням десктопу, а не дефолтним
+  # на робочому столі, щоб грітер виглядав продовженням десктопу, а не дефолтним
   # Adwaita-екраном. background.fit = "Cover" (а не sample-івський "Contain")
   # -- заповнює весь екран без чорних смуг, image ширший за екран (3840x2160).
   services.displayManager.regreet.theme = {
@@ -84,7 +85,6 @@ in
     appearance.greeting_msg = "Nebula OS — ласкаво просимо";
   };
 
-  services.displayManager.sessionPackages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.halley ];
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   # wlroots-івський обхідний прийом для DMA-BUF-захоплення екрана на Arc A770
   # (заміна заліза 2026-09-29, деталі в TODO.md Follow-up #42): і `wlrobs`
@@ -122,18 +122,11 @@ in
 
   xdg.portal = {
     enable = true;
-    extraPortals = [
-      self.packages.${pkgs.stdenv.hostPlatform.system}.halley
-      pkgs.xdg-desktop-portal-gtk
-    ];
-    # ScreenCast/Screenshot тут раніше форсились на "halley" у config.common
-    # -- тобто для ВСІХ сесій, не тільки halley. Halley сам оголошує
-    # `UseIn=Halley` у власному .portal-файлі (перевірено:
-    # /nix/store/.../share/xdg-desktop-portal/portals/halley.portal), тож
-    # цей глобальний override був не просто зайвим, а шкідливим у Hyprland-
-    # сесії: halley там не запущений, портал-запит впирався в нікуди --
-    # звідси і скріншот у Noctalia, і screen-share в Discord мовчки не
-    # працювали. Прибрано; кожна сесія сама бере свій портал за UseIn=.
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    # Без config.common-оверрайду ScreenCast/Screenshot: раніше він форсив
+    # halley-портал для ВСІХ сесій і ламав скріншоти Noctalia та screen-share
+    # під Hyprland (TODO.md Follow-up #41). Кожна сесія сама бере свій портал
+    # за UseIn= у .portal-файлі.
     config.common.default = [ "gtk" ];
   };
 }
