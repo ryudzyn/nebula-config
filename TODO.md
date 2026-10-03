@@ -2950,3 +2950,17 @@ Atheros/Killer на `alx` (без WoL у mainline, через що замовл�
 
 BIOS: Advanced → APM, «Power On By PCI-E» Enabled, «ErP Ready» Disabled.
 **Живий тест:** вимкнений earth запустився магічним пакетом з телефона (MAC `a8:5e:45:13:59:f1`).
+
+## Follow-up #47 (2026-10-03): доступ до earth з телефона — Tailscale + SSH за ключем + mosh (перевірено наживо)
+
+- Pixel 11 доданий у tailnet. З'єднання з earth пряме, не через ретранслятори Tailscale
+  (`tailscale ping`: ~64 мс, на телефоні 83–110 мс).
+- У Termux ім'я `earth` не резолвиться: Termux має власний DNS і не бачить MagicDNS, який
+  підставляє Android-застосунок Tailscale. Підключення за IP `100.101.178.25`, ярлик через
+  `~/.ssh/config` на телефоні (`Host earth` → `HostName 100.101.178.25`, `User ryudzyn`).
+  Відбиток host-ключа звірено: `SHA256:VkmREkGq…MTilC+vs`.
+- Ключ телефона прописаний в `users.users.ryudzyn.openssh.authorizedKeys.keys` (`core/users.nix`),
+  вхід без пароля працює. Пароль у sshd лишився ввімкненим як запасний шлях (+ fail2ban).
+- `programs.mosh` (`constellations/comms.nix`) з `openFirewall = false`: UDP 60000–61000 відкриті
+  тільки через `tailscale0` (він у trustedInterfaces). `mosh earth` з телефона працює.
+- Дрібниця, не виправлено: сам earth не резолвить імена з tailnet (DNS через локальний unbound).

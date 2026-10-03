@@ -41,6 +41,17 @@
     };
   };
 
+  # mosh -- заміна SSH для телефона (Termux на Pixel через Tailscale): не
+  # рветься при зміні мережі Wi-Fi <-> мобільний і при сні телефона, на
+  # відміну від звичайного SSH. Логін іде через той самий sshd, далі --
+  # UDP 60000-61000. openFirewall=false навмисно: tailscale0 уже в
+  # trustedInterfaces вище, тож через tailnet порти й так відкриті, а в
+  # LAN/інтернет їх відкривати нема потреби.
+  programs.mosh = {
+    enable = true;
+    openFirewall = false;
+  };
+
   services.syncthing = {
     enable = true;
     user = "ryudzyn";

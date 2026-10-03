@@ -12,6 +12,12 @@
       "input"
     ];
     shell = pkgs.zsh;
+    # SSH-ключі для входу без пароля. Pixel 11 (Termux) -- через Tailscale,
+    # `ssh earth` / `mosh earth` (constellations/comms.nix). Пароль у sshd
+    # лишається ввімкненим як запасний шлях.
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEapV73v63w+hv7xtvO0WV39eu4J4qZqoTYPg+/t0jEn pixel-11-termux"
+    ];
   };
 
   # Lingering: юзер-інстанс systemd (і, відповідно, наш сервіс
