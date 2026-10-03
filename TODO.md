@@ -3087,5 +3087,5 @@ Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
   вважає їх false і не додає ffmpeg у `LD_LIBRARY_PATH`. Відвалилось після оновлення nixpkgs.
 - Фікс (`core/packages.nix`): `pkgs.wrapFirefox` над `zen-browser-unwrapped` з passthru
   `withFFmpeg = true; withGSSAPI = true;`. Обгортка тепер тягне ffmpeg 8.1 (`libavcodec.so.62`);
-  Zen 1.22.3b на Firefox 156 — сумісно. Чекає живого тесту. Прибрати, коли zen-browser-flake оновить
+  Zen 1.22.3b на Firefox 156 — сумісно. **Живо підтверджено:** звук у Telegram Web повернувся. Прибрати, коли zen-browser-flake оновить
   passthru.
