@@ -2948,15 +2948,15 @@ Atheros/Killer на `alx` (без WoL у mainline, через що замовл�
 незалежно від назви інтерфейсу.
 
 BIOS: Advanced → APM, «Power On By PCI-E» Enabled, «ErP Ready» Disabled.
-**Живий тест:** вимкнений earth запустився магічним пакетом з телефона (MAC `a8:5e:45:13:59:f1`).
+**Живий тест:** вимкнений earth запустився магічним пакетом з телефона (MAC `<earth-mac>`).
 
 ## Follow-up #47 (2026-10-03): доступ до earth з телефона — Tailscale + SSH за ключем + mosh (перевірено наживо)
 
 - Pixel 11 доданий у tailnet. З'єднання з earth пряме, не через ретранслятори Tailscale
   (`tailscale ping`: ~64 мс, на телефоні 83–110 мс).
 - У Termux ім'я `earth` не резолвиться: Termux має власний DNS і не бачить MagicDNS, який
-  підставляє Android-застосунок Tailscale. Підключення за IP `100.101.178.25`, ярлик через
-  `~/.ssh/config` на телефоні (`Host earth` → `HostName 100.101.178.25`, `User ryudzyn`).
+  підставляє Android-застосунок Tailscale. Підключення за IP `<earth-tailscale-ip>`, ярлик через
+  `~/.ssh/config` на телефоні (`Host earth` → `HostName <earth-tailscale-ip>`, `User ryudzyn`).
   Відбиток host-ключа звірено: `SHA256:VkmREkGq…MTilC+vs`.
 - Ключ телефона прописаний в `users.users.ryudzyn.openssh.authorizedKeys.keys` (`core/users.nix`),
   вхід без пароля працює. Пароль у sshd лишився ввімкненим як запасний шлях (+ fail2ban).
@@ -3126,10 +3126,10 @@ Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
 2. `constellations/dns.nix`: прибрано з файрволу 5335 (unbound слухає лише 127.0.0.1 — порт був
    зайвий); `access-control` unbound тепер лише localhost (стояла `192.168.0.0/24` — стара підмережа до
    роутера Starlink, LAN зараз `192.168.1.0/24`).
-3. `constellations/dns.nix`: earth тепер резолвить імена tailnet — forward-zone `taild85963.ts.net.` на
+3. `constellations/dns.nix`: earth тепер резолвить імена tailnet — forward-zone `<tailnet>.ts.net.` на
    `100.100.100.100` (MagicDNS tailscaled) + `domain-insecure` для неї (зона не підписана DNSSEC).
    Перевірено: `unbound-checkconf` чисто; тимчасовий unbound з цим конфігом на окремому порту
-   резолвить `pixel-11` → 100.87.4.108, `earth` → 100.101.178.25 і звичайні сайти.
+   резолвить `pixel-11` → <phone-tailscale-ip>, `earth` → <earth-tailscale-ip> і звичайні сайти.
 4. `core/system.nix`: `services.smartd` + сповіщення через systembus-notify — єдиний диск Samsung SSD 850
    (~2015 рік, 81% заповнено), SMART ніхто не читав.
 
@@ -3142,7 +3142,7 @@ Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
 6. `.gitignore`: `.claude/` (локальні налаштування Claude Code, тижнями висіли в `git status`).
 
 **Після `sysup` (живо перевірено):** smartd активний, бачить `/dev/sda`; `getent hosts
-pixel-11.taild85963.ts.net` → 100.87.4.108 системним резолвером; 5335 слухає лише localhost; remote-control
+pixel-11.<tailnet>.ts.net` → <phone-tailscale-ip> системним резолвером; 5335 слухає лише localhost; remote-control
 перезапустився з новим юнітом. Знахідка: `systembus-notify` (user-юніт з `WantedBy=graphical-session.target`)
 не стартував — той самий target, що ніколи не активується в цій Hyprland-сесії (як noctalia,
 hyprpolkitagent). Додано явний `systemctl --user start systembus-notify.service` у `hl.on("hyprland.start")`;
@@ -3159,3 +3159,22 @@ hyprpolkitagent). Додано явний `systemctl --user start systembus-noti
 - Місце на диску (700/915 ГБ): Steam 437 ГБ, Android SDK + AVD ~44 ГБ, Downloads 26 ГБ, `~/.cache` 12 ГБ,
   `/nix/store` 81 ГБ — інформаційно, нічого не видалялось.
 - `pkgs/halley/` — пакет ніде не підключений (з #44), лише flake-вихід; можна прибрати.
+
+## Follow-up #54 (2026-10-04): рішення по пунктах з #53 — SSH, заглушки в публічному репо, halley
+
+- **SSH:** вхід за ключем — звідусіль; за паролем — лише з LAN (`192.168.1.0/24`) і tailnet
+  (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`), через `Match Address` у `services.openssh.extraConfig`.
+  Вимкнено обидва парольні методи: вхід за паролем фактично йшов через `keyboard-interactive/pam`, тож
+  одного `PasswordAuthentication=no` було б замало. Перевірено `sshd -t` і `sshd -T -C addr=…`: LAN і
+  tailnet (v4/v6) — пароль так, інтернет — лише ключ.
+- **Публічне репо → заглушки:** ключ телефона перенесено з `core/users.nix` у `~/.ssh/authorized_keys`
+  на earth (поза репо; sshd читає `%h/.ssh/authorized_keys`, права 700/700/600 перевірено); forward-zone
+  unbound тепер уся `ts.net.` замість конкретної назви tailnet (перевірено тимчасовим unbound: пристрої
+  tailnet, публічні сайти й `login.tailscale.com` резолвляться); у TODO.md MAC, Tailscale-адреси й назва
+  tailnet замінені на `<earth-mac>`, `<earth-tailscale-ip>`, `<phone-tailscale-ip>`, `<tailnet>`.
+  **В історії git попередні значення лишаються** — переписування історії (force-push) не робилось.
+- **halley:** за рішенням користувача лишається в репо як пакет.
+- **AdGuard UI (:3005):** лише earth + tailnet. `openFirewall = false` (модуль відкривав лише 3005), тож LAN
+  порт більше не бачить; tailscale0 і lo — trustedInterfaces, там доступ лишається. AdGuard уміє слухати
+  лише одну адресу, тому `host = "0.0.0.0"` лишається. Прибрано оманливий `settings.http.address =
+  127.0.0.1:3005` (модуль перебивав його своїм host:port). DNS (53) для мережі не змінено.

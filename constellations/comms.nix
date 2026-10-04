@@ -32,13 +32,25 @@
   # ErP вимкнено (інакше живлення мережевої карти в S5 зникає).
   networking.networkmanager.settings.connection."ethernet.wake-on-lan" = 64;
 
+  # SSH (2026-10-04): за ключем -- звідусіль; за паролем -- лише з домашньої
+  # мережі та tailnet (запасний шлях, якщо телефон із ключем загубиться).
+  # Вимикаємо ОБИДВА парольні методи: вхід за паролем фактично йшов через
+  # keyboard-interactive/PAM (видно в журналі sshd), тож одного
+  # PasswordAuthentication=no було б замало. Match-блок мусить бути в кінці
+  # sshd_config -- extraConfig NixOS туди його й кладе.
   services.openssh = {
     enable = true;
     settings = {
-      PasswordAuthentication = true;
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
       X11Forwarding = false;
       PermitRootLogin = "prohibit-password";
     };
+    extraConfig = ''
+      Match Address 192.168.1.0/24,100.64.0.0/10,fd7a:115c:a1e0::/48
+        PasswordAuthentication yes
+        KbdInteractiveAuthentication yes
+    '';
   };
 
   # mosh -- заміна SSH для телефона (Termux на Pixel через Tailscale): не

@@ -30,9 +30,9 @@
         # Тільки localhost: unbound слухає лише 127.0.0.1, клієнтів LAN обслуговує
         # AdGuard. (Тут була 192.168.0.0/24 -- стара підмережа до роутера Starlink.)
         access-control = [ "127.0.0.1 allow" ];
-        # Tailnet-зона нижче не підписана DNSSEC -- без цього валідатор unbound
-        # відкидав би відповіді MagicDNS як bogus.
-        domain-insecure = [ "taild85963.ts.net" ];
+        # Відповіді MagicDNS (зона ts.net нижче) не підписані DNSSEC -- без цього
+        # валідатор unbound відкидав би їх як bogus.
+        domain-insecure = [ "ts.net" ];
         harden-glue = true;
         harden-dnssec-stripped = true;
         prefetch = true;
@@ -41,12 +41,14 @@
         hide-version = true;
       };
       forward-zone = [
-        # MagicDNS Tailscale: імена з tailnet (pixel-11.taild85963.ts.net тощо)
-        # через резолвер самого tailscaled. Без цього earth не міг резолвити
-        # імена власного tailnet (TODO.md #47). Специфічніша зона має пріоритет
-        # над ".".
+        # MagicDNS Tailscale: імена з tailnet (<пристрій>.<tailnet>.ts.net) через
+        # резолвер самого tailscaled. Без цього earth не міг резолвити імена
+        # власного tailnet (TODO.md #47). Уся зона ts.net, а не конкретна назва
+        # tailnet -- репо публічне, назву tailnet сюди не пишемо; 100.100.100.100
+        # сам відповідає за свій tailnet і пересилає решту ts.net назовні.
+        # Специфічніша зона має пріоритет над ".".
         {
-          name = "taild85963.ts.net.";
+          name = "ts.net.";
           forward-addr = [ "100.100.100.100" ];
         }
         {
@@ -63,12 +65,18 @@
 
   services.adguardhome = {
     enable = true;
+    # Панель керування (:3005) -- лише з самого earth і з tailnet (2026-10-04):
+    # слухає на всіх інтерфейсах (AdGuard уміє лише одну адресу), але файрвол
+    # порт 3005 для LAN більше не відкриває -- через tailscale0 (trustedInterfaces,
+    # comms.nix) і localhost доступ лишається. "Білий список" = членство в
+    # tailnet. DNS-фільтрація (порт 53) для всієї мережі не змінюється.
+    # (Тут ще стояло settings.http.address = 127.0.0.1:3005, але модуль його
+    # перебиває своїм host:port -- реально слухало *:3005; прибрано як оманливе.)
     host = "0.0.0.0";
     port = 3005;
     mutableSettings = true;
-    openFirewall = true;
+    openFirewall = false;
     settings = {
-      http.address = "127.0.0.1:3005";
       dns = {
         bind_host = "0.0.0.0";
         bind_port = 53;
