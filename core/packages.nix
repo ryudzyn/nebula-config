@@ -31,58 +31,6 @@ let
   # discord-pipewire вище (officially supported override, не патч у сторі).
   vivaldi-pipewire = pkgs.vivaldi.override { commandLineArgs = discordPipewireFlags; };
 
-  # discord-screenaudio (2026-09-30, TODO.md Follow-up #43) -- Qt6+QtWebEngine
-  # клієнт (НЕ Electron), архівований апстрім (maltejur/discord-screenaudio,
-  # останній комміт 2024-05), не в nixpkgs (package request #226504 висить
-  # незакритим) -- деривація з нуля. Vesktop (той самий Electron/Chromium
-  # рушій, що й stock Discord) живо підтвердив ту саму помилку
-  # EGL_BAD_MATCH/DMA-BUF-модифікатор I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC,
-  # тож наступний кандидат -- інший рушій під капотом. ВАЖЛИВЕ застереження:
-  # відео тут усе одно йде через вбудований у QtWebEngine Chromium (той самий
-  # клас WebRTC desktop_capture, що й скрізь) -- "screenaudio" в назві прямо
-  # про АУДІО (власний virtmic.cpp через rohrkabel/PipeWire, підмінює
-  # системний звук під виглядом мікрофона -- обхід відсутності system-audio-
-  # in-screenshare на Linux, той самий клас проблеми, що ми знайшли для
-  # google-chrome/Zen того ж вечора). Чи впливає на VIDEO-баг конкретно ця
-  # збірка QtWebEngine-Chromium (відмінна від і Electron, і stock google-
-  # chrome, обидва вже перевірені з різним результатом) -- невідомо, живий
-  # тест і покаже. rohrkabel -- git submodule, не тягнеться fetchFromGitHub
-  # автоматично (не справжній git checkout у /nix/store) -- фетчиться окремо
-  # й підкладається в postPatch, той самий трюк, що й з build-time патчами
-  # нижче в crew/hyprland/default.nix. SKIP_KDE=ON -- необов'язкові
-  # KF6Notifications/XmlGui/GlobalAccel не запаковуємо заради однієї фічі,
-  # notify-send прапорець (--notify-send) іде в Noctalia.
-  discord-screenaudio-rohrkabel = pkgs.fetchFromGitHub {
-    owner = "Soundux";
-    repo = "rohrkabel";
-    rev = "04bfb921c44fb0d2337df70f5660899bc8d2844f";
-    sha256 = "0iaq58w49zn364irwsnrxp2qw3rnd19c6bchk6slv7w4wj4jylgi";
-  };
-  discord-screenaudio = pkgs.stdenv.mkDerivation {
-    pname = "discord-screenaudio";
-    version = "1.10.1";
-    src = pkgs.fetchFromGitHub {
-      owner = "maltejur";
-      repo = "discord-screenaudio";
-      rev = "v1.10.1";
-      sha256 = "0fjmw74zrb35hyx1r23yywlab3pi0yvh89sipcij9ppxv38jfb3x";
-    };
-
-    postPatch = ''
-      rm -rf submodules/rohrkabel
-      cp -r ${discord-screenaudio-rohrkabel} submodules/rohrkabel
-      chmod -R u+w submodules/rohrkabel
-    '';
-
-    nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.qt6.wrapQtAppsHook ];
-    buildInputs = [ pkgs.qt6.qtbase pkgs.qt6.qtwebengine pkgs.pipewire ];
-    # CMAKE_POLICY_VERSION_MINIMUM -- rohrkabel submodule (не оновлювався з
-    # 2023) декларує cmake_minimum_required(VERSION 3.1), а сучасний CMake у
-    # nixpkgs прибрав сумісність з <3.5 повністю (живо впіймано: build падав
-    # на конфігурації submodule'а).
-    cmakeFlags = [ "-DSKIP_KDE=ON" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
-  };
-
   # Zen без звуку у відео (Telegram Web, 2026-10-03): у процесі-декодері (RDD)
   # вантажився лише вбудований libmozavcodec (VP9/AV1/Opus), без системного
   # ffmpeg -- H.264/AAC не декодуються, картинка є, звуку нема. Причина:
@@ -124,7 +72,11 @@ in
     # Лишаю поряд зі stable заради venmic (системне аудіо в шерингу, коли/якщо
     # видео-баг колись таки поправлять апстрім) і кращих UI-налаштувань якості.
     vesktop
-    discord-screenaudio
+    # discord-screenaudio (власна деривація, Qt6/QtWebEngine) прибрано
+    # 2026-10-04: живо тестувався 2026-09-30 і був нестабільний (GPU-процес
+    # QtWebEngine падав з EGL_BAD_CONTEXT або зависав у циклі
+    # EGL_BAD_DISPLAY, TODO.md #43), апстрім архівований. Рецепт пакування --
+    # в історії git (коміт 7c1ad22), якщо колись знадобиться.
     nemo-with-extensions # файловий менеджер (Cinnamon Nemo) з розширеннями -- стрічка шляху, архіви тощо
     prismlauncher # лаунчер Minecraft (мультиінстанс, моди)
     libva-utils # діагностика VAAPI (vainfo) -- апаратне відео-прискорення
