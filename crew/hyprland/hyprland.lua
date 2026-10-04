@@ -290,7 +290,7 @@ local binds = {
     { key = "SUPER + SHIFT + V", desc = "Мікшер гучності (pavucontrol)", action = hl.dsp.exec_cmd("pavucontrol") },
     -- surf замість xdg-open -- окреме вікно без вкладок/адресного рядка
     -- браузера, той самий готовий HTML/CSS/JS без переписування.
-    { key = "SUPER + SHIFT + R", desc = "Рулетка (жарт-застосунок)", action = hl.dsp.exec_cmd(
+    { key = "SUPER + SHIFT + R", desc = "Рулетка — кілька списків, ваги, без повторів, історія", action = hl.dsp.exec_cmd(
         "surf file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
     ) },
     { key = "SUPER + SHIFT + M", desc = "Панель керування мишею Swiftpoint X1", action = hl.dsp.exec_cmd(

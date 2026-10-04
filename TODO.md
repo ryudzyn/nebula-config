@@ -2503,8 +2503,7 @@ follow-up (new Nix deps, two functions rewritten), not attempted yet — deferre
 finishing it same-session. Do not re-attempt a windowrule-only fix for this; it's been tried.
 
 **Ideas for later** (not scoped, just noted so they aren't lost):
-- Roulette (`super+shift+r`, currently `xdg-open` on a static `assets/cprogram/roulette.html`) —
-  build it as its own real little app/program instead of a static page.
+- ~~Roulette~~ — done 2026-10-04, see Follow-up #52.
 - Calculator (`super+equal`, currently `nebula-calc-wl` / rofi-calc) — replace with something more
   capable than a plain rofi expression evaluator.
 
@@ -3089,3 +3088,29 @@ Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
   `withFFmpeg = true; withGSSAPI = true;`. Обгортка тепер тягне ffmpeg 8.1 (`libavcodec.so.62`);
   Zen 1.22.3b на Firefox 156 — сумісно. **Живо підтверджено:** звук у Telegram Web повернувся. Прибрати, коли zen-browser-flake оновить
   passthru.
+
+## Follow-up #52 (2026-10-04): рулетка (`super+shift+r`) — з макета зроблено справжній маленький застосунок
+
+`assets/cprogram/roulette.html` (той самий файл, відкривається в `surf`), переписано:
+- **Зберігається між запусками** (localStorage WebKit у `~/.surf/cache`, ключ `nebula-roulette-v2`): списки,
+  налаштування, історія. Раніше будь-яка правка списку зникала після закриття вікна.
+- **Кілька списків** (за замовчуванням «Чим сьогодні займаюсь», «Що поїсти», «У що пограти»): створити /
+  перейменувати / видалити — у рядку на самій сторінці, не через `prompt()` (у surf це грубий вбудований
+  діалог WebKit «Prompt - file:///…»).
+- **Вага пункту 1–5** = ширина сектора і частота випадіння. Переможець обирається спершу (зважено,
+  `crypto.getRandomValues`), потім колесо цілиться у випадкову точку всередині його сектора — ваги точні,
+  анімація завжди збігається з результатом. Перевірено node-скриптом: 20 000 обертань без жодного
+  промаху, розподіл відповідає вагам.
+- **«Без повторів»** (⟲): переможець вимикається до «Повернути вимкнені»; лишається підсвіченим на колесі
+  до наступного обертання; коли все випало — підказка й відкритий редактор.
+- **Клавіші** Пробіл/Enter — крутити, Esc — згорнути панелі; клік по центру колеса теж крутить.
+- **Звук тріскачки** (WebAudio, вимикається ♪) і посмикування стрілки на кожному секторі; підсвічування
+  сектора-переможця; **історія** останніх 30 результатів з назвою списку й часом.
+- Виправлено: редактор не прокручувався при довгому списку (тепер max-height + scroll, сторінка теж
+  прокручується); порожні назви давали порожні сектори; назви обрізались зарано (тепер шрифт спершу
+  зменшується 13→10px).
+
+Як тестував без живого користувача: `surf` на справжньому Hyprland (headless sway не малює WebKit) з
+тимчасовим `HOME` (щоб не чіпати реальний localStorage), сценарії через `~/.surf/script.js` (surf
+виконує його на кожній сторінці, вже після `load`), результат читався через заголовок вікна в
+`hyprctl clients`. `wtype` для перевірки клавіш не годиться: через розкладки us,ua,de шле не ті символи.

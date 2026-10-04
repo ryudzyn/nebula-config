@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>Nebula — Рулетка дня</title>
+<title>Nebula — Рулетка</title>
 <style>
   :root {
     --bg: #0d0d1a;
@@ -12,6 +12,7 @@
     --accent-dim: #3d3d6b;
     --text: #e8e6f5;
     --text-dim: #a7a4c0;
+    --danger: #ff6b6b;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -19,9 +20,8 @@
     background: radial-gradient(circle at 50% 20%, #17172c 0%, var(--bg) 65%);
     color: var(--text);
     font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden;
   }
+  body { overflow-y: auto; }
   .stars {
     position: fixed; inset: 0; pointer-events: none;
     background-image:
@@ -35,13 +35,38 @@
   .app {
     position: relative; z-index: 1;
     display: flex; flex-direction: column; align-items: center;
-    gap: 28px; padding: 32px;
+    gap: 18px; padding: 20px 20px 28px;
+    min-height: 100%;
   }
-  h1 {
-    margin: 0; font-size: 15px; letter-spacing: 0.35em;
-    text-transform: uppercase; color: var(--text-dim); font-weight: 500;
+
+  /* --- list switcher --- */
+  .lists { display: flex; align-items: center; gap: 6px; width: 380px; }
+  .lists select {
+    flex: 1; appearance: none; background: var(--panel); color: var(--text);
+    border: 1px solid var(--accent-dim); border-radius: 8px; padding: 7px 10px;
+    font: inherit; font-size: 13px; letter-spacing: 0.05em; cursor: pointer;
   }
-  .wheel-wrap { position: relative; width: 360px; height: 360px; }
+  .lists select:focus { outline: none; border-color: var(--accent); }
+  .icon-btn {
+    all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); background: var(--panel); border: 1px solid var(--accent-dim);
+    font-size: 14px;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .icon-btn.on { color: #14031f; background: var(--accent); border-color: var(--accent); }
+  .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+  .inline-bar { display: none; align-items: center; gap: 6px; width: 380px; margin-top: -10px; }
+  .inline-bar.show { display: flex; }
+  .inline-bar input {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--accent); border-radius: 8px;
+    color: var(--text); padding: 6px 10px; font: inherit; font-size: 13px;
+  }
+  .inline-bar input:focus { outline: none; }
+  .inline-bar .msg { flex: 1; font-size: 13px; color: var(--text); }
+
+  /* --- wheel --- */
+  .wheel-wrap { position: relative; width: 340px; height: 340px; }
   .pointer {
     position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
     width: 0; height: 0; z-index: 3;
@@ -49,8 +74,11 @@
     border-right: 14px solid transparent;
     border-top: 22px solid var(--accent);
     filter: drop-shadow(0 0 6px rgba(157, 78, 221, 0.8));
+    transform-origin: 50% 0;
   }
-  canvas {
+  .pointer.tick { animation: tick 90ms ease-out; }
+  @keyframes tick { 50% { transform: translateX(-50%) rotate(-12deg); } }
+  canvas#wheel {
     border-radius: 50%;
     box-shadow: 0 0 0 3px var(--accent-dim), 0 0 40px rgba(157, 78, 221, 0.25);
   }
@@ -58,14 +86,24 @@
     position: absolute; top: 50%; left: 50%;
     width: 54px; height: 54px; transform: translate(-50%, -50%);
     background: var(--panel); border: 2px solid var(--accent);
-    border-radius: 50%; z-index: 2;
+    border-radius: 50%; z-index: 2; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 0 16px rgba(157, 78, 221, 0.5);
   }
   .hub svg { width: 22px; height: 22px; fill: var(--accent); }
+
+  .result {
+    min-height: 28px; font-size: 18px; font-weight: 600;
+    color: var(--accent); text-align: center; max-width: 380px;
+    text-shadow: 0 0 12px rgba(157, 78, 221, 0.5);
+  }
+  .result.pop { animation: pop 380ms ease-out; }
+  @keyframes pop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+
+  .controls { display: flex; align-items: center; gap: 8px; }
   button#spin {
     all: unset; cursor: pointer;
-    padding: 12px 34px;
+    padding: 11px 34px;
     background: var(--accent); color: #14031f;
     font-weight: 700; font-size: 13px; letter-spacing: 0.15em;
     text-transform: uppercase; border-radius: 8px;
@@ -74,85 +112,199 @@
   }
   button#spin:hover { transform: translateY(-1px); box-shadow: 0 0 26px rgba(157, 78, 221, 0.7); }
   button#spin:active { transform: translateY(0); }
-  button#spin:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
-  .result {
-    min-height: 28px; font-size: 18px; font-weight: 600;
-    color: var(--accent); text-align: center;
-    text-shadow: 0 0 12px rgba(157, 78, 221, 0.5);
-  }
-  .editor {
-    width: 360px; background: var(--panel);
+  button#spin:disabled { opacity: 0.5; cursor: default; box-shadow: none; transform: none; }
+  .hint { font-size: 11px; color: var(--text-dim); letter-spacing: 0.05em; margin-top: -8px; }
+  .hint b { color: var(--text); font-weight: 600; }
+
+  /* --- panels --- */
+  details.panel {
+    width: 380px; background: var(--panel);
     border: 1px solid var(--accent-dim); border-radius: 10px;
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
-  .editor summary {
+  details.panel summary {
     cursor: pointer; font-size: 12px; letter-spacing: 0.1em;
     color: var(--text-dim); text-transform: uppercase; user-select: none;
   }
-  .editor[open] summary { margin-bottom: 10px; }
-  .row { display: flex; gap: 8px; margin-bottom: 8px; }
-  .row input {
-    flex: 1; background: var(--panel-2); border: 1px solid var(--accent-dim);
+  details.panel[open] summary { margin-bottom: 10px; }
+  .rows { max-height: 240px; overflow-y: auto; padding-right: 4px; }
+  .row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .row.off input.name { opacity: 0.4; text-decoration: line-through; }
+  .row input.name {
+    flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--accent-dim);
     border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px;
     font-family: inherit;
   }
-  .row input:focus { outline: none; border-color: var(--accent); }
-  .row button {
-    all: unset; cursor: pointer; padding: 6px 10px;
-    color: var(--text-dim); font-size: 15px; border-radius: 6px;
+  .row input.name:focus { outline: none; border-color: var(--accent); }
+  .row .swatch { width: 10px; height: 26px; border-radius: 3px; flex: none; }
+  .weight {
+    display: flex; align-items: center; gap: 2px; flex: none;
+    color: var(--text-dim); font-size: 12px;
   }
-  .row button:hover { color: #ff6b6b; background: #ff6b6b22; }
-  .add-row { display: flex; gap: 8px; margin-top: 4px; }
+  .weight button, .row .del {
+    all: unset; cursor: pointer; padding: 4px 6px; border-radius: 6px;
+    color: var(--text-dim); font-size: 13px;
+  }
+  .weight button:hover { color: var(--text); background: var(--accent-dim); }
+  .weight span { min-width: 14px; text-align: center; color: var(--text); }
+  .row .del:hover { color: var(--danger); background: #ff6b6b22; }
+  .add-row { display: flex; gap: 8px; margin-top: 6px; }
   .add-row input {
     flex: 1; background: var(--panel-2); border: 1px dashed var(--accent-dim);
     border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px;
     font-family: inherit;
   }
-  .add-row button {
-    all: unset; cursor: pointer; padding: 6px 14px;
-    background: var(--accent-dim); color: var(--text); border-radius: 6px; font-size: 13px;
+  .add-row input:focus { outline: none; border-color: var(--accent); }
+  .add-row button, .small-btn {
+    all: unset; cursor: pointer; padding: 6px 12px;
+    background: var(--accent-dim); color: var(--text); border-radius: 6px; font-size: 12px;
   }
-  .add-row button:hover { background: var(--accent); color: #14031f; }
+  .add-row button:hover, .small-btn:hover { background: var(--accent); color: #14031f; }
+  .panel-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-dim); }
+  ul.history { list-style: none; margin: 0; padding: 0; max-height: 160px; overflow-y: auto; }
+  ul.history li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 2px; font-size: 13px; border-bottom: 1px solid #ffffff0d; }
+  ul.history li span.t { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+  ul.history li span.l { color: var(--text-dim); font-size: 11px; }
+  .empty { color: var(--text-dim); font-size: 12px; text-align: center; padding: 6px 0; }
 </style>
 </head>
 <body>
 <div class="stars"></div>
 <div class="app">
-  <h1>Чим сьогодні займаюсь</h1>
+  <div class="lists">
+    <select id="listSelect" title="Список"></select>
+    <button class="icon-btn" id="newList" title="Новий список">＋</button>
+    <button class="icon-btn" id="renameList" title="Перейменувати список">✎</button>
+    <button class="icon-btn danger" id="deleteList" title="Видалити список">✕</button>
+  </div>
+  <div class="inline-bar" id="inlineBar">
+    <input id="inlineInput" type="text" maxlength="40">
+    <span class="msg" id="inlineMsg"></span>
+    <button class="small-btn" id="inlineOk">OK</button>
+    <button class="small-btn" id="inlineCancel">Скасувати</button>
+  </div>
 
   <div class="wheel-wrap">
-    <div class="pointer"></div>
-    <canvas id="wheel" width="360" height="360"></canvas>
-    <div class="hub">
+    <div class="pointer" id="pointer"></div>
+    <canvas id="wheel" width="340" height="340"></canvas>
+    <div class="hub" id="hub" title="Крутити">
       <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v2.06a7 7 0 0 1 5.94 5.94H21a1 1 0 1 1 0 2h-2.06a7 7 0 0 1-5.94 5.94V21a1 1 0 1 1-2 0v-2.06A7 7 0 0 1 5.06 13H3a1 1 0 1 1 0-2h2.06A7 7 0 0 1 11 5.06V3a1 1 0 0 1 1-1zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
     </div>
   </div>
 
   <div class="result" id="result"></div>
-  <button id="spin">Крутити</button>
+  <div class="controls">
+    <button class="icon-btn" id="noRepeat" title="Без повторів: те, що випало, вимикається до скидання">⟲</button>
+    <button id="spin">Крутити</button>
+    <button class="icon-btn" id="sound" title="Звук тріскачки">♪</button>
+  </div>
+  <div class="hint"><b>Пробіл</b> / <b>Enter</b> — крутити · <b>Esc</b> — згорнути панелі</div>
 
-  <details class="editor" id="editor">
+  <details class="panel" id="editor">
     <summary>Редагувати список</summary>
-    <div id="rows"></div>
+    <div class="rows" id="rows"></div>
     <div class="add-row">
-      <input id="newItem" type="text" placeholder="Нова активність…" maxlength="28">
+      <input id="newItem" type="text" placeholder="Нова активність…" maxlength="40">
       <button id="addBtn">Додати</button>
+    </div>
+    <div class="panel-foot">
+      <span id="offInfo"></span>
+      <button class="small-btn" id="resetOff">Повернути вимкнені</button>
+    </div>
+  </details>
+
+  <details class="panel" id="historyPanel">
+    <summary>Історія</summary>
+    <ul class="history" id="history"></ul>
+    <div class="panel-foot">
+      <span>останні 30</span>
+      <button class="small-btn" id="clearHistory">Очистити</button>
     </div>
   </details>
 </div>
 
 <script>
-  const palette = ["#9d4edd", "#3d3d6b", "#c9b8ff", "#2d2d4f", "#7b2cbf", "#5a189a"];
-  let items = ["Мод для Minecraft", "Пограти в Forza", "Покопатись у NixOS", "Музика (Ardour/LMMS)", "Німецька", "Просто відпочити"];
+  // ---------- state & persistence ----------
+  // Stored in WebKit localStorage (surf keeps it under ~/.surf/cache), so lists,
+  // settings and history survive closing the window. Every access is guarded:
+  // if storage is unavailable the page still works, just without memory.
+  const STORAGE_KEY = "nebula-roulette-v2";
+  const palette = ["#9d4edd", "#3d3d6b", "#c9b8ff", "#2d2d4f", "#7b2cbf", "#5a189a", "#b388ff", "#24244a"];
 
-  const canvas = document.getElementById("wheel");
-  const ctx = canvas.getContext("2d");
-  const resultEl = document.getElementById("result");
-  const spinBtn = document.getElementById("spin");
-  const rowsEl = document.getElementById("rows");
+  function defaultState() {
+    const mk = (name, labels) => ({ name, items: labels.map((label) => ({ label, weight: 1, off: false })) });
+    return {
+      current: 0,
+      noRepeat: false,
+      sound: true,
+      lists: [
+        mk("Чим сьогодні займаюсь", ["Мод для Minecraft", "Пограти в Forza", "Покопатись у NixOS", "Музика (Ardour/LMMS)", "Німецька", "Просто відпочити"]),
+        mk("Що поїсти", ["Піца", "Вареники", "Суші", "Борщ", "Шаурма", "Приготувати щось нове"]),
+        mk("У що пограти", ["Path of Exile", "Path of Exile 2", "Minecraft", "Forza", "Balatro", "Factorio"]),
+      ],
+      history: [],
+    };
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (Array.isArray(s.lists) && s.lists.length) return Object.assign(defaultState(), s);
+      }
+    } catch (_) {}
+    return defaultState();
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
+  }
+
+  let state = load();
+  if (state.current >= state.lists.length) state.current = 0;
+  const list = () => state.lists[state.current];
+  // Slices actually on the wheel: named and not switched off. The last winner
+  // stays visible (highlighted) until the next spin even if "no repeats" just
+  // switched it off, so the pointer and the result text agree.
+  const active = () => list().items.filter((it) => it.label.trim() && (!it.off || it === winner));
+
+  // ---------- elements ----------
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("wheel"), ctx = canvas.getContext("2d");
+  const resultEl = $("result"), spinBtn = $("spin"), pointerEl = $("pointer");
+  const SIZE = 340, CX = SIZE / 2, CY = SIZE / 2, R = SIZE / 2 - 2;
 
   let rotation = 0;
   let spinning = false;
+  let winner = null; // item object highlighted after a spin
+
+  // ---------- randomness ----------
+  function rand() {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] / 4294967296;
+  }
+
+  // ---------- geometry ----------
+  // Slice angles proportional to weight; angle 0 = canvas east, clockwise.
+  function layout(items) {
+    const total = items.reduce((s, it) => s + it.weight, 0);
+    let a = 0;
+    return items.map((it, i) => {
+      const sweep = (it.weight / total) * Math.PI * 2;
+      const seg = { item: it, start: a, sweep, color: palette[i % palette.length] };
+      a += sweep;
+      return seg;
+    });
+  }
+  const TAU = Math.PI * 2;
+  const norm = (x) => ((x % TAU) + TAU) % TAU;
+  // Wheel-space angle currently under the top pointer
+  const pointerAngle = (rot) => norm(Math.PI * 1.5 - rot);
+  function segAt(segs, angle) {
+    for (const s of segs) if (angle >= s.start && angle < s.start + s.sweep) return s;
+    return segs[segs.length - 1];
+  }
 
   function hexLuminance(hex) {
     const c = hex.replace("#", "");
@@ -162,115 +314,314 @@
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
+  // ---------- drawing ----------
   function renderWheel() {
-    const n = items.length;
-    const cx = 180, cy = 180, r = 178;
-    ctx.clearRect(0, 0, 360, 360);
+    const items = active();
+    ctx.clearRect(0, 0, SIZE, SIZE);
     ctx.save();
-    ctx.translate(cx, cy);
+    ctx.translate(CX, CY);
+    if (items.length === 0) {
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU);
+      ctx.fillStyle = "#1a1a2e"; ctx.fill();
+      ctx.fillStyle = "#a7a4c0"; ctx.textAlign = "center";
+      ctx.font = "13px 'JetBrainsMono Nerd Font', monospace";
+      ctx.fillText("Список порожній — додай пункти", 0, 60);
+      ctx.restore();
+      return;
+    }
     ctx.rotate(rotation);
-    const slice = (Math.PI * 2) / n;
-    for (let i = 0; i < n; i++) {
-      const start = i * slice;
+    const segs = layout(items);
+    for (const s of segs) {
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, r, start, start + slice);
-      ctx.closePath();
-      ctx.fillStyle = palette[i % palette.length];
+      if (segs.length === 1) {
+        ctx.arc(0, 0, R, 0, TAU); // a lone slice is a full disc - no radius seam
+      } else {
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, R, s.start, s.start + s.sweep);
+        ctx.closePath();
+      }
+      ctx.fillStyle = s.color;
       ctx.fill();
-      ctx.strokeStyle = "#0d0d1a";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      if (winner && s.item === winner && !spinning) {
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.stroke();
+      }
+      ctx.strokeStyle = "#0d0d1a"; ctx.lineWidth = 2; ctx.stroke();
 
       ctx.save();
-      ctx.rotate(start + slice / 2);
+      ctx.rotate(s.start + s.sweep / 2);
       ctx.textAlign = "right";
-      const bg = palette[i % palette.length];
-      const isLight = hexLuminance(bg) > 0.55;
+      const isLight = hexLuminance(s.color) > 0.55;
       ctx.fillStyle = isLight ? "#1a1330" : "#f5f3ff";
-      ctx.font = "600 13px 'JetBrainsMono Nerd Font', monospace";
+      // Fit the label between the hub and the rim: shrink the font (13 -> 10px,
+      // capped lower for narrow slices) before falling back to an ellipsis.
+      const maxW = R - 14 - 34;
+      let label = s.item.label.trim();
+      let px = s.sweep < 0.35 ? 11 : 13;
+      const fontFor = (p) => `600 ${p}px 'JetBrainsMono Nerd Font', monospace`;
+      ctx.font = fontFor(px);
+      while (px > 10 && ctx.measureText(label).width > maxW) ctx.font = fontFor(--px);
       ctx.shadowColor = isLight ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.6)";
       ctx.shadowBlur = 3;
-      const label = items[i].length > 20 ? items[i].slice(0, 19) + "…" : items[i];
-      ctx.fillText(label, r - 16, 5);
+      while (label.length > 1 && ctx.measureText(label).width > maxW) label = label.slice(0, -2) + "…";
+      ctx.fillText(label, R - 14, px / 2.6);
       ctx.restore();
     }
     ctx.restore();
   }
 
-  function renderRows() {
-    rowsEl.innerHTML = "";
-    items.forEach((item, i) => {
-      const row = document.createElement("div");
-      row.className = "row";
-      const input = document.createElement("input");
-      input.value = item;
-      input.addEventListener("input", (e) => { items[i] = e.target.value; renderWheel(); });
-      const del = document.createElement("button");
-      del.textContent = "✕";
-      del.addEventListener("click", () => {
-        if (items.length <= 2) return;
-        items.splice(i, 1);
-        renderRows(); renderWheel();
-      });
-      row.appendChild(input);
-      row.appendChild(del);
-      rowsEl.appendChild(row);
-    });
+  // ---------- sound ----------
+  let audioCtx = null;
+  function tickSound() {
+    if (!state.sound) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "triangle"; o.frequency.value = 1400;
+      g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.05);
+    } catch (_) {}
+  }
+  function pointerTick() {
+    pointerEl.classList.remove("tick");
+    void pointerEl.offsetWidth; // restart the CSS animation
+    pointerEl.classList.add("tick");
+    tickSound();
   }
 
-  document.getElementById("addBtn").addEventListener("click", () => {
-    const input = document.getElementById("newItem");
-    const val = input.value.trim();
-    if (!val) return;
-    items.push(val);
-    input.value = "";
-    renderRows(); renderWheel();
-  });
-  document.getElementById("newItem").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") document.getElementById("addBtn").click();
-  });
-
-  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  // ---------- spin ----------
+  function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
 
   function spin() {
-    if (spinning || items.length === 0) return;
+    if (spinning) return;
+    // Drop the previous winner first: if "no repeats" switched it off it must
+    // leave the wheel now, before the new slice layout is computed.
+    const prevWinner = winner;
+    winner = null;
+    const items = active();
+    if (items.length === 0) {
+      winner = prevWinner;
+      renderWheel();
+      if (list().items.some((it) => it.off)) {
+        resultEl.textContent = "Усе вже випало — «Повернути вимкнені» в редакторі";
+        $("editor").open = true;
+      }
+      return;
+    }
     spinning = true;
     spinBtn.disabled = true;
     resultEl.textContent = "";
+    resultEl.classList.remove("pop");
 
-    const n = items.length;
-    const slice = (Math.PI * 2) / n;
-    const extraTurns = 5 + Math.random() * 2;
-    const finalOffset = Math.random() * Math.PI * 2;
+    // Pick the winner first (weighted), then aim the wheel at a random point
+    // inside its slice - so weights are exact and the animation always agrees.
+    const segs = layout(items);
+    const total = items.reduce((s, it) => s + it.weight, 0);
+    let r = rand() * total, chosen = segs[segs.length - 1];
+    for (const s of segs) { if (r < s.item.weight) { chosen = s; break; } r -= s.item.weight; }
+    const target = chosen.start + chosen.sweep * (0.15 + 0.7 * rand());
+    // rotation such that pointerAngle(rotation) === target
+    const base = norm(Math.PI * 1.5 - target);
     const startRotation = rotation;
-    const targetRotation = startRotation + extraTurns * Math.PI * 2 + finalOffset;
-    const duration = 3600;
+    const turns = 5 + Math.floor(rand() * 3);
+    const targetRotation = startRotation + turns * TAU + norm(base - norm(startRotation));
+    const duration = 3800 + rand() * 800;
     const startTime = performance.now();
+    let lastSeg = segAt(segs, pointerAngle(rotation));
 
     function frame(now) {
       const t = Math.min((now - startTime) / duration, 1);
-      const eased = easeOutCubic(t);
-      rotation = startRotation + (targetRotation - startRotation) * eased;
+      rotation = startRotation + (targetRotation - startRotation) * easeOutQuart(t);
+      const seg = segAt(segs, pointerAngle(rotation));
+      if (seg !== lastSeg) { lastSeg = seg; pointerTick(); }
       renderWheel();
-      if (t < 1) {
-        requestAnimationFrame(frame);
-      } else {
-        spinning = false;
-        spinBtn.disabled = false;
-        const norm = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        const pointerAngle = ((Math.PI * 2) - norm + Math.PI * 1.5) % (Math.PI * 2);
-        const idx = Math.floor(pointerAngle / slice) % n;
-        resultEl.textContent = "→ " + items[idx];
-      }
+      if (t < 1) { requestAnimationFrame(frame); return; }
+      rotation = norm(rotation);
+      finish(chosen.item);
     }
     requestAnimationFrame(frame);
   }
 
-  spinBtn.addEventListener("click", spin);
+  function finish(item) {
+    spinning = false;
+    spinBtn.disabled = false;
+    winner = item;
+    resultEl.textContent = "→ " + item.label.trim();
+    void resultEl.offsetWidth;
+    resultEl.classList.add("pop");
+    state.history.unshift({ label: item.label.trim(), list: list().name, at: Date.now() });
+    state.history = state.history.slice(0, 30);
+    if (state.noRepeat) item.off = true;
+    save();
+    renderRows(); renderHistory();
+    renderWheel();
+  }
 
-  renderRows();
-  renderWheel();
+  // ---------- editor ----------
+  function renderRows() {
+    const rowsEl = $("rows");
+    rowsEl.innerHTML = "";
+    const items = list().items;
+    if (items.length === 0) rowsEl.innerHTML = '<div class="empty">Порожньо</div>';
+    let colorIdx = 0;
+    items.forEach((it, i) => {
+      const onWheel = it.label.trim() && !it.off;
+      const row = document.createElement("div");
+      row.className = "row" + (it.off ? " off" : "");
+
+      const sw = document.createElement("div");
+      sw.className = "swatch";
+      sw.style.background = onWheel ? palette[colorIdx++ % palette.length] : "transparent";
+
+      const input = document.createElement("input");
+      input.className = "name"; input.value = it.label; input.maxLength = 40;
+      input.title = it.off ? "Вимкнено (без повторів) — клацни ⟲ унизу, щоб повернути" : "";
+      input.addEventListener("input", (e) => { it.label = e.target.value; save(); renderWheel(); });
+      input.addEventListener("change", () => renderRows());
+
+      const w = document.createElement("div");
+      w.className = "weight";
+      w.title = "Вага: як часто випадає (ширина сектора)";
+      const minus = document.createElement("button"); minus.textContent = "−";
+      const val = document.createElement("span"); val.textContent = it.weight;
+      const plus = document.createElement("button"); plus.textContent = "+";
+      minus.onclick = () => { it.weight = Math.max(1, it.weight - 1); save(); renderRows(); renderWheel(); };
+      plus.onclick = () => { it.weight = Math.min(5, it.weight + 1); save(); renderRows(); renderWheel(); };
+      w.append(minus, val, plus);
+
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "✕"; del.title = "Видалити";
+      del.onclick = () => { items.splice(i, 1); if (winner === it) winner = null; save(); renderRows(); renderWheel(); };
+
+      row.append(sw, input, w, del);
+      rowsEl.appendChild(row);
+    });
+    const offCount = items.filter((it) => it.off).length;
+    $("offInfo").textContent = offCount ? `вимкнено: ${offCount}` : "";
+    $("resetOff").style.visibility = offCount ? "visible" : "hidden";
+  }
+
+  function addItem() {
+    const input = $("newItem");
+    const val = input.value.trim();
+    if (!val) return;
+    list().items.push({ label: val, weight: 1, off: false });
+    input.value = "";
+    save(); renderRows(); renderWheel();
+  }
+  $("addBtn").onclick = addItem;
+  $("newItem").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } });
+  $("resetOff").onclick = () => { list().items.forEach((it) => (it.off = false)); save(); renderRows(); renderWheel(); };
+
+  // ---------- lists ----------
+  function renderLists() {
+    const sel = $("listSelect");
+    sel.innerHTML = "";
+    state.lists.forEach((l, i) => {
+      const o = document.createElement("option");
+      o.value = i; o.textContent = l.name;
+      sel.appendChild(o);
+    });
+    sel.value = state.current;
+    $("deleteList").style.visibility = state.lists.length > 1 ? "visible" : "hidden";
+  }
+  function switchList(i) {
+    state.current = i; winner = null; resultEl.textContent = "";
+    save(); renderLists(); renderRows(); renderWheel();
+  }
+  $("listSelect").onchange = (e) => switchList(Number(e.target.value));
+  // In-page bar instead of prompt()/confirm(): WebKit's built-in dialogs in surf
+  // are titled "Prompt - file:///..." and look out of place.
+  let inlineAction = null;
+  function askInline({ text = null, value = null, okLabel = "OK", onOk }) {
+    const input = $("inlineInput"), msg = $("inlineMsg");
+    input.style.display = value === null ? "none" : "";
+    msg.style.display = text === null ? "none" : "";
+    msg.textContent = text || "";
+    input.value = value || "";
+    input.placeholder = "Назва списку…";
+    $("inlineOk").textContent = okLabel;
+    inlineAction = onOk;
+    $("inlineBar").classList.add("show");
+    if (value !== null) { input.focus(); input.select(); } else $("inlineOk").focus();
+  }
+  function closeInline() { inlineAction = null; $("inlineBar").classList.remove("show"); }
+  function confirmInline() {
+    const act = inlineAction;
+    const val = $("inlineInput").value.trim();
+    closeInline();
+    if (act) act(val);
+  }
+  $("inlineOk").onclick = confirmInline;
+  $("inlineCancel").onclick = closeInline;
+  $("inlineInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); confirmInline(); }
+    if (e.key === "Escape") { e.stopPropagation(); closeInline(); }
+  });
+
+  $("newList").onclick = () => askInline({ value: "", okLabel: "Створити", onOk: (name) => {
+    if (!name) return;
+    state.lists.push({ name, items: [] });
+    switchList(state.lists.length - 1);
+    $("editor").open = true;
+    $("newItem").focus();
+  } });
+  $("renameList").onclick = () => askInline({ value: list().name, okLabel: "Зберегти", onOk: (name) => {
+    if (!name) return;
+    list().name = name; save(); renderLists();
+  } });
+  $("deleteList").onclick = () => {
+    if (state.lists.length <= 1) return;
+    askInline({ text: `Видалити «${list().name}»?`, okLabel: "Так, видалити", onOk: () => {
+      state.lists.splice(state.current, 1);
+      switchList(Math.max(0, state.current - 1));
+    } });
+  };
+
+  // ---------- toggles ----------
+  function renderToggles() {
+    $("noRepeat").classList.toggle("on", state.noRepeat);
+    $("sound").classList.toggle("on", state.sound);
+  }
+  $("noRepeat").onclick = () => { state.noRepeat = !state.noRepeat; save(); renderToggles(); };
+  $("sound").onclick = () => { state.sound = !state.sound; save(); renderToggles(); };
+
+  // ---------- history ----------
+  function renderHistory() {
+    const ul = $("history");
+    ul.innerHTML = "";
+    if (state.history.length === 0) { ul.innerHTML = '<li class="empty">Ще нічого не випадало</li>'; return; }
+    const fmt = new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    for (const h of state.history) {
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span><span class="l"></span><span class="t"></span>`;
+      li.children[0].textContent = h.label;
+      li.children[1].textContent = h.list;
+      li.children[2].textContent = fmt.format(new Date(h.at));
+      ul.appendChild(li);
+    }
+  }
+  $("clearHistory").onclick = () => { state.history = []; save(); renderHistory(); };
+
+  // ---------- keyboard ----------
+  document.addEventListener("keydown", (e) => {
+    const typing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName);
+    if (e.key === "Escape") {
+      closeInline();
+      $("editor").open = false; $("historyPanel").open = false;
+      document.activeElement.blur();
+      return;
+    }
+    if (!typing && (e.key === " " || e.key === "Enter")) { e.preventDefault(); spin(); }
+  });
+
+  spinBtn.onclick = spin;
+  $("hub").onclick = spin;
+
+  renderLists(); renderRows(); renderToggles(); renderHistory(); renderWheel();
 </script>
 </body>
 </html>
