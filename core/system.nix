@@ -74,6 +74,17 @@
   };
   nix.settings.auto-optimise-store = true;
 
+  # Моніторинг здоров'я диска (2026-10-04): єдиний диск -- Samsung SSD 850
+  # (~2015 рік, заповнений на 81%), а SMART ніхто не читав. smartd сам знаходить
+  # диски, періодично перевіряє SMART і при проблемах (знос, realloc-сектори,
+  # помилки) шле сповіщення на робочий стіл через systembus-notify (Noctalia
+  # його покаже) і в wall. Застереження модуля про DoS сповіщеннями від інших
+  # локальних користувачів тут неактуальне -- користувач один.
+  services.smartd = {
+    enable = true;
+    notifications.systembus-notify.enable = true;
+  };
+
   # Cachix для Noctalia (alpha Quickshell-стек, довго компілюється локально) —
   # без цього flake.nix'ів `noctalia` вхід (гілка cachix, без nixpkgs.follows,
   # див. коментар там) все одно збирався б із джерела.

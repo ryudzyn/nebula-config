@@ -3114,3 +3114,48 @@ Zen («Picture-in-Picture»), і Chromium/Vivaldi («Picture in picture»).
 тимчасовим `HOME` (щоб не чіпати реальний localStorage), сценарії через `~/.surf/script.js` (surf
 виконує його на кожній сторінці, вже після `load`), результат читався через заголовок вікна в
 `hyprctl clients`. `wtype` для перевірки клавіш не годиться: через розкладки us,ua,de шле не ті символи.
+
+## Follow-up #53 (2026-10-04): огляд системи — 6 покращень застосовано й перевірено, решта чекає рішень
+
+Стан: збійних systemd-юнітів нема (system і user); nix-gc працює (щотижня, старші 30 днів — останній
+прогін звільнив 2.2 ГБ); 76 поколінь системи за ~місяць — просто частота `sysup`.
+
+**Підготовлено, `dry-build` зелений, ще НЕ застосовано (потрібен `sysup`):**
+1. `core/bootloader.nix`: `systemd-boot.configurationLimit = 20` — у меню завантаження потрапляли всі
+   покоління (76); /boot 1 ГіБ (зараз 29%) не переповниться при кількох змінах ядра поспіль.
+2. `constellations/dns.nix`: прибрано з файрволу 5335 (unbound слухає лише 127.0.0.1 — порт був
+   зайвий); `access-control` unbound тепер лише localhost (стояла `192.168.0.0/24` — стара підмережа до
+   роутера Starlink, LAN зараз `192.168.1.0/24`).
+3. `constellations/dns.nix`: earth тепер резолвить імена tailnet — forward-zone `taild85963.ts.net.` на
+   `100.100.100.100` (MagicDNS tailscaled) + `domain-insecure` для неї (зона не підписана DNSSEC).
+   Перевірено: `unbound-checkconf` чисто; тимчасовий unbound з цим конфігом на окремому порту
+   резолвить `pixel-11` → 100.87.4.108, `earth` → 100.101.178.25 і звичайні сайти.
+4. `core/system.nix`: `services.smartd` + сповіщення через systembus-notify — єдиний диск Samsung SSD 850
+   (~2015 рік, 81% заповнено), SMART ніхто не читав.
+
+5. `crew/remote-control.nix`: після кожного завантаження сервіс падав з `getaddrinfo ENOTFOUND
+   api.anthropic.com` і піднімався лише з 5-ї спроби — `After/Wants=network-online.target` у user-юніті
+   нічого не робить (такого target нема в user-менеджері). Тепер `ExecStartPre` чекає DNS до 2 хв (без `$` —
+   systemd сам розкриває змінні; з повними шляхами — PATH user-юнітів не має coreutils) +
+   `StartLimitIntervalSec = 0`, щоб після WoL сервіс піднявся за будь-яких затримок мережі. Згенерований
+   юніт перевірено `systemd-analyze --user verify`, цикл очікування — вручну.
+6. `.gitignore`: `.claude/` (локальні налаштування Claude Code, тижнями висіли в `git status`).
+
+**Після `sysup` (живо перевірено):** smartd активний, бачить `/dev/sda`; `getent hosts
+pixel-11.taild85963.ts.net` → 100.87.4.108 системним резолвером; 5335 слухає лише localhost; remote-control
+перезапустився з новим юнітом. Знахідка: `systembus-notify` (user-юніт з `WantedBy=graphical-session.target`)
+не стартував — той самий target, що ніколи не активується в цій Hyprland-сесії (як noctalia,
+hyprpolkitagent). Додано явний `systemctl --user start systembus-notify.service` у `hl.on("hyprland.start")`;
+тестове системне сповіщення (`gdbus emit … net.nuetzlich.SystemNotifications.Notify`) дійшло до сесії.
+
+**Потребує рішення користувача (не змінювалось):**
+- **Вебінтерфейс AdGuard (:3005) відкритий на весь LAN/tailnet:** `ss` показує `*:3005`. У `settings`
+  задумано `http.address = 127.0.0.1:3005`, але `host = "0.0.0.0"` + `openFirewall = true` модуля його
+  перебивають. Варіанти: лише localhost, або localhost + tailnet.
+- **SSH за паролем** досі ввімкнений, хоча вхід за ключем з телефона працює (#47). Можна вимкнути паролі
+  зовсім або лишити лише для LAN (`Match Address`).
+- **Бекапів досі нема** (restic відкладено з вересня — не було куди). Можливі напрямки: зовнішній диск,
+  хмара (Backblaze B2 тощо), або інший пристрій у tailnet.
+- Місце на диску (700/915 ГБ): Steam 437 ГБ, Android SDK + AVD ~44 ГБ, Downloads 26 ГБ, `~/.cache` 12 ГБ,
+  `/nix/store` 81 ГБ — інформаційно, нічого не видалялось.
+- `pkgs/halley/` — пакет ніде не підключений (з #44), лише flake-вихід; можна прибрати.

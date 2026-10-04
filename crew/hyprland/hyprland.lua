@@ -85,6 +85,11 @@ hl.on("hyprland.start", function()
     -- спрацьовує тут (та сама причина, що й для noctalia.service вище),
     -- тому старт явний.
     hl.exec_cmd("systemctl --user start hyprpolkitagent.service")
+    -- systembus-notify -- передає системні сповіщення (smartd: проблеми зі
+    -- SMART диска, core/system.nix) у сесійний демон сповіщень (Noctalia).
+    -- Той самий WantedBy=graphical-session.target, що ніколи не спрацьовує
+    -- тут, тому старт явний (2026-10-04).
+    hl.exec_cmd("systemctl --user start systembus-notify.service")
 end)
 
 -- Awakened PoE Trade -- встановлений, оверлей/тултіп працює (no_blur,
