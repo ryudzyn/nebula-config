@@ -90,6 +90,8 @@ hl.on("hyprland.start", function()
     -- Той самий WantedBy=graphical-session.target, що ніколи не спрацьовує
     -- тут, тому старт явний (2026-10-04).
     hl.exec_cmd("systemctl --user start systembus-notify.service")
+    -- Kando працює у фоні (трей), меню викликається SUPER+Space.
+    hl.exec_cmd("kando")
 end)
 
 -- Awakened PoE Trade -- встановлений, оверлей/тултіп працює (no_blur,
@@ -141,6 +143,25 @@ hl.window_rule({
     no_blur = true,
     no_shadow = true,
     border_size = 0,
+})
+
+-- Kando (круговий лончер, crew/kando.nix) -- меню малюється в прозорому
+-- повноекранному вікні: без цього правила Hyprland тайлив його як звичайне вікно
+-- (живо перевірено 2026-10-04). Правило -- з офіційної інструкції Kando для
+-- Hyprland 0.55+ (kando.menu/installation-on-linux).
+hl.window_rule({
+    name  = "kando",
+    match = { class = "menu.kando.Kando", title = "Kando Menu" },
+
+    no_blur = true,
+    opaque = true,
+    move = { 0, 0 },
+    rounding = 0,
+    size = "100% 100%",
+    border_size = 0,
+    no_anim = true,
+    float = true,
+    pin = true,
 })
 
 -- Рулетка (surf) -- floating, розмір під контент (колесо 360px + кнопки/
@@ -211,6 +232,12 @@ local binds = {
     -- Основні
     { key = "SUPER + Return", desc = "Термінал (wezterm)", action = hl.dsp.exec_cmd(terminal) },
     { key = "SUPER + D", desc = "Запуск застосунків (Noctalia)", action = hl.dsp.exec_cmd("noctalia msg panel-toggle launcher") },
+    -- Kando (crew/kando.nix): `--trigger` просить уже запущений Kando показати
+    -- меню. Не `global`-диспетчер з інструкції Kando: той вимагає реєстрації
+    -- через портал GlobalShortcuts, а портал відмовляє ("App info not found for
+    -- menu.kando.Kando" -- у пакеті ярлик kando.desktop). Super, а не
+    -- Ctrl+Space -- ігри часто займають Ctrl+Space.
+    { key = "SUPER + Space", desc = "Кругове меню Kando (папки, режими, система)", action = hl.dsp.exec_cmd("kando --trigger nebula-menu") },
     -- poe-price-check -- основний прайс-чекер на Hyprland (crew/poe-price-check.nix);
     -- нативний Hyprland-бінд, який не залежить від фокус-трекінгу
     -- XWayland/electron-overlay-window взагалі.

@@ -1,0 +1,369 @@
+{
+  "version": "3.0.0",
+  "menus": [
+    {
+      "shortcut": "",
+      "shortcutID": "nebula-menu",
+      "centered": false,
+      "anchored": false,
+      "hoverMode": false,
+      "root": {
+        "type": "root",
+        "name": "Nebula",
+        "icon": "rocket_launch",
+        "iconTheme": "material-symbols-rounded",
+        "children": [
+          {
+            "type": "submenu",
+            "name": "Папки",
+            "icon": "folder",
+            "iconTheme": "material-symbols-rounded",
+            "children": [
+              {
+                "type": "button",
+                "name": "Завантаження",
+                "icon": "download",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Downloads",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Проєкти",
+                "icon": "code",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Projects",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "nebula-config",
+                "icon": "settings",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/nebula-config",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Документи",
+                "icon": "description",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Documents",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Зображення",
+                "icon": "image",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Pictures",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Відео",
+                "icon": "movie",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Videos",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Музика",
+                "icon": "music_note",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME/Music",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Домашня",
+                "icon": "home",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo $HOME",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "PoE2 Build Planner",
+                "icon": "construction",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "nemo \"$HOME/.steam/root/steamapps/compatdata/2694490/pfx/drive_c/users/steamuser/Documents/My Games/Path of Exile 2/BuildPlanner\"",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "type": "submenu",
+            "name": "Режими",
+            "icon": "dashboard",
+            "iconTheme": "material-symbols-rounded",
+            "children": [
+              {
+                "type": "button",
+                "name": "Робота",
+                "icon": "work",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "mode-work",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Навчання",
+                "icon": "school",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "mode-study",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "button",
+                "name": "Гра",
+                "icon": "sports_esports",
+                "iconTheme": "material-symbols-rounded",
+                "selectWorkflow": {
+                  "actions": [
+                    {
+                      "type": "execute-command",
+                      "command": "mode-play",
+                      "detached": true,
+                      "isolated": false
+                    },
+                    {
+                      "type": "close-menu"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "name": "Game mode",
+            "icon": "speed",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "nebula-gamemode-toggle-wl",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
+            "name": "Рулетка",
+            "icon": "casino",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "surf file://$HOME/nebula-config/assets/cprogram/roulette.html",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
+            "name": "Оновити систему",
+            "icon": "system_update",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "wezterm start -- zsh -ic 'sysup; echo; read -k1 \"?Готово, натисни будь-яку клавішу\"'",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
+            "name": "Заблокувати",
+            "icon": "lock",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "noctalia msg session lock",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
+            "name": "Живлення",
+            "icon": "power_settings_new",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "noctalia msg panel-toggle session",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "collections": [
+    {
+      "name": "Favorites",
+      "icon": "favorite",
+      "iconTheme": "material-symbols-rounded",
+      "tags": [
+        "favs"
+      ]
+    }
+  ]
+}

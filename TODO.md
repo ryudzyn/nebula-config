@@ -3178,3 +3178,22 @@ hyprpolkitagent). Додано явний `systemctl --user start systembus-noti
   порт більше не бачить; tailscale0 і lo — trustedInterfaces, там доступ лишається. AdGuard уміє слухати
   лише одну адресу, тому `host = "0.0.0.0"` лишається. Прибрано оманливий `settings.http.address =
   127.0.0.1:3005` (модуль перебивав його своїм host:port). DNS (53) для мережі не змінено.
+
+## Follow-up #55 (2026-10-04): Kando — круговий лончер на десктопі запрацював (живо перевірено)
+
+Kando 3.0.0 був лише встановлений: ніколи не запускався (нема `~/.config/kando`), без клавіші й правил.
+- **Виклик `SUPER+Space`** (не Ctrl+Space — його займають ігри) → `kando --trigger nebula-menu`. Офіційний
+  `global`-диспетчер з інструкції Kando не годиться: реєстрація через портал GlobalShortcuts падає
+  ("App info not found for 'menu.kando.Kando'" — у пакеті ярлик `kando.desktop`).
+- **Window-rule** з інструкції Kando для Hyprland 0.55+ (float, pin, no_blur, opaque, move 0 0, без
+  рамок/анімацій), розмір рядком `size = "100% 100%"`. Пастка: правила застосовуються лише при створенні
+  вікна — Kando тримає одне вікно, тож після зміни правила його треба перезапустити (до перезапуску вікно
+  лишалось тайленим / 1270×693).
+- **Автозапуск** `hl.exec_cmd("kando")` у `hl.on("hyprland.start")`.
+- **Меню** «Nebula» (`crew/kando-menus.json`): Папки ▸ (Downloads, Projects, nebula-config, Documents,
+  Pictures, Videos, Music, Home, PoE2 Build Planner — у Nemo), Режими ▸ (mode-work/study/play), Game mode,
+  Рулетка, Оновити систему (wezterm + sysup), Заблокувати, Живлення (панель Noctalia з підтвердженням).
+  `home.activation.kandoMenus` копіює шаблон лише якщо в `~/.config/kando/menus.json` ще нема меню
+  `nebula-menu` (далі меню належить GUI-редактору Kando; дефолтний приклад збережено як
+  `menus.json.before-nebula`). Команди Kando виконуються з `shell: true` (перевірено в бандлі), тож `$HOME`
+  і лапки працюють.
