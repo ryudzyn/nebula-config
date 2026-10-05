@@ -3238,3 +3238,18 @@ nixpkgs наздожене ≥ 1.15.9. Профільний `vencordFiles` пі�
 `xdph.conf`, що друкує `[SELECTION]/screen:DP-3`, замінює вікно вибору; кліки в desktop Discord —
 `hl.dsp.cursor.move` + `wlrctl pointer click left` (virtual-pointer). Усе тимчасове (дозволено користувачем
 на одну ніч), після тесту відкочено.
+
+**Звук у стрімі через venmic (та сама ніч) — працює.** У вікні Vesktop «Audio Sources» видно окремі
+PipeWire-потоки (Noctalia, `WEBRTC VoiceEngine` = desktop Discord, будь-яка програма) + «Entire System».
+Тест: тихий тон 440 Гц (`pw-play`, потік `nebula-tone`) обрано джерелом → граф
+`nebula-tone → vencord-screen-share → vesktop:input`, у потоці стріму аудіотрек
+`vencord-screen-share`; у глядача (desktop Discord) вихід `WEBRTC VoiceEngine`: RMS 910 і пік 440 Гц у
+~1000× над фоном, без тону — тиша (RMS 0). Тобто звук гри можна давати в стрім напряму з Vesktop,
+обираючи саму гру (не «Entire System», щоб не зачепити голоси) — `stream-relay` у Vivaldi (#56) для цього
+вже не обов'язковий; прибирати чи лишати — рішення користувача.
+Нюанс: коли Vesktop створює `vencord-screen-share`, desktop Discord на тому ж ПК пропонує «Виявлено новий
+аудіопристрій… перемкнутись?» — тиснути «Не перемикатися», інакше його мікрофоном стане звук стріму.
+
+**Стан після тесту:** `xdph.conf` знову symlink Home Manager, портал перезапущено; Vesktop запущено зі
+store-шляху нової збірки без DevTools-порту (до `sysup` системний `vesktop` ще старий — **після switch
+просто перезапустити Vesktop**). `wlrctl` лише через `nix shell`, у систему не додавався.
