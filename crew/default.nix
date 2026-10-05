@@ -9,6 +9,7 @@
     ./theming.nix
     ./modes.nix
     ./poe-price-check.nix
+    ./keybind-help.nix
     ./remote-control.nix
     ./stream-relay.nix
     ./hyprland
