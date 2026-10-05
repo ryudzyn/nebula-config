@@ -20,12 +20,39 @@ let
   discordPipewireFlags = "--enable-features=WaylandWindowDecorations,WebRTCPipeWireCapturer";
   discord-pipewire = pkgs.discord.override { commandLineArgs = discordPipewireFlags; };
 
+  # Vesktop з Vencord із nixpkgs замість завантаженого в профіль (2026-10-05,
+  # TODO.md Follow-up #57). Трансляція не стартувала ("Video was requested,
+  # but no video stream was provided") НЕ через Arc/DMA-BUF, а через
+  # Vencord: Vesktop сам качав його в ~/.config/vesktop/sessionData і з
+  # квітня не оновлював, а Vesktop 1.6.7 шукає openModal у
+  # Vencord.Webpack.Common -- вікно налаштувань стріму падало, і Vesktop
+  # віддавав порожню відповідь. Vencord 1.15.7 з nixpkgs теж замалий
+  # (Discord змінився, "findExportedComponent found no module Filter:
+  # Modal"); виправлено в апстрімі в 1.15.8 ("fix modals") / 1.15.9.
+  # pnpm-залежності 1.15.9 ті самі, що й в 1.15.7 (хеш збігся). Прибрати
+  # override, коли nixpkgs наздожене >= 1.15.9. Живо перевірено: стрім
+  # стартує, другий акаунт у desktop Discord бачить чисту картинку.
+  vencord-fresh = pkgs.vencord.overrideAttrs (final: old: {
+    version = "1.15.9";
+    src = pkgs.fetchFromGitHub {
+      owner = "Vendicated";
+      repo = "Vencord";
+      tag = "v${final.version}";
+      hash = "sha256-LuIwFUAJOoV8Su0g1tvhvXhMEJbkpM2BCCOWzQR4JIA=";
+    };
+    pnpmDeps = old.pnpmDeps.overrideAttrs { inherit (final) src; };
+  });
+  vesktop-fresh = pkgs.vesktop.override {
+    withSystemVencord = true;
+    vencord = vencord-fresh;
+  };
+
   # vivaldi-pipewire (2026-09-30, TODO.md Follow-up #43) -- заміна google-chrome:
   # живо підтверджено, що ЦЕЙ клас захоплення екрана (звичайний Chromium,
   # НЕ Discord-івський/Vesktop-івський Electron-шел) дає чисте відео на Arc
-  # A770 через discord.com у браузері -- на відміну від desktop Discord і
-  # Vesktop, що падають з EGL_BAD_MATCH на тому самому DMA-BUF-модифікаторі
-  # (I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC). google-chrome сам по собі
+  # A770 через discord.com у браузері -- на відміну від desktop Discord, що
+  # дає артефакти на тому самому DMA-BUF-модифікаторі
+  # (I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC; Vesktop -- див. vesktop-fresh). google-chrome сам по собі
   # користувачу не сподобався (застарілий UI) -- Vivaldi той самий Chromium-
   # рушій під сучаснішим інтерфейсом. Той самий commandLineArgs-прийом, що й
   # discord-pipewire вище (officially supported override, не патч у сторі).
@@ -66,12 +93,12 @@ in
     # проблема глибша за конкретну збірку (Chromium-баг на Arc A770,
     # TODO.md Follow-up #42) і користувач перейшов на браузерний Discord.
     discord-pipewire
-    # Vesktop (2026-09-30) -- ЖИВО ПЕРЕВІРЕНО: той самий Electron/Chromium
-    # рушій, що й stock Discord, падає з ІДЕНТИЧНОЮ EGL_BAD_MATCH/DMA-BUF-
-    # модифікатор помилкою (TODO.md Follow-up #43) -- не фікс, не обхід.
-    # Лишаю поряд зі stable заради venmic (системне аудіо в шерингу, коли/якщо
-    # видео-баг колись таки поправлять апстрім) і кращих UI-налаштувань якості.
-    vesktop
+    # Vesktop: трансляція працює з 2026-10-05 (vesktop-fresh, див. let вище).
+    # EGL_BAD_MATCH на CCS-модифікаторі в лозі лишається, але Chromium сам
+    # переузгоджує потік і кадри йдуть -- справжньою причиною «нема відео»
+    # був застарілий Vencord, а не Arc (TODO.md Follow-up #57; #43/#49 --
+    # історія хибного сліду).
+    vesktop-fresh
     # discord-screenaudio (власна деривація, Qt6/QtWebEngine) прибрано
     # 2026-10-04: живо тестувався 2026-09-30 і був нестабільний (GPU-процес
     # QtWebEngine падав з EGL_BAD_CONTEXT або зависав у циклі

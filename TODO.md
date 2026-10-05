@@ -3197,3 +3197,44 @@ Kando 3.0.0 був лише встановлений: ніколи не запу
   `nebula-menu` (далі меню належить GUI-редактору Kando; дефолтний приклад збережено як
   `menus.json.before-nebula`). Команди Kando виконуються з `shell: true` (перевірено в бандлі), тож `$HOME`
   і лапки працюють.
+
+## Follow-up #57 (2026-10-05, нічна сесія): трансляція з Vesktop запрацювала — причина в застарілому Vencord, не в Arc
+
+**Симптом** (з #43/#49): «Демонстрація екрана» у Vesktop не стартує, у лозі `EGL_BAD_MATCH` /
+`DMA-BUF modifier 72057594037927948 failed`, далі `TypeError: Video was requested, but no video stream
+was provided`. Раніше вважалось, що це той самий Arc/CCS-баг, що й у desktop Discord.
+
+**Справжня причина — два шари, обидва в Vencord:**
+1. Vesktop качає Vencord сам у `~/.config/vesktop/sessionData/vencordFiles`, і там лежала збірка від
+   **22.04.2026** (пів року без оновлень). Vesktop 1.6.7 (nixpkgs) бере `openModal` з
+   `Vencord.Webpack.Common`, а старий Vencord має її лише в `Vencord.Util` → вікно налаштувань стріму
+   падає з `TypeError: (0 , S.openModal) is not a function`, обробник `setDisplayMediaRequestHandler`
+   отримує `null` і віддає Electron-у `{}` → «no video stream». Видно лише після логування в
+   пропатченій копії `main.js` — у звичайному лозі цієї помилки нема.
+2. Vencord 1.15.7 з nixpkgs (`withSystemVencord = true`) теж замалий: Discord змінився,
+   `findExportedComponent found no module Filter: Modal`. В апстрімі виправлено: 1.15.8 «fix modals»,
+   1.15.9 «fix closeAllModals».
+
+`EGL_BAD_MATCH` у лозі **лишається, але не заважає**: Chromium позначає модифікатор як невдалий,
+переузгоджує потік і кадри йдуть.
+
+**Фікс** (`core/packages.nix`): `vesktop-fresh` = `vesktop.override { withSystemVencord = true; vencord =
+vencord 1.15.9 }` (overrideAttrs на src; хеш pnpm-залежностей збігся з 1.15.7). Прибрати override, коли
+nixpkgs наздожене ≥ 1.15.9. Профільний `vencordFiles` після цього не використовується (налаштування
+плагінів у `~/.config/vesktop/settings/` лишаються).
+
+**Живо перевірено (той самий store-шлях, що в системі після switch):** вікно Vesktop «Screen Share Picker»
+відкривається, Go Live → трансляція йде; кадр з локального прев'ю чистий; другий акаунт у desktop Discord
+бачить трансляцію (прев'ю в картці профілю + повноцінний перегляд), картинка чиста й різка, без смуги
+сміття вгорі й зелених кадрів (кропи з grim, порівняння кадрів); рух курсору оновлюється в глядача.
+
+**Принагідно:** `~/.local/share/applications/vesktop.desktop` (локальний ярлик від KDE-редактора меню,
+січень 2026) перекривав системний і запускав Vesktop з `--disable-gpu` — тобто тести #43/#49 ішли без GPU.
+Перенесено в `~/.cache/vesktop-night/backup/`. На результат не вплинуло (помилка з GPU була та сама), але
+прапорець був зайвий.
+
+**Методика (на майбутнє):** Vesktop із `--remote-debugging-port=9223 --remote-debugging-address=127.0.0.1`
+→ JS через CDP (вхід у канал, кнопка «екран», читання `<video>`/треків); `custom_picker_binary` у
+`xdph.conf`, що друкує `[SELECTION]/screen:DP-3`, замінює вікно вибору; кліки в desktop Discord —
+`hl.dsp.cursor.move` + `wlrctl pointer click left` (virtual-pointer). Усе тимчасове (дозволено користувачем
+на одну ніч), після тесту відкочено.
