@@ -10,6 +10,7 @@
     ./modes.nix
     ./poe-price-check.nix
     ./remote-control.nix
+    ./stream-relay.nix
     ./hyprland
     ./noctalia
     ./wezterm.nix

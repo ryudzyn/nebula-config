@@ -297,6 +297,25 @@
           },
           {
             "type": "button",
+            "name": "Стрім зі звуком",
+            "icon": "cast",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "vivaldi --new-window http://127.0.0.1:8787/stream-relay.html",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
             "name": "Оновити систему",
             "icon": "system_update",
             "iconTheme": "material-symbols-rounded",
