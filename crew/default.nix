@@ -17,6 +17,7 @@
     ./wezterm.nix
     ./kando.nix
     ./gzml.nix
+    ./claude
     ./terminal/starship.nix
 
     # kitty як термінал сам уже підключений напряму через hyprland-

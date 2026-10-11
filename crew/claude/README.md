@@ -1,0 +1,45 @@
+# Claude Code: плагіни, скіли, агенти
+
+Декларативна частина — `default.nix` (бінарники LSP/MCP + живі симлінки на `skills/` і `agents/`).
+Плагіни ставляться командами нижче: їх стан веде сам Claude Code у `~/.claude/plugins`,
+тож на новій машині ці команди треба виконати один раз вручну.
+
+## Плагіни (user scope)
+
+```sh
+claude plugin marketplace add ~/nebula-config/crew/claude/marketplace   # локальний "nebula"
+for p in commit-commands claude-md-management hookify claude-code-setup \
+         lua-lsp jdtls-lsp rust-analyzer-lsp context7; do
+  claude plugin install $p@claude-plugins-official -s user
+done
+claude plugin install nixd-lsp@nebula -s user
+claude plugin install kotlin-ls@nebula -s user
+claude mcp add -s user playwright -- playwright-mcp
+```
+
+| Плагін | Для чого |
+|---|---|
+| commit-commands | `/commit`, `/commit-push-pr` |
+| claude-md-management | аудит CLAUDE.md, збір уроків із сесії в CLAUDE.md |
+| hookify | хуки з опису природною мовою ("не дозволяй X") |
+| claude-code-setup | аналізує репо і радить автоматизації |
+| lua-lsp / nixd-lsp | діагностика для `hyprland.lua` і `.nix` одразу після правки |
+| jdtls-lsp / kotlin-ls / rust-analyzer-lsp | моди (Java), Orbit (Kotlin), halley (Rust) |
+| context7 | свіжа документація бібліотек (NeoForge, Android, Hyprland…) |
+| playwright (MCP) | керування браузером; бінарник з nixpkgs, не `npx` |
+
+`marketplace/` — власні LSP-обгортки: для Nix в офіційному маркетплейсі нічого немає, а офіційний
+`kotlin-lsp` (JetBrains) не запакований у nixpkgs, тож `kotlin-ls` запускає fwcd/kotlin-language-server.
+
+## Скіли (`skills/`)
+
+- `/nixcheck` — nixfmt змінених файлів, перевірка imports, dry-build через `nix-builder`, звіт.
+- `/orbit-ship` — bump версії, assembleDebug, adb install, скриншот з телефона.
+- `/hypr-verify` — `hyprctl reload`, configerrors, перевірка фокусу, grim-скриншот.
+
+## Агенти (`agents/`, модель haiku — економія токенів)
+
+- `nix-builder` — запускає nix-збірки і повертає вердикт замість сирого логу.
+- `log-digger` — читає journalctl/логи збірок і повертає лише суттєві рядки.
+
+Аліас `haiku` з claude-code ≥ 2.1.295 указує на Haiku 5.5 (у 10× дешевша за 4.5).

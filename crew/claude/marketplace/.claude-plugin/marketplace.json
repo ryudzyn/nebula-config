@@ -1,0 +1,43 @@
+{
+  "name": "nebula",
+  "owner": {
+    "name": "ryudzyn"
+  },
+  "plugins": [
+    {
+      "name": "nixd-lsp",
+      "description": "Nix language server (nixd) for code intelligence",
+      "version": "1.0.0",
+      "source": "./plugins/nixd-lsp",
+      "strict": false,
+      "lspServers": {
+        "nixd": {
+          "command": "nixd",
+          "extensionToLanguage": {
+            ".nix": "nix"
+          }
+        }
+      }
+    },
+    {
+      "name": "kotlin-ls",
+      "description": "Kotlin language server (fwcd/kotlin-language-server, from nixpkgs) for code intelligence",
+      "version": "1.0.0",
+      "source": "./plugins/kotlin-ls",
+      "strict": false,
+      "lspServers": {
+        "kotlin": {
+          "command": "kotlin-language-server",
+          "extensionToLanguage": {
+            ".kt": "kotlin",
+            ".kts": "kotlin"
+          },
+          "startupTimeout": 120000
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "description": "Local plugins for Nebula OS: LSP wrappers for languages the official marketplace lacks or that need nixpkgs binaries"
+  }
+}
