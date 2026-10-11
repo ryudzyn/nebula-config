@@ -21,6 +21,7 @@ let
     "orbit-ship"
     "hypr-verify"
     "arena"
+    "mod-port"
   ];
   agents = [
     "log-digger.md"
