@@ -20,6 +20,7 @@ let
     "nixcheck"
     "orbit-ship"
     "hypr-verify"
+    "arena"
   ];
   agents = [
     "log-digger.md"
@@ -42,6 +43,9 @@ in
     # плагіна тягне власний chromium, який на NixOS не стартує -- цей
     # пакет зібраний проти браузерів з nixpkgs
     playwright-mcp
+    # skills/arena (вендорено з github:Jakeschincariol/arena-skill @ df07b8e,
+    # MIT) веде турнір через bracket.py -- лише stdlib, але потрібен python3
+    python3
   ];
 
   home.file =

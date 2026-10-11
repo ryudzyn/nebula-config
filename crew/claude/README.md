@@ -36,6 +36,7 @@ claude mcp add -s user playwright -- playwright-mcp
 - `/nixcheck` — nixfmt змінених файлів, перевірка imports, dry-build через `nix-builder`, звіт.
 - `/orbit-ship` — bump версії, assembleDebug, adb install, скриншот з телефона.
 - `/hypr-verify` — `hyprctl reload`, configerrors, перевірка фокусу, grim-скриншот.
+- `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
 ## Агенти (`agents/`, модель haiku — економія токенів)
 
