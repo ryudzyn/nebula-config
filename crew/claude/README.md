@@ -38,6 +38,12 @@ claude mcp add -s user playwright -- playwright-mcp
 - `/hypr-verify` — `hyprctl reload`, configerrors, перевірка фокусу, grim-скриншот.
 - `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
+## Statusline
+
+`statusline.sh` — модель │ % контексту │ ліміти підписки 5h/7d (≥80% — з часом скидання ↻) │ $ сесії │ git-гілка.
+Підключається в `~/.claude/settings.json` (поза репо):
+`"statusLine": {"type": "command", "command": "bash ~/nebula-config/crew/claude/statusline.sh"}`.
+
 ## Агенти (`agents/`, модель haiku — економія токенів)
 
 - `nix-builder` — запускає nix-збірки і повертає вердикт замість сирого логу.
