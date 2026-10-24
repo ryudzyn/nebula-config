@@ -90,7 +90,8 @@ claude mcp add -s user playwright -- playwright-mcp
   ([bradautomates/claude-video](https://github.com/bradautomates/claude-video) @ `03ceb42`, MIT). SessionStart-хук плагіна не беремо.
   Налаштування лежать у `~/.config/watch/.env`, поза репо: `WATCH_ENGINE=local`, `WATCH_WHISPER_BACKEND=whisperx`,
   `WATCH_COOKIES_FROM_BROWSER` на профіль Zen (для рілсів). WhisperX стоїть у `~/.cache/watch/whisperx-venv` (uv, CPU-torch, nix-ld).
-  Gemini — лише вручну: `--engine gemini` і `GEMINI_API_KEY` у тому ж `.env`; відео тоді йде в Google.
+  Gemini — лише вручну: `--engine gemini` і `GEMINI_API_KEY` у тому ж `.env`; відео тоді йде в Google. Модель закріплена через
+  `WATCH_GEMINI_MODEL="gemini-3.6-flash"`: на 2026-10-24 дефолтна 3.7-flash віддавала 503, а 3.8 зависала.
 
 ## phone-adb
 
@@ -104,6 +105,8 @@ claude mcp add -s user playwright -- playwright-mcp
 
 `notify-phone [-t заголовок] [-p high] [-g tags] "текст"` — пуш на телефон через ntfy на earth (`constellations/comms.nix`,
 порт 2586, доступний лише з tailnet). На Pixel: застосунок ntfy з F-Droid, підписка на топік `claude` на сервері `http://<IP earth у tailnet>:2586`.
+Підписку зручно зробити посиланням: `phone-adb shell am start -a android.intent.action.VIEW -d "'ntfy://<IP>:2586/claude?secure=false'"`.
+Щоб сповіщення не затримувались у сні: `dumpsys deviceidle whitelist +io.heckel.ntfy` і дозвіл `POST_NOTIFICATIONS`.
 
 ## nebula-update-check
 
