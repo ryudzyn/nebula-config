@@ -33,6 +33,11 @@
       # Без `$` у команді (systemd сам розкриває $-змінні) і з повними шляхами
       # (PATH user-юнітів на NixOS не містить coreutils).
       ExecStartPre = "${pkgs.bash}/bin/bash -c 'for i in {1..120}; do ${pkgs.getent}/bin/getent hosts api.anthropic.com >/dev/null && exit 0; ${pkgs.coreutils}/bin/sleep 1; done; exit 0'";
+      # Цикл вище чекає до 120 с, а дефолтний таймаут старту -- 90 с: на switch
+      # з оновленням NetworkManager/AdGuard (2026-10-24) DNS лежав довше, юніт
+      # падав за таймаутом, і через це весь `nh os switch` завершувався з
+      # помилкою (status 4) і не оновлював профіль системи.
+      TimeoutStartSec = 150;
       ExecStart = "${pkgs.claude-code}/bin/claude remote-control --name earth";
       Restart = "always";
       RestartSec = 5;
