@@ -48,6 +48,8 @@ claude mcp add -s user playwright -- playwright-mcp
   `compatdata` видалених ігор може містити збереження ігор без Steam Cloud, тому видаляється лише за списком.
   Автоочищення в `core/system.nix`: `programs.nh.clean` (10 поколінь + 3 дні, щотижня), `min-free`/`max-free` (GC під час
   збірки), журнал до 500 МБ.
+- `/mod-playtest` — фіча мода в живому клієнті: збірка, `tools/hyprland-test/relaunch` у тестовий світ, команди, клавіші й кліки,
+  скриншот або відео через `/screen-watch`, зупинка клієнта. Хелпери лежать у репо мода і не дають слати ввід поза клієнтом на workspace 2.
 - `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
 ### Вендорені сторонні скіли
@@ -105,6 +107,10 @@ claude mcp add -s user playwright -- playwright-mcp
 `phone-adb` друкує serial (`export ANDROID_SERIAL=$(phone-adb)`), `phone-adb shell …` — це `adb -s <serial> shell …`.
 Спарювання (`adb pair`) робиться один раз з екрана «Підключити за кодом». Обмеження: Android вмикає бездротове налагодження
 лише в Wi-Fi, на мобільних даних не працює. Ім'я в tailnet — `$PHONE_ADB_HOST`, за замовчуванням `pixel-11`.
+
+`phone-ui` (скіл `/phone-control`): екран телефона як текст через uiautomator. `dump`/`find`, натискання за підписом
+(`tap "Текст"`), `key`, `open`, ASCII-`type`. На екранах, що постійно змінюються (анімації, відео, Termux), uiautomator
+дамп не робить, тоді лишається скриншот.
 
 ## notify-phone
 

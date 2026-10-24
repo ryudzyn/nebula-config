@@ -26,6 +26,8 @@ let
     "flake-bump"
     "screen-watch"
     "disk-cleanup"
+    "phone-control"
+    "mod-playtest"
     # Вендорені сторонні скіли (лише SKILL.md + ліцензія, без хуків):
     # ponytail, ponytail-debt -- github:DietrichGebert/ponytail @ 09c434a, MIT
     "ponytail"
@@ -124,6 +126,10 @@ in
       text = builtins.readFile ./screen-rec.sh;
     })
     weeklyReport
+    # керування телефоном по тексту (uiautomator поверх phone-adb)
+    (writers.writePython3Bin "phone-ui" {
+      flakeIgnore = [ "E501" ];
+    } (builtins.readFile ./phone-ui.py))
     # звіт для /disk-cleanup: що займає місце, рештки видалених ігор Steam
     (writeShellApplication {
       name = "disk-report";
