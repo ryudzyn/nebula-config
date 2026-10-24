@@ -82,14 +82,27 @@
     "flakes"
   ];
 
-  # Без цього /nix/store росте необмежено з кожним поколінням — щотижня
-  # прибирає покоління старші 30 днів і дедублікує store автоматично.
-  nix.gc = {
-    automatic = true;
-    dates = "weekly";
-    options = "--delete-older-than 30d";
+  # Автоочищення (2026-10-24, після того як диск заповнився посеред збірки).
+  # Раніше був nix.gc "--delete-older-than 30d": при кількох sysup на день це
+  # давало 69 поколінь і 101 ГБ store. nh clean лишає 10 останніх поколінь +
+  # усі за 3 дні (відкат завжди є) і прибирає gcroots від `nix build` у проєктах.
+  programs.nh = {
+    enable = true;
+    clean = {
+      enable = true;
+      dates = "weekly";
+      extraArgs = "--keep 10 --keep-since 3d";
+    };
   };
-  nix.settings.auto-optimise-store = true;
+  nix.settings = {
+    auto-optimise-store = true;
+    # Якщо під час збірки вільного менше 10 ГБ -- Nix сам збирає сміття, поки не
+    # стане 30 ГБ; без цього великі оновлення валились з ENOSPC.
+    min-free = 10 * 1024 * 1024 * 1024;
+    max-free = 30 * 1024 * 1024 * 1024;
+  };
+  # Журнал systemd був 3.7 ГБ
+  services.journald.settings.Journal.SystemMaxUse = "500M";
 
   # Моніторинг здоров'я диска (2026-10-04): єдиний диск -- Samsung SSD 850
   # (~2015 рік, заповнений на 81%), а SMART ніхто не читав. smartd сам знаходить

@@ -25,6 +25,7 @@ let
     "post-switch"
     "flake-bump"
     "screen-watch"
+    "disk-cleanup"
     # Вендорені сторонні скіли (лише SKILL.md + ліцензія, без хуків):
     # ponytail, ponytail-debt -- github:DietrichGebert/ponytail @ 09c434a, MIT
     "ponytail"
@@ -122,6 +123,17 @@ in
       text = builtins.readFile ./screen-rec.sh;
     })
     updateCheck
+    # звіт для /disk-cleanup: що займає місце, рештки видалених ігор Steam
+    (writeShellApplication {
+      name = "disk-report";
+      runtimeInputs = [
+        coreutils
+        findutils
+        gawk
+        gnugrep
+      ];
+      text = builtins.readFile ./disk-report.sh;
+    })
   ];
 
   home.file =
