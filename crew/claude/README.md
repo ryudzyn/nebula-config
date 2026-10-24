@@ -39,6 +39,27 @@ claude mcp add -s user playwright -- playwright-mcp
 - `/mod-port` — порт Ascension на 1.21.1 NeoForge: setup worktree `~/Projects/ascension-1211` (гілка `neoforge-1.21.1` з `ascension-night` master), далі по одній фічі з `forge-1.20.1` — build, GameTests, живий клієнт, коміт, чекліст у `PORT_1.21.1.md`.
 - `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
+### Вендорені сторонні скіли
+
+Скопійовано лише `SKILL.md` + ліцензію з перевіреного коміту. Хуки, телеметрію й плагінну обв'язку
+свідомо не беремо.
+
+- `/ponytail` (`lite|full|ultra|off`) — режим «лінивого сеньйора»: найменша повна зміна, без зайвих
+  абстракцій і залежностей. `/ponytail-debt` — збирає коментарі `shortcut:` у список боргу.
+  [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) @ `09c434a`, MIT. Без Node-хуків
+  оригінального плагіна, тому сам на старті сесії не вмикається: модель бере його за описом або
+  через `/ponytail`.
+- `/interview-me`, `/debugging-and-error-recovery`, `/source-driven-development` — з
+  [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) @ `aeac41d`, MIT. Решту 22 скіли не
+  брали: дублюють `code-review`/`simplify`/`security-review` і засмічують контекст описами.
+- `/graphify [шлях]` — граф знань по коду й документах (`graph.html`, `GRAPH_REPORT.md`, `graph.json` у
+  `graphify-out/`). [safishamsi/graphify](https://github.com/safishamsi/graphify) @ `92741d1`, Apache-2.0/MIT.
+  Наші правки: `disable-model-invocation: true` (лише вручну, переважно для мода) і пін
+  `graphifyy==0.9.95` у командах встановлення. Python-частину скіл ставить сам через
+  `uv tool install graphifyy==0.9.95` при першому запуску (`uv` у `home.packages`, колеса працюють через nix-ld).
+  Тільки по коду, без LLM: `graphify update .`. `graphify install` **не запускати**: він дописує
+  `~/.claude/CLAUDE.md`.
+
 ## Statusline
 
 `statusline.sh` — модель │ % контексту │ ліміти підписки 5h/7d (≥80% — з часом скидання ↻) │ $ сесії │ git-гілка.

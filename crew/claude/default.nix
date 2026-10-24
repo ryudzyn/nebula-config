@@ -22,6 +22,16 @@ let
     "hypr-verify"
     "arena"
     "mod-port"
+    # Вендорені сторонні скіли (лише SKILL.md + ліцензія, без хуків):
+    # ponytail, ponytail-debt -- github:DietrichGebert/ponytail @ 09c434a, MIT
+    "ponytail"
+    "ponytail-debt"
+    # interview-me, debugging..., source-driven... -- github:addyosmani/agent-skills @ aeac41d, MIT
+    "interview-me"
+    "debugging-and-error-recovery"
+    "source-driven-development"
+    # graphify -- github:safishamsi/graphify @ 92741d1 (graphifyy 0.9.95), Apache-2.0/MIT
+    "graphify"
   ];
   agents = [
     "log-digger.md"
@@ -47,6 +57,10 @@ in
     # skills/arena (вендорено з github:Jakeschincariol/arena-skill @ df07b8e,
     # MIT) веде турнір через bracket.py -- лише stdlib, але потрібен python3
     python3
+    # skills/graphify сам ставить і знаходить свій Python через `uv tool`
+    # (graphifyy з ~25 tree-sitter-граматиками, у nixpkgs нема). Колеса
+    # manylinux запускаються завдяки nix-ld (core/system.nix)
+    uv
   ];
 
   home.file =

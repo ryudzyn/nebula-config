@@ -18,6 +18,11 @@
       gpg.format = "ssh";
       gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.config/git/allowed_signers";
     };
+    # Глобальний ~/.config/git/ignore -- діє в усіх репо (моди, Orbit),
+    # не треба правити .gitignore кожного
+    ignores = [
+      "graphify-out/" # вихід /graphify (crew/claude/skills/graphify)
+    ];
   };
 
   home.file.".config/git/allowed_signers".text =
