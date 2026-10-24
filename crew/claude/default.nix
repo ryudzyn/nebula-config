@@ -24,6 +24,7 @@ let
     "mod-port"
     "post-switch"
     "flake-bump"
+    "screen-watch"
     # Вендорені сторонні скіли (лише SKILL.md + ліцензія, без хуків):
     # ponytail, ponytail-debt -- github:DietrichGebert/ponytail @ 09c434a, MIT
     "ponytail"
@@ -95,6 +96,22 @@ in
         nmap
       ];
       text = builtins.readFile ./phone-adb.sh;
+    })
+    # пуш на телефон через ntfy (сервер -- constellations/comms.nix)
+    (writeShellApplication {
+      name = "notify-phone";
+      runtimeInputs = [ curl ];
+      text = builtins.readFile ./notify-phone.sh;
+    })
+    # коротке відео екрана для /watch (skills/screen-watch)
+    (writeShellApplication {
+      name = "screen-rec";
+      runtimeInputs = [
+        wf-recorder
+        slurp
+        jq
+      ];
+      text = builtins.readFile ./screen-rec.sh;
     })
   ];
 

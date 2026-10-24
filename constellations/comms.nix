@@ -64,6 +64,20 @@
     openFirewall = false;
   };
 
+  # ntfy -- пуш-сповіщення на телефон (застосунок ntfy з F-Droid, підписка на
+  # http://<tailnet-IP earth>:2586/claude). Ними Claude Code повідомляє про кінець
+  # довгих задач (`notify-phone`, crew/claude). Слухає на всіх інтерфейсах, але
+  # порт у файрволі не відкритий -- доступ лише через tailscale0 (trustedInterfaces),
+  # як і в mosh. Без авторизації: у tailnet лише власні пристрої.
+  services.ntfy-sh = {
+    enable = true;
+    settings = {
+      # Обов'язкова опція модуля; потрібна лише для вкладень/e-mail, які не вмикаємо
+      base-url = "http://earth:2586";
+      listen-http = ":2586";
+    };
+  };
+
   services.syncthing = {
     enable = true;
     user = "ryudzyn";

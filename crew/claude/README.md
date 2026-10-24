@@ -41,6 +41,8 @@ claude mcp add -s user playwright -- playwright-mcp
   Home Manager, Noctalia, чи greetd досі на старому конфігу (тоді треба `restart greetd`), биті симлінки скілів.
 - `/flake-bump` — `nix flake update` з перевіркою, що nixpkgs у Noctalia збігається з системним (пастка glibc),
   повна збірка без switch і підсумок `nvd diff` (ядро, mesa, hyprland, claude-code…). `flake.lock` комітить лише за згодою.
+- `/screen-watch` — коротке відео екрана (`screen-rec`: wf-recorder, монітор, вікно або область, 30 кадрів/с) і перегляд через `/watch`.
+  Для багів, які не видно на скриншоті: анімації, мерехтіння, гальмування, поведінка мода в грі. Запис після перегляду видаляється.
 - `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
 ### Вендорені сторонні скіли
@@ -97,6 +99,11 @@ claude mcp add -s user playwright -- playwright-mcp
 `phone-adb` друкує serial (`export ANDROID_SERIAL=$(phone-adb)`), `phone-adb shell …` — це `adb -s <serial> shell …`.
 Спарювання (`adb pair`) робиться один раз з екрана «Підключити за кодом». Обмеження: Android вмикає бездротове налагодження
 лише в Wi-Fi, на мобільних даних не працює. Ім'я в tailnet — `$PHONE_ADB_HOST`, за замовчуванням `pixel-11`.
+
+## notify-phone
+
+`notify-phone [-t заголовок] [-p high] [-g tags] "текст"` — пуш на телефон через ntfy на earth (`constellations/comms.nix`,
+порт 2586, доступний лише з tailnet). На Pixel: застосунок ntfy з F-Droid, підписка на топік `claude` на сервері `http://<IP earth у tailnet>:2586`.
 
 ## Statusline
 
