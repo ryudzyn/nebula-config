@@ -22,6 +22,8 @@ let
     "hypr-verify"
     "arena"
     "mod-port"
+    "post-switch"
+    "flake-bump"
     # Вендорені сторонні скіли (лише SKILL.md + ліцензія, без хуків):
     # ponytail, ponytail-debt -- github:DietrichGebert/ponytail @ 09c434a, MIT
     "ponytail"
@@ -34,6 +36,12 @@ let
     "graphify"
     # security-audit -- github:cloudflare/security-audit-skill @ c1c8a8c, MIT
     "security-audit"
+    # minecraft-testing -- github:jahrome907/minecraft-agent-skills @ 30137f9, MIT
+    # (правка: анотаційні GameTests і для 1.21.1, не лише 1.21.3)
+    "minecraft-testing"
+    # hyprland-lua -- github:janusfil/ai-skills @ 3082711, Apache-2.0
+    # (правки: NixOS-шлях до стабів, наш crew/hyprland/, `hyprctl eval`)
+    "hyprland-lua"
   ];
   agents = [
     "log-digger.md"

@@ -37,6 +37,10 @@ claude mcp add -s user playwright -- playwright-mcp
 - `/orbit-ship` — bump версії, assembleDebug, adb install, скриншот з телефона.
 - `/hypr-verify` — `hyprctl reload`, configerrors, перевірка фокусу, grim-скриншот.
 - `/mod-port` — порт Ascension на 1.21.1 NeoForge: setup worktree `~/Projects/ascension-1211` (гілка `neoforge-1.21.1` з `ascension-night` master), далі по одній фічі з `forge-1.20.1` — build, GameTests, живий клієнт, коміт, чекліст у `PORT_1.21.1.md`.
+- `/post-switch` — перевірка після `sysup`, нічого не змінює: впалі юніти (системні й користувацькі), помилки в журналі з моменту switch,
+  Home Manager, Noctalia, чи greetd досі на старому конфігу (тоді треба `restart greetd`), биті симлінки скілів.
+- `/flake-bump` — `nix flake update` з перевіркою, що nixpkgs у Noctalia збігається з системним (пастка glibc),
+  повна збірка без switch і підсумок `nvd diff` (ядро, mesa, hyprland, claude-code…). `flake.lock` комітить лише за згодою.
 - `/arena` — турнір субагентів за одне завдання (вендорено з [arena-skill](https://github.com/Jakeschincariol/arena-skill) @ `df07b8e`, MIT). **Дорого**: 100 агентів = 595 викликів; для щоденного — `--quick` (16 агентів, 91 виклик) або `--agents 8` (43). Запускати в accept-edits (Shift+Tab), інакше — підтвердження на кожен файл у `.arena/`.
 
 ### Вендорені сторонні скіли
@@ -66,6 +70,14 @@ claude mcp add -s user playwright -- playwright-mcp
   за потреби, бюджет агентів. Звіти пишуться в `~/security-audit-skill/<repo>/run-N`, поза репо. Валідатори
   `.cjs` потребують `nodejs` (є в `home.packages`). Чужий код без пісочниці не запускає, знахідку лишає `needs_validation`.
   На відміну від `/security-review`, дивиться весь репозиторій, а не диф.
+- `/minecraft-testing` — JUnit і NeoForge GameTests для мода
+  ([jahrome907/minecraft-agent-skills](https://github.com/jahrome907/minecraft-agent-skills) @ `30137f9`, MIT; з 13 скілів репо
+  взяли лише цей). Правка: в оригіналі анотаційні `@GameTestHolder` позначені як «тільки 1.21.3», хоча це API і 1.21.1
+  (перевірено в `ascension-1211`). Data-driven тести з 1.21.5+ для порту не використовувати.
+- `hyprland-lua` — довідник Lua-API Hyprland (`hl.bind`, `hl.dsp.*`, події, правила)
+  ([janusfil/ai-skills](https://github.com/janusfil/ai-skills) @ `3082711`, Apache-2.0). Писаний під 0.55, на earth 0.56.x, тож
+  головне джерело — стаби `/run/current-system/sw/share/hypr/stubs/hl.meta.lua` (у скілі виправлено з `/usr/share`).
+  Додано: конфіг живе в `crew/hyprland/`, живі команди через `hyprctl eval`.
 
 ## Statusline
 
