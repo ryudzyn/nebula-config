@@ -83,6 +83,13 @@ claude mcp add -s user playwright -- playwright-mcp
   і конфліктують з нашою пам'яттю. Додано примітку: Orbit тестується на JUnit 4 і `kotlinx-coroutines-test`, тож
   Kotest, MockK, Kover, detekt і Turbine (є в `libs.versions.toml`, але не підключений) без згоди не додавати.
 
+- `/watch <url|файл>` — «дивлюсь» відео: yt-dlp завантажує його, ffmpeg вирізає кадри на зміні сцен (до 100), текст береться
+  з субтитрів, а коли їх немає, з WhisperX
+  ([bradautomates/claude-video](https://github.com/bradautomates/claude-video) @ `03ceb42`, MIT). SessionStart-хук плагіна не беремо.
+  Налаштування лежать у `~/.config/watch/.env`, поза репо: `WATCH_ENGINE=local`, `WATCH_WHISPER_BACKEND=whisperx`,
+  `WATCH_COOKIES_FROM_BROWSER` на профіль Zen (для рілсів). WhisperX стоїть у `~/.cache/watch/whisperx-venv` (uv, CPU-torch, nix-ld).
+  Gemini — лише вручну: `--engine gemini` і `GEMINI_API_KEY` у тому ж `.env`; відео тоді йде в Google.
+
 ## Statusline
 
 `statusline.sh` — модель │ % контексту │ ліміти підписки 5h/7d (≥80% — з часом скидання ↻) │ $ сесії │ git-гілка.

@@ -47,6 +47,9 @@ let
     "kotlin-coroutines-flows"
     "kotlin-patterns"
     "kotlin-testing"
+    # watch -- github:bradautomates/claude-video @ 03ceb42, MIT (без SessionStart-хука;
+    # налаштування й ключі -- ~/.config/watch/.env, поза репо)
+    "watch"
   ];
   agents = [
     "log-digger.md"
@@ -79,6 +82,11 @@ in
     # skills/security-audit перевіряє findings.json і coverage-ledger.json
     # власними валідаторами (.cjs, без залежностей) -- потрібен node
     nodejs
+    # skills/watch: yt-dlp качає відео (javascriptSupport у nixpkgs тягне deno для
+    # YouTube), ffmpeg/ffprobe -- кадри й аудіо. WhisperX скіл ставить сам у
+    # ~/.cache/watch/whisperx-venv через uv
+    yt-dlp
+    ffmpeg
   ];
 
   home.file =

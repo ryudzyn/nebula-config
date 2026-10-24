@@ -24,7 +24,7 @@
   boot.extraModprobeConfig = ''
     options v4l2loopback devices=1 video_nr=1 card_label="OBS Virtual Camera" exclusive_caps=1
   '';
-  
+
   # KillUserProcesses = false (дефолт systemd/NixOS). Раніше тут стояло true
   # (коміт ce23eec, "security hardening", без пояснення), але воно вбивало
   # все, що лишалось після закриття сесії: mosh-server (SSH стартує його і
@@ -59,11 +59,18 @@
   };
 
   programs.nix-ld.enable = true;
+  # Сторонній Python (uv/python-build-standalone -- WhisperX у skills/watch, graphify)
+  # шукає CA-сертифікати в /etc/ssl/cert.pem; NixOS дає лише ca-certificates.crt,
+  # тож без цього лінку HTTPS падає з CERTIFICATE_VERIFY_FAILED
+  environment.etc."ssl/cert.pem".source = "/etc/ssl/certs/ca-certificates.crt";
 
   # nh (і будь-який голий `nix build`/`nix eval`) на відміну від `nixos-rebuild --flake`
   # не вмикає ці фічі самостійно — без цього `nh os switch` падає з "experimental
   # Nix feature 'nix-command' is disabled".
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # Без цього /nix/store росте необмежено з кожним поколінням — щотижня
   # прибирає покоління старші 30 днів і дедублікує store автоматично.
