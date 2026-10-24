@@ -90,6 +90,14 @@ claude mcp add -s user playwright -- playwright-mcp
   `WATCH_COOKIES_FROM_BROWSER` на профіль Zen (для рілсів). WhisperX стоїть у `~/.cache/watch/whisperx-venv` (uv, CPU-torch, nix-ld).
   Gemini — лише вручну: `--engine gemini` і `GEMINI_API_KEY` у тому ж `.env`; відео тоді йде в Google.
 
+## phone-adb
+
+`phone-adb` — adb до Pixel без кабелю, через Tailscale. Порт бездротового налагодження змінюється при кожному
+ввімкненні, тож скрипт шукає його через nmap у діапазоні 30000–49999 і підключається сам.
+`phone-adb` друкує serial (`export ANDROID_SERIAL=$(phone-adb)`), `phone-adb shell …` — це `adb -s <serial> shell …`.
+Спарювання (`adb pair`) робиться один раз з екрана «Підключити за кодом». Обмеження: Android вмикає бездротове налагодження
+лише в Wi-Fi, на мобільних даних не працює. Ім'я в tailnet — `$PHONE_ADB_HOST`, за замовчуванням `pixel-11`.
+
 ## Statusline
 
 `statusline.sh` — модель │ % контексту │ ліміти підписки 5h/7d (≥80% — з часом скидання ↻) │ $ сесії │ git-гілка.

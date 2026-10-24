@@ -87,6 +87,15 @@ in
     # ~/.cache/watch/whisperx-venv через uv
     yt-dlp
     ffmpeg
+    # adb до телефона через Tailscale (порт бездротового налагодження щоразу інший)
+    (writeShellApplication {
+      name = "phone-adb";
+      runtimeInputs = [
+        android-tools
+        nmap
+      ];
+      text = builtins.readFile ./phone-adb.sh;
+    })
   ];
 
   home.file =
