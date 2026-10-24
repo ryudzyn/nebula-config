@@ -17,7 +17,12 @@ Run these (one Bash call is fine), then report:
 4. **Home Manager.** `systemctl show home-manager-ryudzyn -p Result,ExecMainExitTimestamp` — `Result=success` and a timestamp ≈ `T`. On failure: `journalctl -u home-manager-ryudzyn -b -n 40 --no-pager` (usually a file clobber: "would be clobbered").
 5. **Noctalia** (glibc lockstep trap after nixpkgs bumps): `systemctl --user is-active noctalia`. Not active → `journalctl --user-unit noctalia -b -n 30`; `eglGetDisplay failed` means the `noctalia` input lags nixpkgs — fix is `nix flake update noctalia` (see the `/flake-bump` skill).
 6. **greetd still on old config?** greetd has `X-RestartIfChanged=false`, so switch never restarts it. Compare the running cmdline with the unit:
-   `tr '\0' ' ' < /proc/$(systemctl show -p MainPID --value greetd)/cmdline` vs `grep ^ExecStart /etc/systemd/system/greetd.service`.
+   ```sh
+   a=$(tr '\0' ' ' < /proc/$(systemctl show -p MainPID --value greetd)/cmdline | sed 's/ $//')
+   b=$(grep ^ExecStart /etc/systemd/system/greetd.service | sed 's/^ExecStart=//')
+   [ "$a" = "$b" ] && echo same || printf '%s\n%s\n' "$a" "$b"
+   ```
+   Compare as strings — `diff <(…) <(…)` false-alarms on the missing trailing newline of `/proc/*/cmdline`.
    Different `--config` path → tell the user `sudo systemctl restart greetd` is needed (it ends the graphical session, so they choose when — or just reboot).
 7. **Claude links.** `find ~/.claude/skills ~/.claude/agents -maxdepth 1 -xtype l` must be empty; every name in the `skills`/`agents` lists of `~/nebula-config/crew/claude/default.nix` must exist under `~/.claude/`.
 8. **Live-linked config** (only if this switch touched `crew/hyprland/` or `crew/noctalia/`): `hyprctl configerrors` (needs `HYPRLAND_INSTANCE_SIGNATURE`; take it from `ls /run/user/1000/hypr/`). For anything visual, offer `/hypr-verify`.
