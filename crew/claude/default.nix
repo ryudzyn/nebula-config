@@ -43,6 +43,11 @@ let
     # minecraft-testing -- github:jahrome907/minecraft-agent-skills @ 30137f9, MIT
     # (правка: анотаційні GameTests і для 1.21.1, не лише 1.21.3)
     "minecraft-testing"
+    # game-mechanics-design, game-balance-economy, game-interface-feedback --
+    # github:lvtd-llc/skills @ a3ad087 (plugins/game-design), MIT; з references/ і workflows/
+    "game-mechanics-design"
+    "game-balance-economy"
+    "game-interface-feedback"
     # hyprland-lua -- github:janusfil/ai-skills @ 3082711, Apache-2.0
     # (правки: NixOS-шлях до стабів, наш crew/hyprland/, `hyprctl eval`)
     "hyprland-lua"

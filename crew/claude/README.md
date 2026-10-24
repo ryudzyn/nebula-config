@@ -83,6 +83,12 @@ claude mcp add -s user playwright -- playwright-mcp
   ([jahrome907/minecraft-agent-skills](https://github.com/jahrome907/minecraft-agent-skills) @ `30137f9`, MIT; з 13 скілів репо
   взяли лише цей). Правка: в оригіналі анотаційні `@GameTestHolder` позначені як «тільки 1.21.3», хоча це API і 1.21.1
   (перевірено в `ascension-1211`). Data-driven тести з 1.21.5+ для порту не використовувати.
+- `game-mechanics-design`, `game-balance-economy`, `game-interface-feedback` — дизайн механік, баланс і економіка,
+  HUD і зворотний зв'язок за «The Art of Game Design: A Book of Lenses» Шелла, для мода Ascension
+  ([lvtd-llc/skills](https://github.com/lvtd-llc/skills) @ `a3ad087`, `plugins/game-design`, MIT; з 8 скілів набору взяли 3:
+  playtest-planning перекривається з `/mod-playtest`, prototype-loop — про ранні прототипи). Без змін, з `references/`
+  і `workflows/`. На виході структуровані таблиці й тестові сценарії, які переносяться в GameTests.
+  `scripts/expected_value.py` лише рахує очікуване значення (stdlib, без мережі).
 - `hyprland-lua` — довідник Lua-API Hyprland (`hl.bind`, `hl.dsp.*`, події, правила)
   ([janusfil/ai-skills](https://github.com/janusfil/ai-skills) @ `3082711`, Apache-2.0). Писаний під 0.55, на earth 0.56.x, тож
   головне джерело — стаби `/run/current-system/sw/share/hypr/stubs/hl.meta.lua` (у скілі виправлено з `/usr/share`).
