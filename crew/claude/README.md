@@ -105,6 +105,12 @@ claude mcp add -s user playwright -- playwright-mcp
 `notify-phone [-t заголовок] [-p high] [-g tags] "текст"` — пуш на телефон через ntfy на earth (`constellations/comms.nix`,
 порт 2586, доступний лише з tailnet). На Pixel: застосунок ntfy з F-Droid, підписка на топік `claude` на сервері `http://<IP earth у tailnet>:2586`.
 
+## nebula-update-check
+
+Щотижневий звіт (systemd user timer, неділя 10:00, `Persistent`): оновлює **копію** `flake.lock` у тимчасовій теці,
+показує, які інпути мають оновлення, скільки днів системному nixpkgs і чи Noctalia в lockstep, і шле підсумок через
+`notify-phone`. Нічого не застосовує, для цього є `/flake-bump`. Вручну: `nebula-update-check --print`.
+
 ## Statusline
 
 `statusline.sh` — модель │ % контексту │ ліміти підписки 5h/7d (≥80% — з часом скидання ↻) │ $ сесії │ git-гілка.

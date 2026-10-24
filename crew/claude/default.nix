@@ -52,6 +52,14 @@ let
     # налаштування й ключі -- ~/.config/watch/.env, поза репо)
     "watch"
   ];
+  updateCheck = pkgs.writeShellApplication {
+    name = "nebula-update-check";
+    runtimeInputs = with pkgs; [
+      jq
+      git
+    ];
+    text = builtins.readFile ./update-check.sh;
+  };
   agents = [
     "log-digger.md"
     "nix-builder.md"
@@ -113,6 +121,7 @@ in
       ];
       text = builtins.readFile ./screen-rec.sh;
     })
+    updateCheck
   ];
 
   home.file =
@@ -128,4 +137,24 @@ in
         value.source = live "agents/${a}";
       }) agents
     );
+
+  # Щотижневий звіт про оновлення флейка на телефон (нічого не застосовує).
+  # Persistent: якщо в неділю earth спав -- запуститься при наступному старті.
+  systemd.user.services.nebula-update-check = {
+    Unit.Description = "Weekly nebula-config flake update report";
+    Service = {
+      Type = "oneshot";
+      # nix і notify-phone -- з профілю користувача/системи
+      Environment = "PATH=/run/current-system/sw/bin:/etc/profiles/per-user/%u/bin";
+      ExecStart = "${updateCheck}/bin/nebula-update-check";
+    };
+  };
+  systemd.user.timers.nebula-update-check = {
+    Unit.Description = "Weekly nebula-config flake update report";
+    Timer = {
+      OnCalendar = "Sun 10:00";
+      Persistent = true;
+    };
+    Install.WantedBy = [ "timers.target" ];
+  };
 }
