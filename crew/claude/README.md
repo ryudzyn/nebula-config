@@ -78,6 +78,10 @@ claude mcp add -s user playwright -- playwright-mcp
   ([janusfil/ai-skills](https://github.com/janusfil/ai-skills) @ `3082711`, Apache-2.0). Писаний під 0.55, на earth 0.56.x, тож
   головне джерело — стаби `/run/current-system/sw/share/hypr/stubs/hl.meta.lua` (у скілі виправлено з `/usr/share`).
   Додано: конфіг живе в `crew/hyprland/`, живі команди через `hyprctl eval`.
+- `kotlin-coroutines-flows`, `kotlin-patterns`, `kotlin-testing` — для Orbit, з [affaan-m/ECC](https://github.com/affaan-m/ECC)
+  @ `90606c8`, MIT. Узяли лише 3 SKILL.md, без хуків, пам'яті й установника ECC: вони спрацьовують на кожен виклик інструмента
+  і конфліктують з нашою пам'яттю. Додано примітку: Orbit тестується на JUnit 4 і `kotlinx-coroutines-test`, тож
+  Kotest, MockK, Kover, detekt і Turbine (є в `libs.versions.toml`, але не підключений) без згоди не додавати.
 
 ## Statusline
 

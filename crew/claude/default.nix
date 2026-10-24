@@ -42,6 +42,11 @@ let
     # hyprland-lua -- github:janusfil/ai-skills @ 3082711, Apache-2.0
     # (правки: NixOS-шлях до стабів, наш crew/hyprland/, `hyprctl eval`)
     "hyprland-lua"
+    # kotlin-* -- github:affaan-m/ECC @ 90606c8, MIT (лише 3 SKILL.md з 311 скілів,
+    # без хуків ECC; додано примітку про стек Orbit: JUnit 4, без нових залежностей)
+    "kotlin-coroutines-flows"
+    "kotlin-patterns"
+    "kotlin-testing"
   ];
   agents = [
     "log-digger.md"
