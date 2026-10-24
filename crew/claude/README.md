@@ -59,6 +59,13 @@ claude mcp add -s user playwright -- playwright-mcp
   `uv tool install graphifyy==0.9.95` при першому запуску (`uv` у `home.packages`, колеса працюють через nix-ld).
   Тільки по коду, без LLM: `graphify update .`. `graphify install` **не запускати**: він дописує
   `~/.claude/CLAUDE.md`.
+- `/security-audit` — аудит безпеки всього репо від Cloudflare
+  ([cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) @ `c1c8a8c`, MIT), без змін.
+  Звичайне питання про безпеку вмикає легкий режим без файлів. Повний аудит (6 фаз, незалежна перевірка
+  кожної знахідки) запускається лише на явне «audit this codebase». **Дорого**: просити профіль `quick` і,
+  за потреби, бюджет агентів. Звіти пишуться в `~/security-audit-skill/<repo>/run-N`, поза репо. Валідатори
+  `.cjs` потребують `nodejs` (є в `home.packages`). Чужий код без пісочниці не запускає, знахідку лишає `needs_validation`.
+  На відміну від `/security-review`, дивиться весь репозиторій, а не диф.
 
 ## Statusline
 
