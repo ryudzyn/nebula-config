@@ -19,7 +19,17 @@
   # Alt+Shift перемикав на українську й там так само.
   console.useXkbConfig = true;
 
-  boot.extraModulePackages = [ config.boot.kernelPackages.v4l2loopback ];
+  # TODO: прибрати overrideAttrs, коли nixos-unstable міститиме nixpkgs 53a0206118
+  # ("v4l2loopback: Use kernel make rules", 2026-10-22). До того 0.15.4 кладе у свій
+  # $out індекси depmod (modules.alias.bin …), і збірка модулів ядра падає з
+  # "buildEnv error: two given paths contain a conflicting subpath".
+  boot.extraModulePackages = [
+    (config.boot.kernelPackages.v4l2loopback.overrideAttrs (old: {
+      postInstall = (old.postInstall or "") + ''
+        rm -f $out/lib/modules/*/modules.*
+      '';
+    }))
+  ];
   boot.kernelModules = [ "v4l2loopback" ];
   boot.extraModprobeConfig = ''
     options v4l2loopback devices=1 video_nr=1 card_label="OBS Virtual Camera" exclusive_caps=1
@@ -116,6 +126,12 @@
       pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
         (pyFinal: pyPrev: {
           patool = pyPrev.patool.overridePythonAttrs (old: {
+            doCheck = false;
+          });
+          # 4.5.0 (nixpkgs 2026-10-20): тести на таймінг падають ("returned too early,
+          # elapsed=1.09s"), у кеші немає збірки -- а через moddb від нього залежить
+          # lutris (core/games.nix). Прибрати, коли пакет знову буде в cache.nixos.org.
+          pyrate-limiter = pyPrev.pyrate-limiter.overridePythonAttrs (old: {
             doCheck = false;
           });
         })
