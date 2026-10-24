@@ -53,13 +53,14 @@ let
     # налаштування й ключі -- ~/.config/watch/.env, поза репо)
     "watch"
   ];
-  updateCheck = pkgs.writeShellApplication {
-    name = "nebula-update-check";
+  weeklyReport = pkgs.writeShellApplication {
+    name = "nebula-weekly-report";
     runtimeInputs = with pkgs; [
       jq
       git
+      gawk
     ];
-    text = builtins.readFile ./update-check.sh;
+    text = builtins.readFile ./weekly-report.sh;
   };
   agents = [
     "log-digger.md"
@@ -122,7 +123,7 @@ in
       ];
       text = builtins.readFile ./screen-rec.sh;
     })
-    updateCheck
+    weeklyReport
     # звіт для /disk-cleanup: що займає місце, рештки видалених ігор Steam
     (writeShellApplication {
       name = "disk-report";
@@ -150,19 +151,20 @@ in
       }) agents
     );
 
-  # Щотижневий звіт про оновлення флейка на телефон (нічого не застосовує).
+  # Щотижневий звіт про стан earth на телефон: диск, SMART, впалі сервіси,
+  # бекап, оновлення флейка (нічого не застосовує).
   # Persistent: якщо в неділю earth спав -- запуститься при наступному старті.
-  systemd.user.services.nebula-update-check = {
-    Unit.Description = "Weekly nebula-config flake update report";
+  systemd.user.services.nebula-weekly-report = {
+    Unit.Description = "Weekly earth health report";
     Service = {
       Type = "oneshot";
       # nix і notify-phone -- з профілю користувача/системи
       Environment = "PATH=/run/current-system/sw/bin:/etc/profiles/per-user/%u/bin";
-      ExecStart = "${updateCheck}/bin/nebula-update-check";
+      ExecStart = "${weeklyReport}/bin/nebula-weekly-report";
     };
   };
-  systemd.user.timers.nebula-update-check = {
-    Unit.Description = "Weekly nebula-config flake update report";
+  systemd.user.timers.nebula-weekly-report = {
+    Unit.Description = "Weekly earth health report";
     Timer = {
       OnCalendar = "Sun 10:00";
       Persistent = true;

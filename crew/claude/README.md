@@ -113,11 +113,16 @@ claude mcp add -s user playwright -- playwright-mcp
 Підписку зручно зробити посиланням: `phone-adb shell am start -a android.intent.action.VIEW -d "'ntfy://<IP>:2586/claude?secure=false'"`.
 Щоб сповіщення не затримувались у сні: `dumpsys deviceidle whitelist +io.heckel.ntfy` і дозвіл `POST_NOTIFICATIONS`.
 
-## nebula-update-check
+## nebula-weekly-report
 
-Щотижневий звіт (systemd user timer, неділя 10:00, `Persistent`): оновлює **копію** `flake.lock` у тимчасовій теці,
-показує, які інпути мають оновлення, скільки днів системному nixpkgs і чи Noctalia в lockstep, і шле підсумок через
-`notify-phone`. Нічого не застосовує, для цього є `/flake-bump`. Вручну: `nebula-update-check --print`.
+Щотижневий звіт про стан earth на телефон (systemd user timer, неділя 10:00, `Persistent`):
+- диск: зайнято і вільно, попередження від 90%;
+- SMART: знімок від `smart-snapshot.service` (root, раз на добу, `/var/lib/smart-snapshot/*.json`), ресурс SSD, записані ТБ, realloc;
+- впалі сервіси, системні й користувацькі;
+- бекап restic `hetzner`: результат і давність;
+- оновлення флейка: на **копії** `flake.lock` плюс lockstep Noctalia.
+
+Якщо є проблема, пуш приходить з високим пріоритетом. Нічого не застосовує. Вручну: `nebula-weekly-report --print`.
 
 ## Statusline
 

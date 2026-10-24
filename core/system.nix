@@ -114,6 +114,27 @@
     enable = true;
     notifications.systembus-notify.enable = true;
   };
+  # Знімок SMART для щотижневого звіту (crew/claude/weekly-report.sh): smartctl
+  # потребує root, а звіт -- user-сервіс, тож раз на добу root кладе JSON у
+  # /var/lib/smart-snapshot/ (читається всіма, секретів там немає).
+  systemd.services.smart-snapshot = {
+    description = "SMART snapshot for the weekly report";
+    serviceConfig = {
+      Type = "oneshot";
+      StateDirectory = "smart-snapshot";
+      StateDirectoryMode = "0755";
+    };
+    # smartctl повертає ненульовий код при попередженнях (бітова маска) -- це не збій
+    script = ''
+      for d in /dev/sd? /dev/nvme?n1; do
+        [ -e "$d" ] || continue
+        ${pkgs.smartmontools}/bin/smartctl -j -a "$d" > "/var/lib/smart-snapshot/$(basename "$d").json" || true
+      done
+      chmod 0644 /var/lib/smart-snapshot/*.json
+    '';
+    startAt = "daily";
+  };
+  systemd.timers.smart-snapshot.timerConfig.Persistent = true;
 
   # Cachix для Noctalia (alpha Quickshell-стек, довго компілюється локально) —
   # без цього flake.nix'ів `noctalia` вхід (гілка cachix, без nixpkgs.follows,
