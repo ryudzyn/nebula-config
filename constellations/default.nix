@@ -7,5 +7,6 @@
     ./homeservices.nix
     ./dns.nix
     ./devops.nix
+    ./backup.nix
   ];
 }
