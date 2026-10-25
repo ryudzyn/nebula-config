@@ -16,7 +16,10 @@
 
   systemd.services.unbound.stopIfChanged = false;
   systemd.services.adguardhome.serviceConfig = {
-    After = [ "network.target" "unbound.service" ];
+    After = [
+      "network.target"
+      "unbound.service"
+    ];
     Requires = [ "unbound.service" ];
   };
 
@@ -70,13 +73,12 @@
     # порт 3005 для LAN більше не відкриває -- через tailscale0 (trustedInterfaces,
     # comms.nix) і localhost доступ лишається. "Білий список" = членство в
     # tailnet. DNS-фільтрація (порт 53) для всієї мережі не змінюється.
-    # (Тут ще стояло settings.http.address = 127.0.0.1:3005, але модуль його
-    # перебиває своїм host:port -- реально слухало *:3005; прибрано як оманливе.)
-    host = "0.0.0.0";
-    port = 3005;
+    # Адреса панелі -- settings.http.address (2026-10-25: модуль оголосив
+    # host/port застарілими; раніше саме вони перебивали http.address).
     mutableSettings = true;
     openFirewall = false;
     settings = {
+      http.address = "0.0.0.0:3005";
       dns = {
         bind_host = "0.0.0.0";
         bind_port = 53;
@@ -87,11 +89,17 @@
         protection_enabled = true;
         filtering_enabled = true;
       };
-      filters = map (url: { enabled = true; inherit url; }) [
-        "https://adguardteam.github.io/HostlistsRegistry/assets/filter_9.txt"
-        "https://easylist.to/easylist/easylist.txt"
-        "https://easylist.to/easylist/easyprivacy.txt"
-      ];
+      filters =
+        map
+          (url: {
+            enabled = true;
+            inherit url;
+          })
+          [
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_9.txt"
+            "https://easylist.to/easylist/easylist.txt"
+            "https://easylist.to/easylist/easyprivacy.txt"
+          ];
     };
   };
 }
