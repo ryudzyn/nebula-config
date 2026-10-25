@@ -36,14 +36,17 @@ failed=$( { systemctl --failed --no-legend --plain; systemctl --user --failed --
 if [ -n "$failed" ]; then bad "Впалі сервіси: $failed"; else add "✅ Впалих сервісів немає"; fi
 
 # --- Бекап (services.restic.backups.hetzner)
+# Час останнього збереженого знімка -- з журналу: Result/ExecMainExitTimestamp юніта скидаються
+# на кожному sysup (так перший звіт 2026-10-25 хибно сказав «ще не запускався»). Окремий збій
+# і так шле пуш (restic-backup-failed); тут ловимо, що успішних бекапів давно немає.
 if systemctl cat restic-backups-hetzner.service >/dev/null 2>&1; then
-  res=$(systemctl show restic-backups-hetzner -p Result --value)
-  ts=$(systemctl show restic-backups-hetzner -p ExecMainExitTimestamp --value)
-  if [ -z "$ts" ]; then
-    bad "Бекап ще жодного разу не запускався"
+  last=$(journalctl -u restic-backups-hetzner -g 'snapshot [0-9a-f]+ saved' -n 1 -o short-unix --no-pager -q 2>/dev/null |
+    awk '{print int($1)}')
+  if [ -z "$last" ]; then
+    bad "Бекап: жодного збереженого знімка в журналі"
   else
-    days=$((($(date +%s) - $(date -d "$ts" +%s)) / 86400))
-    if [ "$res" != "success" ] || [ "$days" -gt 2 ]; then bad "Бекап: $res, останній $days дн. тому"; else add "☁️ Бекап: ок, $days дн. тому"; fi
+    days=$((($(date +%s) - last) / 86400))
+    if [ "$days" -gt 2 ]; then bad "Бекап: останній успішний $days дн. тому"; else add "☁️ Бекап: ок, $days дн. тому"; fi
   fi
 fi
 
