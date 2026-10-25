@@ -24,7 +24,11 @@
     };
     Service = {
       WorkingDirectory = "%h/nebula-config";
-      # Чекаємо DNS перед стартом (до 2 хв). Раніше тут стояло
+      # Чекаємо DNS (до 2 хв) -- всередині ExecStart, а не в ExecStartPre (2026-10-25):
+      # поки йде ExecStartPre, юніт "стартує", і Home Manager на switch чекає на нього;
+      # коли switch перезапускає AdGuard, DNS лежить довго, і HM падав з "timed out
+      # waiting on channel" -> nh не оновлював профіль системи. Так юніт активний одразу.
+      # Раніше тут стояло
       # After/Wants=network-online.target, але в user-юніті цей target не
       # існує (він лише в системному менеджері) -- тож після кожного
       # завантаження сервіс стартував раніше за AdGuard/unbound, падав з
@@ -32,13 +36,7 @@
       # спроби (живо видно в журналі 2026-10-04).
       # Без `$` у команді (systemd сам розкриває $-змінні) і з повними шляхами
       # (PATH user-юнітів на NixOS не містить coreutils).
-      ExecStartPre = "${pkgs.bash}/bin/bash -c 'for i in {1..120}; do ${pkgs.getent}/bin/getent hosts api.anthropic.com >/dev/null && exit 0; ${pkgs.coreutils}/bin/sleep 1; done; exit 0'";
-      # Цикл вище чекає до 120 с, а дефолтний таймаут старту -- 90 с: на switch
-      # з оновленням NetworkManager/AdGuard (2026-10-24) DNS лежав довше, юніт
-      # падав за таймаутом, і через це весь `nh os switch` завершувався з
-      # помилкою (status 4) і не оновлював профіль системи.
-      TimeoutStartSec = 150;
-      ExecStart = "${pkgs.claude-code}/bin/claude remote-control --name earth";
+      ExecStart = "${pkgs.bash}/bin/bash -c 'for i in {1..120}; do ${pkgs.getent}/bin/getent hosts api.anthropic.com >/dev/null && break; ${pkgs.coreutils}/bin/sleep 1; done; exec ${pkgs.claude-code}/bin/claude remote-control --name earth'";
       Restart = "always";
       RestartSec = 5;
     };

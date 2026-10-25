@@ -15,12 +15,15 @@
   services.resolved.enable = false;
 
   systemd.services.unbound.stopIfChanged = false;
-  systemd.services.adguardhome.serviceConfig = {
-    After = [
+  # AdGuard пересилає запити в unbound -- стартує після нього. (До 2026-10-25 це
+  # стояло в serviceConfig, тобто в секції [Service], де systemd After/Requires
+  # ігнорує: "Unknown key 'After' in section [Service]" -- порядку не було.)
+  systemd.services.adguardhome = {
+    after = [
       "network.target"
       "unbound.service"
     ];
-    Requires = [ "unbound.service" ];
+    requires = [ "unbound.service" ];
   };
 
   services.unbound = {
