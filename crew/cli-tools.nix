@@ -22,6 +22,7 @@
     # не треба правити .gitignore кожного
     ignores = [
       "graphify-out/" # вихід /graphify (crew/claude/skills/graphify)
+      ".playwright-mcp/" # логи й знімки браузера Playwright MCP -- можуть містити вміст сторінок
     ];
   };
 
