@@ -17,6 +17,20 @@
     drivers = [ pkgs.brlaser ];
   };
 
+  # OctoPrint -- друк на 3D-принтер (Artillery Sidewinder X2, /dev/ttyACM0)
+  # прямо з ПК: Orca Slicer шле G-code через вкладку «Пристрій» на
+  # http://localhost:5000, з телефона -- через tailnet. Порт у файрволі НЕ
+  # відкритий: tailscale0 уже в trustedInterfaces (constellations/comms.nix).
+  # Групу dialout сервісу модуль дає сам (SupplementaryGroups).
+  services.octoprint.enable = true;
+
+  # ModemManager (тягнеться NetworkManager-ом) прощупує кожен ttyACM
+  # AT-командами -- з принтером це рве з'єднання/друк. Плата Ruby (STM32
+  # Virtual COM Port) для нього невидима.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", ENV{ID_MM_DEVICE_IGNORE}="1"
+  '';
+
   hardware.sane = {
     enable = true;
     extraBackends = [ pkgs.sane-airscan ];

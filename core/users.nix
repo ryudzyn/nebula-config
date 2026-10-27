@@ -10,6 +10,7 @@
       "video"
       "audio"
       "input"
+      "dialout" # /dev/ttyACM0 -- USB-серійник 3D-принтера (Artillery Sidewinder X2, плата Ruby): Pronterface/OctoPrint, прошивка
     ];
     shell = pkgs.zsh;
     # SSH-ключі для входу без пароля (телефон тощо) свідомо НЕ тут, а в
