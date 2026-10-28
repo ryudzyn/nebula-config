@@ -10,7 +10,10 @@
       "video"
       "audio"
       "input"
-      "dialout" # /dev/ttyACM0 -- USB-серійник 3D-принтера (Artillery Sidewinder X2, плата Ruby): Pronterface/OctoPrint, прошивка
+      # dialout свідомо НЕ тут: тоді будь-яка програма сесії може писати в
+      # /dev/ttyACM0 (3D-принтер), і 2026-10-28 запуск Steam посеред друку
+      # обірвав OctoPrint ("multiple access on port"). Порт тримає лише
+      # OctoPrint -- сервіс сам має dialout (constellations/homeservices.nix).
     ];
     shell = pkgs.zsh;
     # SSH-ключі для входу без пароля (телефон тощо) свідомо НЕ тут, а в

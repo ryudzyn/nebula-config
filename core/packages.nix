@@ -130,9 +130,9 @@ in
     qpwgraph # візуальний патчбей для PipeWire-графа з'єднань, pavucontrol сам цього не вміє
 
     # 3D-друк (Artillery Sidewinder X2): Orca Slicer має вбудований профіль
-    # цього принтера; USB-серійника сам не вміє (лише мережеві хости типу
-    # OctoPrint), тож G-code -- на TF-карту принтера. FreeCAD -- технічні
-    # деталі під друк
+    # цього принтера; USB-серійника сам не вміє -- шле друк в OctoPrint
+    # (constellations/homeservices.nix) або G-code на TF-карту. FreeCAD --
+    # технічні деталі під друк
     orca-slicer
     freecad
 
