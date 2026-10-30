@@ -22,7 +22,12 @@
   # http://localhost:5000, з телефона -- через tailnet. Порт у файрволі НЕ
   # відкритий: tailscale0 уже в trustedInterfaces (constellations/comms.nix).
   # Групу dialout сервісу модуль дає сам (SupplementaryGroups).
-  services.octoprint.enable = true;
+  services.octoprint = {
+    enable = true;
+    # TouchUI -- мобільний інтерфейс (стандартний веб-UI розрахований на ПК);
+    # вмикається сам на телефоні, на ПК -- через меню користувача
+    plugins = p: [ p.touchui ];
+  };
 
   # Вебка перед принтером (Sandberg USB Webcam Pro) для OctoPrint: MJPEG-стрім
   # на :8080 (/stream, /snapshot), той самий закритий файрвол -- localhost і
