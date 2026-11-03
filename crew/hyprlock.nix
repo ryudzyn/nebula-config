@@ -1,5 +1,29 @@
-{ ... }:
+{ pkgs, ... }:
+let
+  # Фон екрана блокування -- планета поточного столу: той самий кадр, що на робочому столі,
+  # заздалегідь відрендерений assets/planets/render-lock.py (hyprlock не виконує шейдери).
+  planets = [
+    "mercury"
+    "venus"
+    "earth"
+    "mars"
+    "jupiter"
+    "saturn"
+    "uranus"
+    "neptune"
+  ];
+  nebula-lock = pkgs.writeShellScriptBin "nebula-lock" ''
+    names=(${builtins.concatStringsSep " " planets})
+    page=$(hyprctl activeworkspace -j | ${pkgs.jq}/bin/jq -r .id)
+    [ "$page" -ge 1 ] 2>/dev/null || page=1
+    mkdir -p "$HOME/.cache/nebula-lock"
+    ln -sfn "${../assets/planets/lock}/''${names[$(( (page - 1) % 8 ))]}.jpg" "$HOME/.cache/nebula-lock/current.jpg"
+    exec hyprlock
+  '';
+in
 {
+  home.packages = [ nebula-lock ];
+
   # Екран блокування для ETEA (Settings -> Lock screen -> hyprlock): її власний не
   # сподобався. PAM-служба -- окремо, у
   # core/desktop.nix (programs.hyprlock.enable), без неї hyprlock не прийме пароль.
@@ -11,7 +35,7 @@
     enable = true;
     settings = {
       general = {
-        lock_cmd = "pidof hyprlock || hyprlock";
+        lock_cmd = "pidof hyprlock || nebula-lock";
         before_sleep_cmd = "loginctl lock-session";
         after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'";
       };
@@ -40,11 +64,9 @@
       background = [
         {
           monitor = "";
-          path = "screenshot";
+          path = "/home/ryudzyn/.cache/nebula-lock/current.jpg";
           color = "rgb(06080c)";
-          blur_passes = 3;
-          blur_size = 8;
-          brightness = 0.35;
+          blur_passes = 0;
         }
       ];
 
@@ -52,11 +74,11 @@
         {
           monitor = "";
           text = "$TIME";
-          font_size = 120;
+          font_size = 96;
           font_family = "JetBrainsMono Nerd Font";
           color = "rgb(9fb0bf)";
-          position = "0, 160";
-          halign = "center";
+          position = "120, 110";
+          halign = "left";
           valign = "center";
         }
         # Поточна розкладка клавіатури (порядок -- як у kb_layout)
@@ -66,8 +88,8 @@
           font_size = 14;
           font_family = "JetBrainsMono Nerd Font";
           color = "rgb(9fb0bf)";
-          position = "0, -110";
-          halign = "center";
+          position = "120, -80";
+          halign = "left";
           valign = "center";
         }
       ];
@@ -76,8 +98,8 @@
         {
           monitor = "";
           size = "320, 52";
-          position = "0, -60";
-          halign = "center";
+          position = "120, -30";
+          halign = "left";
           valign = "center";
           outline_thickness = 1;
           rounding = 8;
