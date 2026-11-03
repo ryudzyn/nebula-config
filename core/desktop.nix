@@ -51,6 +51,8 @@ in
   # configPackages, для ScreenCast/Screenshot з Noctalia) — нічого з цього не
   # треба дублювати вручну нижче.
   programs.hyprland.enable = true;
+  # PAM-служба для hyprlock; вигляд -- у crew/hyprlock.nix
+  programs.hyprlock.enable = true;
 
   # ReGreet замість tuigreet: показує список сесій (Hyprland і Steam-івська
   # gamescope-сесія з core/games.nix) і сам пам'ятає останній вибір

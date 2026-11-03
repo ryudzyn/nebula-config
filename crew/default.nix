@@ -14,6 +14,7 @@
     ./stream-relay.nix
     ./hyprland
     ./noctalia
+    ./hyprlock.nix
     ./wezterm.nix
     ./kando.nix
     ./gzml.nix

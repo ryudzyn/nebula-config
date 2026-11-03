@@ -343,7 +343,7 @@ local binds = {
         "surf file://" .. os.getenv("HOME") .. "/nebula-config/assets/cprogram/roulette.html"
     ) },
     { key = "SUPER + SHIFT + M", desc = "Панель керування мишею Swiftpoint X1", action = hl.dsp.exec_cmd(
-        "sh -c 'cd ~/Applications/SwiftpointX1 && ./\"Swiftpoint X1 Control Panel\"'"
+        "sh -c 'cd ~/Applications/SwiftpointX1-3.1.4.0 && ./\"Swiftpoint X1 Control Panel\"'"
     ) },
     { key = "SUPER + SHIFT + C", desc = "Запуск Ascension-мода (dev-клієнт)", action = hl.dsp.exec_cmd(
         'wezterm start --always-new-process -- sh -c "cd ~/Projects/ascension-limitless-progression && nix develop --command ./gradlew runClient"'

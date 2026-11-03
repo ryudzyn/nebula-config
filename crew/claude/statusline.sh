@@ -19,7 +19,9 @@ pct_color() {
 dim=$'\033[2m'; rst=$'\033[0m'
 
 model=$(j '.model.display_name')
-ctx=$(j '.context_window.used_percentage')
+# used_percentage ціле -- рахуємо точніше з токенів поточного запиту, якщо вони є
+ctx=$(j '.context_window | (.current_usage | .input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens) as $t | if $t > 0 and .context_window_size > 0 then $t * 100 / .context_window_size else .used_percentage end')
+[ -z "$ctx" ] && ctx=$(j '.context_window.used_percentage')
 cost=$(j '.cost.total_cost_usd')
 h5=$(j '.rate_limits.five_hour.used_percentage')
 d7=$(j '.rate_limits.seven_day.used_percentage')
@@ -27,12 +29,12 @@ dir=$(j '.workspace.current_dir')
 branch=$(git -C "${dir:-.}" --no-optional-locks branch --show-current 2>/dev/null)
 
 out="${model:-?}"
-[ -n "$ctx" ] && out+=" ${dim}│${rst} ctx $(pct_color "$ctx")${ctx%.*}%${rst}"
+[ -n "$ctx" ] && out+=" ${dim}│${rst} ctx $(pct_color "$ctx")$(printf '%.2f' "$ctx")%${rst}"
 # Ліміт ≥ 80% -- дописуємо, коли скинеться (resets_at -- unix-час)
 limit() {
   local name=$1 p=$2 at=$3
   [ -z "$p" ] && return
-  out+=" ${dim}│${rst} $name $(pct_color "$p")${p%.*}%${rst}"
+  out+=" ${dim}│${rst} $name $(pct_color "$p")$(printf '%.2f' "$p")%${rst}"
   [ "${p%.*}" -ge 80 ] && [ -n "$at" ] && out+="${dim} ↻$(date -d "@$at" +"%a %H:%M")${rst}"
 }
 limit 5h "$h5" "$(j .rate_limits.five_hour.resets_at)"

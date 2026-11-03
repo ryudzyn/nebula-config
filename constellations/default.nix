@@ -8,5 +8,6 @@
     ./dns.nix
     ./devops.nix
     ./backup.nix
+    ./sunshine.nix
   ];
 }
