@@ -26,7 +26,7 @@ index 837383b..b9f99a7 100644
              id: "aster",
              name: "Aster",
 diff --git a/config/Theme.qml b/config/Theme.qml
-index 704616f..c9321b0 100644
+index 704616f..83f4a2b 100644
 --- a/config/Theme.qml
 +++ b/config/Theme.qml
 @@ -2,10 +2,11 @@ pragma Singleton
@@ -72,7 +72,8 @@ index 704616f..c9321b0 100644
 +    readonly property color cardDeep: "#0b0e12"
  
      // Colours a card can take when its content has none of its own
-     readonly property var tones: ["#ffc98a", "#f59a7a", "#e98fb0", "#b9a2f0", "#8fc7e8", "#8fd6b4"]
+-    readonly property var tones: ["#ffc98a", "#f59a7a", "#e98fb0", "#b9a2f0", "#8fc7e8", "#8fd6b4"]
++    readonly property var tones: [windowLit]
  
      // Motion that overshoots a touch, then settles
 -    readonly property var expressive: [0.38, 1.21, 0.22, 1, 1, 1]
@@ -459,6 +460,32 @@ index 44b8f49..c934e27 100644
                  color: "#f0705f"
  
                  SequentialAnimation on opacity {
+diff --git a/modules/bar/menus/BluetoothMenu.qml b/modules/bar/menus/BluetoothMenu.qml
+index 19ad4ae..e435742 100644
+--- a/modules/bar/menus/BluetoothMenu.qml
++++ b/modules/bar/menus/BluetoothMenu.qml
+@@ -24,7 +24,7 @@ ColumnLayout {
+             adapter.discovering = false;
+     }
+ 
+-    readonly property color cardTint: root.adapter?.enabled ? "#b9a2f0" : "#a9a4ad"
++    readonly property color cardTint: root.adapter?.enabled ? Theme.windowLit : "#a9a4ad"
+     readonly property real cardRise: root.adapter?.enabled ? 0.12 : 0.05
+ 
+     spacing: 6
+diff --git a/modules/bar/menus/CalendarMenu.qml b/modules/bar/menus/CalendarMenu.qml
+index 07adeea..1354993 100644
+--- a/modules/bar/menus/CalendarMenu.qml
++++ b/modules/bar/menus/CalendarMenu.qml
+@@ -16,7 +16,7 @@ ColumnLayout {
+         shown = new Date(shown.getFullYear(), shown.getMonth() + months, 1);
+     }
+ 
+-    readonly property color cardTint: "#b9a2f0"
++    readonly property color cardTint: Theme.windowLit
+     readonly property real cardRise: 0.07
+ 
+     spacing: 8
 diff --git a/modules/bar/menus/DeskMenu.qml b/modules/bar/menus/DeskMenu.qml
 index b3771d4..3d9e143 100644
 --- a/modules/bar/menus/DeskMenu.qml
@@ -472,6 +499,19 @@ index b3771d4..3d9e143 100644
                              color: Qt.alpha(Theme.windowLit, city.activeFocus ? 0.14 : 0.08)
  
                              TextInput {
+diff --git a/modules/bar/menus/KeyboardMenu.qml b/modules/bar/menus/KeyboardMenu.qml
+index 9bbd71e..57d011a 100644
+--- a/modules/bar/menus/KeyboardMenu.qml
++++ b/modules/bar/menus/KeyboardMenu.qml
+@@ -7,7 +7,7 @@ import qs.services
+ ColumnLayout {
+     id: root
+ 
+-    readonly property color cardTint: "#a6c8e8"
++    readonly property color cardTint: Theme.windowLit
+     readonly property real cardRise: 0.06
+ 
+     spacing: 4
 diff --git a/modules/bar/menus/MediaMenu.qml b/modules/bar/menus/MediaMenu.qml
 index 916d3bc..cde3144 100644
 --- a/modules/bar/menus/MediaMenu.qml
@@ -511,6 +551,45 @@ index 4b423e6..d1904bd 100644
          color: Qt.alpha(Menus.tint, root.on ? 0.8 : 0.22)
      }
  
+diff --git a/modules/bar/menus/NetworkMenu.qml b/modules/bar/menus/NetworkMenu.qml
+index 302f102..19759dd 100644
+--- a/modules/bar/menus/NetworkMenu.qml
++++ b/modules/bar/menus/NetworkMenu.qml
+@@ -11,7 +11,7 @@ ColumnLayout {
+     readonly property var wifi: Networking.devices.values.find(device => device.networks !== undefined) ?? null
+     readonly property var networks: (wifi?.networks.values ?? []).slice().sort((a, b) => b.connected - a.connected || b.signalStrength - a.signalStrength).slice(0, 7)
+ 
+-    readonly property color cardTint: Networking.wifiEnabled ? "#8fc7e8" : "#a9a4ad"
++    readonly property color cardTint: Networking.wifiEnabled ? Theme.windowLit : "#a9a4ad"
+     readonly property real cardRise: Networking.wifiEnabled ? 0.12 : 0.05
+ 
+     property string asking: ""
+diff --git a/modules/bar/menus/PowerMenu.qml b/modules/bar/menus/PowerMenu.qml
+index 7e21ccd..e5c536f 100644
+--- a/modules/bar/menus/PowerMenu.qml
++++ b/modules/bar/menus/PowerMenu.qml
+@@ -21,7 +21,7 @@ ColumnLayout {
+ 
+     // The battery is the sun in this card: it sinks as the charge runs out, and turns red
+     readonly property real level: battery?.percentage ?? 0
+-    readonly property color cardTint: !UPower.onBattery ? "#8fd6b4" : level < 0.2 ? "#f0705f" : "#ffc98a"
++    readonly property color cardTint: !UPower.onBattery ? Theme.windowLit : level < 0.2 ? "#f0705f" : "#ffc98a"
+     readonly property real cardRise: 0.06 + level * 0.36
+ 
+     spacing: 6
+diff --git a/modules/bar/menus/SoundMenu.qml b/modules/bar/menus/SoundMenu.qml
+index fe60ac7..b9a81e3 100644
+--- a/modules/bar/menus/SoundMenu.qml
++++ b/modules/bar/menus/SoundMenu.qml
+@@ -24,7 +24,7 @@ ColumnLayout {
+     }
+ 
+     // The horizon climbs with the volume
+-    readonly property color cardTint: "#e98fb0"
++    readonly property color cardTint: Theme.windowLit
+     readonly property real cardRise: 0.05 + Math.min(1, (sink?.audio.volume ?? 0)) * 0.3
+ 
+     // Device lists stay folded behind the current one, or the menu runs off the screen
 diff --git a/modules/bar/menus/WifiPassword.qml b/modules/bar/menus/WifiPassword.qml
 index 33b3033..1e4d19b 100644
 --- a/modules/bar/menus/WifiPassword.qml
@@ -538,10 +617,63 @@ index 156a8fe..f3cd766 100644
                      border.width: 1
                      border.color: Qt.alpha(Theme.windowLit, modelData.on ? 0.7 : 0.2)
 diff --git a/modules/cheatsheet/Cheatsheet.qml b/modules/cheatsheet/Cheatsheet.qml
-index a7c8e9f..0e5ecae 100644
+index a7c8e9f..ec35b34 100644
 --- a/modules/cheatsheet/Cheatsheet.qml
 +++ b/modules/cheatsheet/Cheatsheet.qml
-@@ -235,7 +235,7 @@ Scope {
+@@ -20,25 +20,23 @@ Scope {
+ 
+     // ETEA's shortcuts, set up by scripts/dev.sh. mods and key match Hyprland's own names.
+     readonly property var own: [
+-        { mods: 64, key: "SUPER_L", keys: "Super", label: Lang.t("Ouvrir le lanceur") },
+-        { mods: 64, key: "code:10", keys: "Super + 1 … 0", label: Lang.t("Aller à une page") },
+-        { mods: 68, key: "Right", keys: "Ctrl + Super + ← →", label: Lang.t("Page précédente ou suivante") },
+-        { mods: 64, key: "mouse_up", keys: `Super + ${Lang.t("Molette")}`, label: Lang.t("Tourner la page, ou changer la taille d'un widget") },
+-        { mods: 64, key: "Tab", keys: "Super + Tab", label: Lang.t("Monter en orbite, puis vers les planètes") },
+-        { mods: 65, key: "Tab", keys: `Super + ${Lang.t("Maj")} + Tab`, label: Lang.t("Redescendre") },
+-        { mods: 64, key: "Q", keys: "Super + Q", label: Lang.t("Fermer la fenêtre") },
+-        { mods: 64, key: "L", keys: "Super + L", label: Lang.t("Verrouiller") },
+-        { mods: 64, key: "A", keys: "Super + A", label: Lang.t("Panneau de gauche") },
+-        { mods: 64, key: "N", keys: "Super + N", label: Lang.t("Panneau de droite") },
+-        { mods: 64, key: "V", keys: "Super + V", label: Lang.t("Presse-papiers") },
+-        { mods: 65, key: "S", keys: `Super + ${Lang.t("Maj")} + S`, label: Lang.t("Capture") },
+-        { mods: 64, key: "Escape", keys: `Super + ${Lang.t("Échap")}`, label: Lang.t("Session") },
+-        { mods: 64, key: "Comma", keys: "Super + ,", label: Lang.t("Réglages") },
+-        { mods: 64, key: "Slash", keys: "Super + /", label: Lang.t("Ces raccourcis") },
+-        { mods: 64, key: "mouse:272", keys: `Super + ${Lang.t("glisser")}`, label: Lang.t("Déplacer un widget, ou une fenêtre") },
+-        { mods: 0, key: "", keys: Lang.t("4 doigts ← →"), label: Lang.t("Changer de page") },
+-        { mods: 0, key: "", keys: Lang.t("4 doigts ↑ ↓"), label: Lang.t("Orbite") }
++        { mods: 64, key: "SUPER_L", keys: "Super", label: "Запуск програм" },
++        { mods: 64, key: "Tab", keys: "Super + Tab", label: "Сонячна система: вибір столу" },
++        { mods: 65, key: "Tab", keys: "Super + Shift + Tab", label: "Назад із Сонячної системи" },
++        { mods: 64, key: "code:10", keys: "Super + 1 … 0", label: "Перелетіти на стіл" },
++        { mods: 68, key: "Right", keys: "Ctrl + Super + ← →", label: "Сусідній стіл" },
++        { mods: 64, key: "mouse_up", keys: "Super + коліщатко", label: "Сусідній стіл, а над віджетом -- його розмір" },
++        { mods: 64, key: "A", keys: "Super + A", label: "Ліва панель: календар, завдання, таймер" },
++        { mods: 64, key: "N", keys: "Super + N", label: "Центр керування і сповіщення" },
++        { mods: 64, key: "Q", keys: "Super + Q", label: "Закрити вікно" },
++        { mods: 64, key: "V", keys: "Super + V", label: "Історія буфера обміну" },
++        { mods: 65, key: "S", keys: "Super + Shift + S", label: "Захоплення екрана, Tab -- запис" },
++        { mods: 64, key: "Comma", keys: "Super + ,", label: "Налаштування" },
++        { mods: 64, key: "Slash", keys: "Super + /", label: "Ці підказки" },
++        { mods: 64, key: "mouse:272", keys: "Super + перетягування", label: "Посунути віджет або вікно" }
+     ]
++    // Ті самі дії, що вже описані рядком вище: у шпаргалці другий раз не потрібні
++    readonly property var repeats: ["68 Left", "64 mouse_down", "64 SUPER_R"]
+ 
+     readonly property var shown: {
+         const wanted = search.trim().toLowerCase();
+@@ -106,8 +104,8 @@ Scope {
+     }
+ 
+     function build(binds) {
+-        const taken = own.map(bind => `${bind.mods} ${bind.key}`);
+-        const found = [{ name: "ETEA", binds: own }];
++        const taken = own.map(bind => `${bind.mods} ${bind.key}`).concat(repeats);
++        const found = [{ name: "Оболонка", binds: own }];
+         for (const bind of binds) {
+             if (!bind.description || taken.includes(`${bind.modmask} ${bind.key}`))
+                 continue;
+@@ -235,7 +233,7 @@ Scope {
                  Rectangle {
                      Layout.preferredWidth: 320
                      implicitHeight: 38
@@ -550,7 +682,7 @@ index a7c8e9f..0e5ecae 100644
                      color: Qt.alpha(Theme.windowLit, 0.1)
  
                      TextInput {
-@@ -347,7 +347,7 @@ Scope {
+@@ -347,7 +345,7 @@ Scope {
                                                      Layout.alignment: Qt.AlignTop
                                                      implicitWidth: keys.implicitWidth + 16
                                                      implicitHeight: 24
@@ -635,8 +767,21 @@ index 90ed7ef..9c00fb3 100644
      }
  
      PanelWindow {
+diff --git a/modules/osd/Osd.qml b/modules/osd/Osd.qml
+index 2248e01..b4d7249 100644
+--- a/modules/osd/Osd.qml
++++ b/modules/osd/Osd.qml
+@@ -110,7 +110,7 @@ Scope {
+             HandCard {
+                 anchors.fill: parent
+                 seed: root.kind
+-                tint: root.kind === "volume" ? "#e98fb0" : root.kind === "microphone" ? "#f59a7a" : root.kind === "keyboard" ? "#a6c8e8" : "#ffd08a"
++                tint: Theme.windowLit
+                 rise: 0.05 + root.level * 0.22
+                 alive: panel.visible
+             }
 diff --git a/modules/panels/ControlCentre.qml b/modules/panels/ControlCentre.qml
-index 0c23e7f..9fc67b7 100644
+index 0c23e7f..90739e4 100644
 --- a/modules/panels/ControlCentre.qml
 +++ b/modules/panels/ControlCentre.qml
 @@ -74,7 +74,7 @@ ColumnLayout {
@@ -647,6 +792,105 @@ index 0c23e7f..9fc67b7 100644
 +                    radius: 0
                      color: Qt.alpha(Theme.windowLit, pointer.containsMouse ? 0.18 : 0.08)
                  }
+ 
+@@ -110,7 +110,7 @@ ColumnLayout {
+             label: "Wi-Fi"
+             detail: root.network?.name ?? (Networking.wifiEnabled ? Lang.t("Recherche") : Lang.t("Coupé"))
+             on: Networking.wifiEnabled
+-            tint: "#8fc7e8"
++            tint: Theme.windowLit
+             onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
+         }
+ 
+@@ -120,7 +120,7 @@ ColumnLayout {
+             detail: root.paired?.name ?? (root.adapter?.enabled ? Lang.t("Allumé") : Lang.t("Coupé"))
+             on: root.adapter?.enabled ?? false
+             available: root.adapter !== null
+-            tint: "#b9a2f0"
++            tint: Theme.windowLit
+             onToggled: root.adapter.enabled = !root.adapter.enabled
+         }
+ 
+@@ -129,7 +129,7 @@ ColumnLayout {
+             label: Lang.t("Silence")
+             detail: Notifs.quiet ? Lang.t("Activé") : ""
+             on: Notifs.quiet
+-            tint: "#e98fb0"
++            tint: Theme.windowLit
+             onToggled: Notifs.quiet = !Notifs.quiet
+         }
+ 
+@@ -139,7 +139,7 @@ ColumnLayout {
+             detail: NightLight.on ? `${NightLight.temperature} K` : ""
+             on: NightLight.on
+             available: NightLight.available
+-            tint: "#ffc98a"
++            tint: Theme.windowLit
+             onToggled: NightLight.toggle()
+         }
+ 
+@@ -149,7 +149,7 @@ ColumnLayout {
+             detail: root.source?.audio?.muted ? Lang.t("Coupé") : Lang.t("Ouvert")
+             on: !(root.source?.audio?.muted ?? true)
+             available: root.source?.audio !== undefined
+-            tint: "#f59a7a"
++            tint: Theme.windowLit
+             onToggled: root.source.audio.muted = !root.source.audio.muted
+         }
+ 
+@@ -160,7 +160,7 @@ ColumnLayout {
+             label: Lang.t("Énergie")
+             detail: root.profileNames[current]
+             on: PowerProfiles.profile !== PowerProfile.Balanced
+-            tint: "#8fd6b4"
++            tint: Theme.windowLit
+             onToggled: {
+                 const next = root.profiles[(current + 1) % root.profiles.length];
+                 PowerProfiles.profile = next === PowerProfile.Performance && !PowerProfiles.hasPerformanceProfile ? PowerProfile.PowerSaver : next;
+@@ -172,7 +172,7 @@ ColumnLayout {
+             label: Lang.t("Éveillé")
+             detail: Wake.on ? Lang.t("Pas de veille") : ""
+             on: Wake.on
+-            tint: "#d9b08c"
++            tint: Theme.windowLit
+             onToggled: Wake.on = !Wake.on
+         }
+ 
+@@ -180,7 +180,7 @@ ColumnLayout {
+         QuickTile {
+             icon: "capture"
+             label: Lang.t("Capture")
+-            tint: "#8fc7e8"
++            tint: Theme.windowLit
+             onToggled: {
+                 Menus.closePanel("right");
+                 Menus.captureOpen = true;
+@@ -190,7 +190,7 @@ ColumnLayout {
+         QuickTile {
+             icon: "picker"
+             label: Lang.t("Pipette")
+-            tint: "#e98fb0"
++            tint: Theme.windowLit
+             onToggled: {
+                 Menus.closePanel("right");
+                 Picker.pick();
+@@ -202,7 +202,7 @@ ColumnLayout {
+         icon: root.sink?.audio?.muted ? "speaker-x" : "speaker-high"
+         value: root.sink?.audio?.volume ?? 0
+         maximum: 1
+-        tint: "#e98fb0"
++        tint: Theme.windowLit
+         onMoved: value => root.sink.audio.volume = value
+         onIconPressed: root.sink.audio.muted = !root.sink.audio.muted
+     }
+@@ -210,7 +210,7 @@ ColumnLayout {
+     SliderRow {
+         icon: "brightness"
+         value: Brightness.value
+-        tint: "#ffd08a"
++        tint: Theme.windowLit
+         onMoved: value => Brightness.set(value)
+     }
  
 @@ -239,7 +239,7 @@ ColumnLayout {
                  visible: cover.status === Image.Ready
@@ -812,9 +1056,24 @@ index 202aec1..06ecd48 100644
  
          Text {
 diff --git a/modules/session/Session.qml b/modules/session/Session.qml
-index d18b6be..d3d5d2f 100644
+index d18b6be..fd57b24 100644
 --- a/modules/session/Session.qml
 +++ b/modules/session/Session.qml
+@@ -31,10 +31,10 @@ Scope {
+         id: panel
+ 
+         readonly property var actions: [
+-            { icon: "lock", label: Lang.t("Verrouiller"), tint: "#8fc7e8", run: () => Menus.locked = true },
+-            { icon: "sleep", label: Lang.t("Veille"), tint: "#b9a2f0", command: ["systemctl", "suspend"] },
+-            { icon: "logout", label: Lang.t("Déconnecter"), tint: "#ffc98a", confirm: true, command: ["hyprctl", "dispatch", "hl.dsp.exit()"] },
+-            { icon: "restart", label: Lang.t("Redémarrer"), tint: "#e98fb0", confirm: true, command: ["systemctl", "reboot"] },
++            { icon: "lock", label: Lang.t("Verrouiller"), tint: Theme.windowLit, run: () => Menus.locked = true },
++            { icon: "sleep", label: Lang.t("Veille"), tint: Theme.windowLit, command: ["systemctl", "suspend"] },
++            { icon: "logout", label: Lang.t("Déconnecter"), tint: Theme.windowLit, confirm: true, command: ["hyprctl", "dispatch", "hl.dsp.exit()"] },
++            { icon: "restart", label: Lang.t("Redémarrer"), tint: Theme.windowLit, confirm: true, command: ["systemctl", "reboot"] },
+             { icon: "power", label: Lang.t("Éteindre"), tint: "#f0705f", confirm: true, command: ["systemctl", "poweroff"] }
+         ]
+ 
 @@ -190,7 +190,7 @@ Scope {
                              x: 0
                              width: 150

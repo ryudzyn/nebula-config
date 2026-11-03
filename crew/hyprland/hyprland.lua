@@ -397,9 +397,18 @@ local binds = {
     { key = "SUPER + CTRL + J", desc = "Збільшити висоту вікна", action = hl.dsp.window.resize({ x = 0, y = 20, relative = true }) },
 }
 
+-- Опис "Розділ: дія" читає шпаргалка ETEA (Super+/), вона ж групує за розділом
+local bind_section = "Основні"
 for _, b in ipairs(binds) do
-    if b.key then -- { section = ... } -- лише заголовок групи для довідки, не бінд
-        hl.bind(b.key, b.action, b.opts)
+    if b.section then -- лише заголовок групи для довідки, не бінд
+        bind_section = b.section
+    else
+        local opts = {}
+        for k, v in pairs(b.opts or {}) do
+            opts[k] = v
+        end
+        opts.description = bind_section .. ": " .. b.desc
+        hl.bind(b.key, b.action, opts)
     end
 end
 
