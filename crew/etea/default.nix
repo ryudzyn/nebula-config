@@ -4,9 +4,15 @@ let
   # лончер, буфер обміну, захоплення екрана, "планети" як теми. Замінила Noctalia.
   # Закріплена на коміті: вбудоване оновлення через git у незмінному сховищі не працює,
   # новий код приходить лише зміною rev/hash тут.
-  # nebula.patch: Super+Space (Kando), Super+L (фокус) і Super+Escape (блокування) лишаються нашими; жести тачпада не знімаються, якщо їх не
-  # було (на десктопі це давало помилку Lua); оголошена крива emphasizedDecel (без неї
-  # помилка при кожному новому вікні); без зірок на рамках вікон; виклик quiet для режимів.
+  # nebula.patch: Super+Space (Kando), Super+L (фокус) і Super+Escape (блокування) лишаються
+  # нашими; жести й крива emphasizedDecel (помилки Lua на десктопі); стиль обсерваторії замість
+  # зірок і м'яких ліній; кожен стіл -- своя планета зі своїм кольором (config/Planets.qml),
+  # фон shaders/planet.frag і переліт у modules/background/World.qml; Super+Tab -- Сонячна
+  # система з вікнами-супутниками (modules/stage/ThemeSystem.qml); віджети за макетом.
+  # Як правити: зміни в ~/Projects/etea-shell, потім
+  # git diff -- . ':(exclude)*.qsb' > crew/etea/nebula.patch
+  # (скомпільовані .qsb у патч не входять, збірка нижче робить їх сама).
+  # Текстури -- assets/planets, CC BY 4.0, авторство там же в CREDITS.md.
   # Налаштування -- не тут, а в ~/.config/etea/settings.json (GUI, Super+,).
   etea = pkgs.stdenvNoCC.mkDerivation {
     pname = "etea-shell";
@@ -24,7 +30,14 @@ let
         --replace-fail /usr/share/X11/xkb/rules/evdev.lst \
         ${pkgs.xkeyboard_config}/share/X11/xkb/rules/evdev.lst
     '';
-    dontBuild = true;
+    nativeBuildInputs = [ pkgs.qt6.qtshadertools ];
+    dontWrapQtApps = true;
+    buildPhase = ''
+      cp -r ${../../assets/planets} assets/planets
+      for shader in shaders/*.frag; do
+        qsb --glsl "320 es,330" -o "$shader.qsb" "$shader"
+      done
+    '';
     dontFixup = true;
     installPhase = ''
       cp -r . $out
