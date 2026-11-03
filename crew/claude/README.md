@@ -38,8 +38,8 @@ claude mcp add -s user playwright -- playwright-mcp
 - `/hypr-verify` — `hyprctl reload`, configerrors, перевірка фокусу, grim-скриншот.
 - `/mod-port` — порт Ascension на 1.21.1 NeoForge: setup worktree `~/Projects/ascension-1211` (гілка `neoforge-1.21.1` з `ascension-night` master), далі по одній фічі з `forge-1.20.1` — build, GameTests, живий клієнт, коміт, чекліст у `PORT_1.21.1.md`.
 - `/post-switch` — перевірка після `sysup`, нічого не змінює: впалі юніти (системні й користувацькі), помилки в журналі з моменту switch,
-  Home Manager, Noctalia, чи greetd досі на старому конфігу (тоді треба `restart greetd`), биті симлінки скілів.
-- `/flake-bump` — `nix flake update` з перевіркою, що nixpkgs у Noctalia збігається з системним (пастка glibc),
+  Home Manager, ETEA, чи greetd досі на старому конфігу (тоді треба `restart greetd`), биті симлінки скілів.
+- `/flake-bump` — `nix flake update`,
   повна збірка без switch і підсумок `nvd diff` (ядро, mesa, hyprland, claude-code…). `flake.lock` комітить лише за згодою.
 - `/screen-watch` — коротке відео екрана (`screen-rec`: wf-recorder, монітор, вікно або область, 30 кадрів/с) і перегляд через `/watch`.
   Для багів, які не видно на скриншоті: анімації, мерехтіння, гальмування, поведінка мода в грі. Запис після перегляду видаляється.
@@ -132,7 +132,7 @@ claude mcp add -s user playwright -- playwright-mcp
 - SMART: знімок від `smart-snapshot.service` (root, раз на добу, `/var/lib/smart-snapshot/*.json`), ресурс SSD, записані ТБ, realloc;
 - впалі сервіси, системні й користувацькі;
 - бекап restic `hetzner`: результат і давність;
-- оновлення флейка: на **копії** `flake.lock` плюс lockstep Noctalia.
+- оновлення флейка: на **копії** `flake.lock`.
 
 Якщо є проблема, пуш приходить з високим пріоритетом. Нічого не застосовує. Вручну: `nebula-weekly-report --print`.
 

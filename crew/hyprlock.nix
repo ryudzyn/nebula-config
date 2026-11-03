@@ -1,7 +1,7 @@
 { ... }:
 {
   # Екран блокування для ETEA (Settings -> Lock screen -> hyprlock): її власний не
-  # сподобався, а Noctalia блокує лише поки сама запущена. PAM-служба -- окремо, у
+  # сподобався. PAM-служба -- окремо, у
   # core/desktop.nix (programs.hyprlock.enable), без неї hyprlock не прийме пароль.
   # Кольори -- зі світу Nyx (~/.config/etea/settings.json, customPlanets).
   programs.hyprlock = {

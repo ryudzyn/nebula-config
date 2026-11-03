@@ -29,7 +29,7 @@ let
     fi
   '';
 
-  # Анотований скріншот -- окремий від Noctalia-івського screenshot-region/
+  # Анотований скріншот -- окремий від ETEA-шного screenshot-region/
   # -fullscreen (той без анотацій, просто в буфер). grim+slurp той самий
   # конвеєр, що й у nebula-ocr-wl, але кадр пайпиться напряму в satty замість
   # tesseract; satty сам зберігає у файл і копіює в буфер (Enter/Ctrl+C) через
@@ -318,8 +318,8 @@ let
   # legacy `hyprctl keyword` живо перевірено й відкидається помилкою
   # "keyword can't work with non-legacy parsers. Use eval." -- `eval` виконує
   # довільний Lua, той самий `hl.config({...})`, що й у tweaks.lua, тільки
-  # runtime, без правки файлу). Сповіщення -- через noctalia msg
-  # notification-dnd-set (Noctalia сама їх обробляє під Hyprland, dunst тут
+  # runtime, без правки файлу). Сповіщення -- через etea-ipc
+  # notifications quiet (ETEA сама їх обробляє під Hyprland, dunst тут
   # не піднятий, на відміну від bspwm-сесії). Земля вимикається так само,
   # як і в bspwm-версії, якщо активна.
   nebula-gamemode-toggle-wl = pkgs.writeShellScriptBin "nebula-gamemode-toggle-wl" ''
@@ -328,12 +328,12 @@ let
     if [ -f "$statefile" ]; then
       rm -f "$statefile"
       hyprctl eval 'hl.config({ decoration = { blur = { enabled = true } }, animations = { enabled = true } })'
-      noctalia msg notification-dnd-set false
+      etea-ipc notifications quiet false
       ${pkgs.libnotify}/bin/notify-send -t 1500 "Game mode" "Вимкнено — блюр/анімації й сповіщення повернуто"
     else
       touch "$statefile"
       hyprctl eval 'hl.config({ decoration = { blur = { enabled = false } }, animations = { enabled = false } })'
-      noctalia msg notification-dnd-set true
+      etea-ipc notifications quiet true
       if [ -f "$earthpid" ] && kill -0 "$(cat "$earthpid")" 2>/dev/null; then
         kill "$(cat "$earthpid")"
         rm -f "$earthpid"
@@ -450,7 +450,7 @@ let
       cp ${uiohook-napi-x11-fix}/node.napi.node \
         "$out/share/exiled-exchange-2/resources/app.asar.unpacked/node_modules/uiohook-napi/prebuilds/linux-x64/node.napi.node"
 
-      # Ярлик та іконки з AppImage -- без них EE2 не видно в лончері Noctalia
+      # Ярлик та іконки з AppImage -- без них EE2 не видно в лончері ETEA
       # (2026-10-03, живе питання "а де програмка для PoE2?"). Exec в
       # оригінальному .desktop -- "AppRun --sandbox", замінюємо на нашу обгортку.
       install -Dm644 "${appImageContents}/exiled-exchange-2.desktop" "$out/share/applications/exiled-exchange-2.desktop"
@@ -638,10 +638,10 @@ in
 
   # hyprpolkitagent постачає власний share/systemd/user/hyprpolkitagent.service
   # -- systemd.user.packages лінкує його в per-user systemd, так стає видимим
-  # для `systemctl --user` (той самий підхід, що вже є для noctalia.service
+  # для `systemctl --user` (той самий підхід, що вже є для etea.service
   # нижче в hyprland.lua). WantedBy=graphical-session.target у самому юніті
   # НЕ спрацьовує на цьому Hyprland-сетапі (той самий давно відомий нюанс,
-  # що й з noctalia.service -- таргет ніколи сам не активується), тому старт
+  # що й з etea.service -- таргет ніколи сам не активується), тому старт
   # усе одно явний, через hl.exec_cmd у hyprland.lua.
   systemd.user.packages = [ pkgs.hyprpolkitagent ];
 }

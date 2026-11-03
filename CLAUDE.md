@@ -54,8 +54,8 @@ that a new module must be added to or it silently has no effect:
   services). Aggregated through `constellations/default.nix` — a new constellation module must be
   added to that import list.
 - `crew/` — everything that runs as the `ryudzyn` Home Manager profile: `hyprland/` (the sole
-  compositor/session — Lua config, live-linked via `mkOutOfStoreSymlink`, see below), `noctalia/`
-  (the shell: bar, launcher, notifications, lock screen), terminal/shell, CLI tools, theming, the
+  compositor/session — Lua config, live-linked via `mkOutOfStoreSymlink`, see below), `etea/`
+  (the shell: bar, launcher, notifications, pinned to a commit with `nebula.patch`), `hyprlock.nix` (lock screen), terminal/shell, CLI tools, theming, the
   VSCodium profile, Spotify (spicetify, inside `media.nix`), and `modes.nix` (workspace-launcher
   scripts bound to `SUPER+F1/F2/F3` in `hyprland.lua`: work / study / play). Aggregated through
   `crew/default.nix` — same rule, a new crew module must be added there.
@@ -73,15 +73,15 @@ that a new module must be added to or it silently has no effect:
   `crew/default.nix` respectively) — there's no auto-discovery.
 - `crew/terminal/kitty.nix` is written but deliberately left commented out in
   `crew/default.nix` pending later work.
-- Hyprland (`crew/hyprland/`) + Noctalia (`crew/noctalia/`) is the sole desktop session; the only
+- Hyprland (`crew/hyprland/`) + ETEA (`crew/etea/`, replaced Noctalia 2026-11-03) is the sole desktop session; the only
   other greetd entry is Steam's own gamescope session (`core/games.nix`). The history: sway/i3 were
   retired for bspwm (2026-08-13), then bspwm (plus `core/x11-greetd-sessions.nix`, polybar, sxhkd,
   dunst, picom, i3lock) was deleted once the Hyprland port was complete (2026-10-03). There is no
   X server (`services.xserver.enable` is off) — X11 apps run through XWayland. Don't reintroduce a
   second X11/Wayland session without checking whether that decision still holds.
-- `hyprland.lua`, `tweaks.lua`, `alttab.lua` and Noctalia's `config.toml` are live symlinks into
+- `hyprland.lua`, `tweaks.lua`, `alttab.lua` are live symlinks into
   this checkout — edits apply on `hyprctl reload` without a switch. Hyprland here uses the native
   Lua config: legacy `hyprctl keyword` is rejected ("Use eval."), so use
   `hyprctl eval '<lua>'` (e.g. `hl.exec_cmd(...)`, `hl.dispatch(hl.dsp.focus({workspace=2}))`).
 - `self` and `inputs` are threaded through via `specialArgs` in `flake.nix` — modules that need flake
-  inputs (e.g. `zen-browser`, `spicetify-nix`, `noctalia`) take `self`/`inputs` as module arguments rather than importing them another way.
+  inputs (e.g. `zen-browser`, `spicetify-nix`) take `self`/`inputs` as module arguments rather than importing them another way.

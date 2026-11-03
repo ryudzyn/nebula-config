@@ -342,7 +342,7 @@
               "actions": [
                 {
                   "type": "execute-command",
-                  "command": "noctalia msg session lock",
+                  "command": "etea-ipc lock lock",
                   "detached": true,
                   "isolated": false
                 },
@@ -361,7 +361,7 @@
               "actions": [
                 {
                   "type": "execute-command",
-                  "command": "noctalia msg panel-toggle session",
+                  "command": "etea-ipc session toggle",
                   "detached": true,
                   "isolated": false
                 },

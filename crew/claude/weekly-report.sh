@@ -62,10 +62,8 @@ if nix flake update --flake "path:$tmp" >/dev/null 2>&1; then
     | select($o != $n) | $i.key' | paste -sd, -)
   age=$(jq -r '.nodes[.nodes.root.inputs.nixpkgs].locked.lastModified' "$repo/flake.lock")
   days=$((($(date +%s) - age) / 86400))
-  lockstep=$(jq -r '(.nodes[.nodes.root.inputs.nixpkgs].locked.rev) == (.nodes[.nodes.noctalia.inputs.nixpkgs].locked.rev)' "$tmp/flake.lock")
   if [ -n "$changes" ]; then
     add "📦 Оновлення: $changes (nixpkgs у системі $days дн.) -- /flake-bump"
-    [ "$lockstep" = "false" ] && add "   Noctalia на іншому nixpkgs -- /flake-bump перевірить glibc"
   else
     add "📦 Оновлень немає (nixpkgs $days дн.)"
   fi

@@ -6,7 +6,7 @@
 # смикаючи фокус (живо перевірено 2026-10-03 через hyprctl eval) -- тож не
 # треба ні перемикатись перед кожним запуском (як робила bspwm-версія через
 # `bspc desktop -f`), ні sleep між ними. Наприкінці -- фокус на workspace 2.
-# Сповіщення -- через Noctalia DND (dunst жив лише в bspwm-сесії).
+# Сповіщення -- через тихий режим ETEA (dunst жив лише в bspwm-сесії).
 let
   # $1 -- workspace, решта -- команда. Одинарні лапки в команді не
   # підтримуються (вона вставляється в Lua-рядок у подвійних лапках).
@@ -17,7 +17,7 @@ let
 
   mode-work = pkgs.writeShellScriptBin "mode-work" ''
     ${launch}
-    noctalia msg notification-dnd-set true
+    etea-ipc notifications quiet true
     launch 2 codium
     launch 3 ${pkgs.kitty}/bin/kitty
     launch 4 zen
@@ -26,7 +26,7 @@ let
 
   mode-study = pkgs.writeShellScriptBin "mode-study" ''
     ${launch}
-    noctalia msg notification-dnd-set true
+    etea-ipc notifications quiet true
     launch 2 anki
     launch 2 goldendict
     launch 3 zen
@@ -35,7 +35,7 @@ let
 
   mode-play = pkgs.writeShellScriptBin "mode-play" ''
     ${launch}
-    noctalia msg notification-dnd-set false
+    etea-ipc notifications quiet false
     launch 2 steam
     launch 3 discord
     focus 2

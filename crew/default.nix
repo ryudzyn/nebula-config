@@ -13,7 +13,7 @@
     ./remote-control.nix
     ./stream-relay.nix
     ./hyprland
-    ./noctalia
+    ./etea
     ./hyprlock.nix
     ./wezterm.nix
     ./kando.nix

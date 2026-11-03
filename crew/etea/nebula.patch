@@ -1,0 +1,79 @@
+diff --git a/modules/notifications/Notifications.qml b/modules/notifications/Notifications.qml
+index 90ed7ef..9c00fb3 100644
+--- a/modules/notifications/Notifications.qml
++++ b/modules/notifications/Notifications.qml
+@@ -38,6 +38,10 @@ Scope {
+         function clearApp(app: string): void {
+             Notifs.clear(app);
+         }
++
++        function quiet(on: bool): void {
++            Notifs.quiet = on;
++        }
+     }
+ 
+     PanelWindow {
+diff --git a/modules/stage/Illumination.qml b/modules/stage/Illumination.qml
+index 14bf432..8116b94 100644
+--- a/modules/stage/Illumination.qml
++++ b/modules/stage/Illumination.qml
+@@ -22,11 +22,13 @@ Scope {
+     readonly property string pages: Config.pageTransition === "slide" ? `
+         hl.curve("eteaSlide", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
+         hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "eteaSlide", style = "slide" })
+-        pcall(hl.gesture, { fingers = 4, direction = "horizontal", action = "unset" })
++        if ETEA_SIDE_GESTURE then pcall(hl.gesture, { fingers = 4, direction = "horizontal", action = "unset" }) end
++        ETEA_SIDE_GESTURE = true
+         hl.gesture({ fingers = 4, direction = "horizontal", action = "workspace" })
+     ` : `
+         hl.animation({ leaf = "workspaces", enabled = false })
+-        pcall(hl.gesture, { fingers = 4, direction = "horizontal", action = "unset" })
++        if ETEA_SIDE_GESTURE then pcall(hl.gesture, { fingers = 4, direction = "horizontal", action = "unset" }) end
++        ETEA_SIDE_GESTURE = true
+         -- The start of the swipe, every move and its end reach the shell as events
+         hl.gesture({ fingers = 4, direction = "horizontal", action = {
+             start = function()
+@@ -115,6 +117,7 @@ Scope {
+ 
+         -- Hyprland tells ETEA a window is coming before it appears, so the screen can be
+         -- frozen in time. Neighbours start moving slowly, just long enough for that photo.
++        hl.curve("emphasizedDecel", { type = "bezier", points = { { 0.05, 0.7 }, { 0.1, 1 } } })
+         hl.curve("eteaSlowStart", { type = "bezier", points = { { 0.7, 0 }, { 0.3, 1 } } })
+         ETEA_MAKE_ROOM = ${Theme.openMakeRoom / 100}
+         if not ETEA_BIRTHS then
+diff --git a/modules/stage/WindowFrames.qml b/modules/stage/WindowFrames.qml
+index b82560c..cb415b8 100644
+--- a/modules/stage/WindowFrames.qml
++++ b/modules/stage/WindowFrames.qml
+@@ -134,6 +134,7 @@ Item {
+             }
+ 
+             FrameStars {
++                visible: false // прибрано: зірки на рамках вікон не потрібні
+                 anchors.fill: parent
+                 seed: frame.modelData?.address ?? ""
+                 windowWidth: frame.width
+diff --git a/scripts/dev.sh b/scripts/dev.sh
+index d5fd75f..bbdb979 100755
+--- a/scripts/dev.sh
++++ b/scripts/dev.sh
+@@ -56,7 +56,6 @@ take_pages() {
+         hl.bind("CTRL + SUPER + Left", hl.dsp.global("etea:pagePrevious"), { description = "Shell: Previous page" })
+         -- The Super key alone opens the launcher. It fires on release, and only if
+         -- no other key came in between, so Super + anything still works normally.
+-        hl.unbind("SUPER + Space")
+         hl.unbind("SUPER + SUPER_L")
+         hl.unbind("SUPER + SUPER_R")
+         hl.bind("SUPER + SUPER_L", hl.dsp.global("etea:launcher"), { release = true, description = "Shell: Launcher" })
+@@ -94,9 +93,10 @@ take_pages() {
+     # sets up itself (modules/stage/Illumination.qml) since it depends on the settings.
+     # Hyprland complains when removing a gesture that isn't there, which is fine here.
+     for direction in up down; do
+-        hyprctl eval "hl.gesture({ fingers = 4, direction = \"$direction\", action = \"unset\" })" >/dev/null 2>&1 || true
++        hyprctl eval "if ETEA_ORBIT_GESTURES then hl.gesture({ fingers = 4, direction = \"$direction\", action = \"unset\" }) end" >/dev/null 2>&1 || true
+     done
+     hyprctl eval '
++        ETEA_ORBIT_GESTURES = true
+         hl.gesture({ fingers = 4, direction = "up", action = function()
+             hl.dispatch(hl.dsp.global("etea:orbit"))
+         end })

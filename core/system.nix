@@ -107,7 +107,7 @@
   # Моніторинг здоров'я диска (2026-10-04): єдиний диск -- Samsung SSD 850
   # (~2015 рік, заповнений на 81%), а SMART ніхто не читав. smartd сам знаходить
   # диски, періодично перевіряє SMART і при проблемах (знос, realloc-сектори,
-  # помилки) шле сповіщення на робочий стіл через systembus-notify (Noctalia
+  # помилки) шле сповіщення на робочий стіл через systembus-notify (ETEA
   # його покаже) і в wall. Застереження модуля про DoS сповіщеннями від інших
   # локальних користувачів тут неактуальне -- користувач один.
   services.smartd = {
@@ -135,14 +135,6 @@
     startAt = "daily";
   };
   systemd.timers.smart-snapshot.timerConfig.Persistent = true;
-
-  # Cachix для Noctalia (alpha Quickshell-стек, довго компілюється локально) —
-  # без цього flake.nix'ів `noctalia` вхід (гілка cachix, без nixpkgs.follows,
-  # див. коментар там) все одно збирався б із джерела.
-  nix.settings.extra-substituters = [ "https://noctalia.cachix.org" ];
-  nix.settings.extra-trusted-public-keys = [
-    "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
-  ];
 
   # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
   # в crew/hyprland/hyprland.lua (input.kb_layout/kb_options) — Hyprland не

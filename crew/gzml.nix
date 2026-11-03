@@ -28,7 +28,7 @@ let
       # AyatanaAppIndicator3, а gzml-tray.py явно шукає старий
       # `gi.require_version("AppIndicator3", "0.1")". Живо перевірено: з
       # ayatana-варіантом typelib не знаходиться, застосунок мовчки
-      # відкочується на легасі Gtk.StatusIcon (XEmbed), який Noctalia не
+      # відкочується на легасі Gtk.StatusIcon (XEmbed), який ETEA не
       # підтримує -- іконка технічно жива, але ніде не рендериться.
       pkgs.libappindicator-gtk3
     ];
