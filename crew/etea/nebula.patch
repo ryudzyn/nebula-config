@@ -81,7 +81,7 @@ index 704616f..c9321b0 100644
      readonly property int notifWidth: 380
      readonly property int notifComet: 360
 diff --git a/modules/background/World.qml b/modules/background/World.qml
-index 46d9eaa..bf204ae 100644
+index 46d9eaa..785c711 100644
 --- a/modules/background/World.qml
 +++ b/modules/background/World.qml
 @@ -1,5 +1,6 @@
@@ -91,7 +91,7 @@ index 46d9eaa..bf204ae 100644
  import qs.config
  import qs.modules.widgets
  import qs.services
-@@ -39,6 +40,151 @@ Item {
+@@ -39,6 +40,158 @@ Item {
          fragmentShader: Qt.resolvedUrl("../../shaders/sky.frag.qsb")
      }
  
@@ -220,30 +220,37 @@ index 46d9eaa..bf204ae 100644
 +        onTriggered: root.spin = (root.spin + 0.00069) % (Math.PI * 2)
 +    }
 +
-+    // Спектр музики: прямокутні смуги вздовж нижнього краю
-+    Row {
-+        anchors.bottom: parent.bottom
-+        anchors.left: parent.left
-+        anchors.right: parent.right
-+        height: root.height * 0.12
-+        spacing: 2
-+        visible: root.interactive && Beat.dancing && root.farOpacity > 0
-+        Repeater {
-+            model: Beat.shown.length
-+            Rectangle {
-+                required property int index
-+                anchors.bottom: parent.bottom
-+                width: (root.width - 2 * Beat.shown.length) / Math.max(1, Beat.shown.length)
-+                height: parent.height * Math.min(1, Beat.shown[index] ?? 0)
-+                color: Qt.alpha(Theme.windowLit, 0.32)
-+            }
-+        }
++    // Спектр музики: деформовані кільця навколо планети, у її ж нахилі
++    ShaderEffect {
++        readonly property var spec: Planets.find(Planets.forPage(root.arriving))
++        readonly property real planetRadius: root.height * (spec.size ?? 0.26)
++
++        anchors.fill: parent
++        visible: root.interactive && Beat.dancing && root.farOpacity > 0 && root.flight > 0.85
++        opacity: (root.flight - 0.85) / 0.15 * root.farOpacity
++
++        property vector2d resolution: Qt.vector2d(width, height)
++        property vector2d centre: Qt.vector2d(root.width * 0.55, root.height * 0.52)
++        property real radius: planetRadius
++        property real tilt: spec.tilt ?? 0
++        property real inner: spec.ring ? 2.42 : 1.32
++        property real amount: 0.42
++        property color tint: spec.light
++        property vector4d l0: root.bands(0)
++        property vector4d l1: root.bands(4)
++        property vector4d l2: root.bands(8)
++        property vector4d l3: root.bands(12)
++        property vector4d l4: root.bands(16)
++        property vector4d l5: root.bands(20)
++        property vector4d l6: root.bands(24)
++
++        fragmentShader: Qt.resolvedUrl("../../shaders/spectrum.frag.qsb")
 +    }
 +
      // Everyone's own images, placed by proportion so they fit on any screen
      Repeater {
          model: Config.decorations
-@@ -69,7 +215,8 @@ Item {
+@@ -69,7 +222,8 @@ Item {
      ShaderEffect {
          anchors.fill: parent
  
@@ -2877,6 +2884,79 @@ index 0000000..2128468
 +    }
 +
 +    fragColor = out_ * qt_Opacity;
++}
+diff --git a/shaders/spectrum.frag b/shaders/spectrum.frag
+new file mode 100644
+index 0000000..cb4ddda
+--- /dev/null
++++ b/shaders/spectrum.frag
+@@ -0,0 +1,67 @@
++#version 440
++
++layout(location = 0) in vec2 qt_TexCoord0;
++layout(location = 0) out vec4 fragColor;
++
++layout(std140, binding = 0) uniform buf {
++    mat4 qt_Matrix;
++    float qt_Opacity;
++    vec2 resolution;
++    vec2 centre;     // у пікселях
++    float radius;    // радіус планети, у пікселях
++    float tilt;      // радіани
++    float inner;     // де починаються кільця, у радіусах планети
++    float amount;    // наскільки сильно їх гне музика
++    vec4 tint;
++    vec4 l0;
++    vec4 l1;
++    vec4 l2;
++    vec4 l3;
++    vec4 l4;
++    vec4 l5;
++    vec4 l6;
++};
++
++const float PI = 3.14159265;
++const float FLAT = 0.34; // нахил площини кілець до глядача
++
++float level(float t) {
++    vec4 bands[7] = vec4[7](l0, l1, l2, l3, l4, l5, l6);
++    float x = clamp(t, 0.0, 1.0) * 26.999;
++    int i = int(x);
++    int j = i + 1;
++    float a = bands[i / 4][i % 4];
++    float b = bands[j / 4][j % 4];
++    return mix(a, b, smoothstep(0.0, 1.0, fract(x)));
++}
++
++// Одна лінія кільця: base у радіусах планети, gain -- частка деформації
++float ring(vec2 e, float rr, float t, float base, float gain, float px) {
++    float target = base + level(t) * amount * gain;
++    return 1.0 - smoothstep(px * 0.6, px * 1.6, abs(rr - target));
++}
++
++void main() {
++    vec2 px = qt_TexCoord0 * resolution;
++    vec2 p = (px - centre) / radius;
++    float ct = cos(tilt), st = sin(tilt);
++    vec2 q = vec2(ct * p.x + st * p.y, -st * p.x + ct * p.y);
++
++    // Задня половина кілець ховається за диском планети
++    if (q.y < 0.0 && length(q) < 1.0) {
++        fragColor = vec4(0.0);
++        return;
++    }
++
++    vec2 e = vec2(q.x, q.y / FLAT);
++    float rr = length(e);
++    float pixel = 1.0 / radius / max(0.34, length(vec2(q.x / max(rr, 0.001), q.y / max(rr, 0.001) / FLAT)) * FLAT);
++    // Частоти дзеркально від лівого краю до правого, обидві половини кільця однакові
++    float t = abs(atan(e.y, e.x)) / PI;
++
++    float a = ring(e, rr, t, inner, 1.0, pixel) * 0.85;
++    a = max(a, ring(e, rr, t, inner + 0.11, 0.62, pixel) * 0.5);
++    a = max(a, ring(e, rr, t, inner + 0.22, 0.34, pixel) * 0.28);
++
++    fragColor = vec4(tint.rgb * a, a) * qt_Opacity;
 +}
 diff --git a/shaders/starmask.frag b/shaders/starmask.frag
 index f3fe1bc..4e03baa 100644
