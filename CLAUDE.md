@@ -55,7 +55,7 @@ that a new module must be added to or it silently has no effect:
   added to that import list.
 - `crew/` — everything that runs as the `ryudzyn` Home Manager profile: `hyprland/` (the sole
   compositor/session — Lua config, live-linked via `mkOutOfStoreSymlink`, see below), `etea/`
-  (the shell: bar, launcher, notifications, pinned to a commit with `nebula.patch`), `hyprlock.nix` (lock screen), terminal/shell, CLI tools, theming, the
+  (the shell: bar, launcher, notifications; our fork github:ryudzyn/etea-shell, branch `nebula`, pinned by rev), `hyprlock.nix` (lock screen), terminal/shell, CLI tools, theming, the
   VSCodium profile, Spotify (spicetify, inside `media.nix`), and `modes.nix` (workspace-launcher
   scripts bound to `SUPER+F1/F2/F3` in `hyprland.lua`: work / study / play). Aggregated through
   `crew/default.nix` — same rule, a new crew module must be added there.

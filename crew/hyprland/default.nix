@@ -174,65 +174,26 @@ let
   #    додано той самий видимий рух камери.
   #  Усі шість шейдерів тримаються паралельно (крайова оцінка/смак), новий
   #  не заміняє попередні.
-  # nebula-space-wallpaper-rotate (SUPER+G): цикл 4 фіксованих ракурсів
-  # (0°/90°/180°/270°) для АКТИВНОГО шейдера. glpaper не приймає live-uniform
-  # (лише time/resolution фіксовано на старті) -- єдиний спосіб змінити
-  # "камеру" на льоту це підмінити `#define CAM_OFFSET 0.0` у файлі шейдера
-  # через sed і перезапустити glpaper з нової копії. Перезапуск скидає time
-  # до нуля -- видима коротка пауза/стрибок анімації при кожному натисканні,
-  # неминучий побічний ефект цього підходу (живо перевірено й прийнято як
-  # компроміс, справжнього live-uniform у glpaper нема).
-  # shaderfile/offsetfile пишуться нижче, у nebula-space-wallpaper-wl, кожного
-  # разу, коли обирається саме ШЕЙДЕР (не відео, не "вимкнути") -- так rotate
-  # знає, який .frag підміняти і з якого кута продовжувати цикл.
+  # nebula-space-wallpaper-rotate (SUPER+G): наступний із 4 ракурсів активного шейдера.
+  # Шейдери тепер усередині ETEA (тема "Глибокий космос"), ракурс там -- живий uniform,
+  # тож камера плавно повертається без перезапуску, а час не скидається.
   nebula-space-wallpaper-rotate = pkgs.writeShellScriptBin "nebula-space-wallpaper-rotate" ''
-    set -eu
-    pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.pid"
-    shaderfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.shader"
-    offsetfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.camoffset"
-    tmpfrag="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth-rotated.frag"
-
-    if [ ! -f "$shaderfile" ]; then
-      ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Зараз активна не шейдер-шпалера (відео або вимкнено) — нема що обертати"
+    if [ "$(etea-ipc deep state)" = "off" ]; then
+      ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Зараз активна не шейдер-шпалера"
       exit 0
     fi
-    src=$(cat "$shaderfile")
-
-    idx=0
-    [ -f "$offsetfile" ] && idx=$(cat "$offsetfile")
-    idx=$(( (idx + 1) % 4 ))
-    echo "$idx" > "$offsetfile"
-
-    case "$idx" in
-      0) deg=0 ;;
-      1) deg=90 ;;
-      2) deg=180 ;;
-      3) deg=270 ;;
-    esac
-    rad=$(${pkgs.gawk}/bin/awk "BEGIN { printf \"%.6f\", $deg * 3.14159265 / 180 }")
-
-    ${pkgs.gnused}/bin/sed "s/#define CAM_OFFSET .*/#define CAM_OFFSET $rad/" "$src" > "$tmpfrag"
-
-    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-      kill "$(cat "$pidfile")"
-    fi
-    output=$(hyprctl monitors -j | jq -r '.[0].name')
-    ${pkgs.glpaper}/bin/glpaper -f 30 "$output" "$tmpfrag" &
-    echo $! > "$pidfile"
-    ${pkgs.libnotify}/bin/notify-send -t 1200 "Ракурс" "$deg°"
+    etea-ipc deep rotate
   '';
 
   nebula-space-wallpaper-wl = pkgs.writeShellScriptBin "nebula-space-wallpaper-wl" ''
     set -eu
     pidfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.pid"
-    shaderfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.shader"
-    offsetfile="''${XDG_RUNTIME_DIR:-/tmp}/nebula-earth.camoffset"
 
     stop_current() {
       if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
         kill "$(cat "$pidfile")"
       fi
-      rm -f "$pidfile" "$shaderfile" "$offsetfile"
+      rm -f "$pidfile"
     }
 
     # Escape/пусто в fuzzel -> exit-код 1 -> з `set -e` скрипт впав би тут,
@@ -243,66 +204,51 @@ let
     case "$choice" in
       "Земля (NASA відео)")
         stop_current
+        etea-ipc deep set off
         ${pkgs.mpvpaper}/bin/mpvpaper -p -o "no-audio loop" '*' ${../../assets/video/earth-spin-nasa.mp4} &
         echo $! > "$pidfile"
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Земля"
         ;;
       "Чорна діра (NASA відео)")
         stop_current
+        etea-ipc deep set off
         ${pkgs.mpvpaper}/bin/mpvpaper -p -o "no-audio loop" '*' ${../../assets/video/blackhole-nasa.mp4} &
         echo $! > "$pidfile"
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Чорна діра (відео)"
         ;;
       "Чорна діра (шейдер)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/blackhole.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/blackhole.frag} > "$shaderfile"
+        etea-ipc deep set blackhole
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Чорна діра"
         ;;
       "Чорна діра (Гаргантюа)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/blackhole-gargantua.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/blackhole-gargantua.frag} > "$shaderfile"
+        etea-ipc deep set blackhole-gargantua
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Чорна діра (Гаргантюа)"
         ;;
       "Туманність (шейдер)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/nebula-dust.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/nebula-dust.frag} > "$shaderfile"
+        etea-ipc deep set nebula-dust
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Туманність"
         ;;
       "Кротовина (шейдер)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/wormhole.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/wormhole.frag} > "$shaderfile"
+        etea-ipc deep set wormhole
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Кротовина"
         ;;
       "Пульсар (шейдер)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/pulsar.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/pulsar.frag} > "$shaderfile"
+        etea-ipc deep set pulsar
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Пульсар"
         ;;
       "Галактика (шейдер)")
         stop_current
-        output=$(hyprctl monitors -j | jq -r '.[0].name')
-        ${pkgs.glpaper}/bin/glpaper -f 30 "$output" ${../../assets/shaders/galaxy.frag} &
-        echo $! > "$pidfile"
-        echo ${../../assets/shaders/galaxy.frag} > "$shaderfile"
+        etea-ipc deep set galaxy
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Галактика"
         ;;
       "Вимкнути")
         stop_current
+        etea-ipc deep set off
         ${pkgs.libnotify}/bin/notify-send -t 1500 "Космічна шпалера" "Вимкнено"
         ;;
       *)
