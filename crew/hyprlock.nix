@@ -4,6 +4,31 @@
   # сподобався. PAM-служба -- окремо, у
   # core/desktop.nix (programs.hyprlock.enable), без неї hyprlock не прийме пароль.
   # Кольори -- зі світу Nyx (~/.config/etea/settings.json, customPlanets).
+
+  # Блокування за простоєм і перед сном. Стартує з hyprland.lua: graphical-session.target
+  # під Hyprland сам не активується. У повноекранних вікнах таймер стоїть (idle-inhibit там же).
+  services.hypridle = {
+    enable = true;
+    settings = {
+      general = {
+        lock_cmd = "pidof hyprlock || hyprlock";
+        before_sleep_cmd = "loginctl lock-session";
+        after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'";
+      };
+      listener = [
+        {
+          timeout = 600;
+          on-timeout = "loginctl lock-session";
+        }
+        {
+          timeout = 900;
+          on-timeout = "hyprctl dispatch 'hl.dsp.dpms({ action = \"disable\" })'";
+          on-resume = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'";
+        }
+      ];
+    };
+  };
+
   programs.hyprlock = {
     enable = true;
     settings = {

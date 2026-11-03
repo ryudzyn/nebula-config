@@ -67,7 +67,7 @@ hl.on("hyprland.start", function()
     -- Послідовно, не двома паралельними exec: ETEA бере оточення з systemd
     -- user-менеджера в момент старту, і раніше могла стартувати до імпорту
     -- (2026-10-05: у неї не виявилось XDG_SESSION_TYPE, див. hl.env угорі).
-    hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd --all; systemctl --user start etea.service'")
+    hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd --all; systemctl --user start etea.service sunshine.service hypridle.service'")
     -- Історія буфера обміну ETEA (Super+V) читає cliphist, його треба годувати
     hl.exec_cmd("wl-paste --watch cliphist store")
     -- xdg-desktop-portal.service -- та сама історія з "мертвим"
@@ -160,6 +160,10 @@ hl.window_rule({
 -- повноекранному вікні: без цього правила Hyprland тайлив його як звичайне вікно
 -- (живо перевірено 2026-10-04). Правило -- з офіційної інструкції Kando для
 -- Hyprland 0.55+ (kando.menu/installation-on-linux).
+-- Автоблокування (hypridle, crew/hyprlock.nix) не спрацьовує, поки щось на весь екран:
+-- відео й ігри не мають гасити монітор.
+hl.window_rule({ name = "idle-inhibit", match = { fullscreen = true }, idle_inhibit = "fullscreen" })
+
 hl.window_rule({
     name  = "kando",
     match = { class = "menu.kando.Kando", title = "Kando Menu" },
@@ -300,7 +304,7 @@ local binds = {
     -- ETEA сама вміє те саме (etea-ipc) -- береться саме воно, а не
     -- окремий X11-інструмент/скрипт: лок, power-menu, dpms, theme, wallpaper,
     -- caffeine (=nebula-awake), clipboard-історія, window switcher.
-    { key = "SUPER + Escape", desc = "Меню сеансу (ETEA)", action = hl.dsp.exec_cmd("etea-ipc session toggle") },
+    { key = "SUPER + Escape", desc = "Заблокувати екран (hyprlock)", action = hl.dsp.exec_cmd("etea-ipc lock lock") },
     { key = "SUPER + SHIFT + E", desc = "Меню живлення (ETEA)", action = hl.dsp.exec_cmd("etea-ipc session toggle") },
     { key = "SUPER + SHIFT + Escape", desc = "Вимкнути монітор (dpms)", action = hl.dsp.dpms({ action = "disable" }) },
     { key = "SUPER + N", desc = "Центр керування (ETEA)", action = hl.dsp.exec_cmd("etea-ipc panels right") },

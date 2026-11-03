@@ -54,10 +54,10 @@ index b82560c..cb415b8 100644
                  seed: frame.modelData?.address ?? ""
                  windowWidth: frame.width
 diff --git a/scripts/dev.sh b/scripts/dev.sh
-index d5fd75f..bbdb979 100755
+index d5fd75f..b241a1d 100755
 --- a/scripts/dev.sh
 +++ b/scripts/dev.sh
-@@ -56,7 +56,6 @@ take_pages() {
+@@ -56,13 +56,10 @@ take_pages() {
          hl.bind("CTRL + SUPER + Left", hl.dsp.global("etea:pagePrevious"), { description = "Shell: Previous page" })
          -- The Super key alone opens the launcher. It fires on release, and only if
          -- no other key came in between, so Super + anything still works normally.
@@ -65,7 +65,22 @@ index d5fd75f..bbdb979 100755
          hl.unbind("SUPER + SUPER_L")
          hl.unbind("SUPER + SUPER_R")
          hl.bind("SUPER + SUPER_L", hl.dsp.global("etea:launcher"), { release = true, description = "Shell: Launcher" })
-@@ -94,9 +93,10 @@ take_pages() {
+         hl.bind("SUPER + SUPER_R", hl.dsp.global("etea:launcher"), { release = true })
+-        hl.unbind("SUPER + L")
+-        hl.bind("SUPER + L", hl.dsp.global("etea:lock"), { description = "Shell: Lock" })
+         hl.unbind("SUPER + A")
+         hl.bind("SUPER + A", hl.dsp.global("etea:panelLeft"), { description = "Shell: Logbook" })
+         hl.unbind("SUPER + N")
+@@ -71,8 +68,6 @@ take_pages() {
+         hl.bind("SUPER + V", hl.dsp.global("etea:clipboard"), { description = "Shell: Clipboard history" })
+         hl.unbind("SUPER + SHIFT + S")
+         hl.bind("SUPER + SHIFT + S", hl.dsp.global("etea:capture"), { description = "Shell: Capture (Tab for video)" })
+-        hl.unbind("SUPER + Escape")
+-        hl.bind("SUPER + Escape", hl.dsp.global("etea:session"), { description = "Shell: Session menu" })
+         hl.unbind("SUPER + Comma")
+         hl.bind("SUPER + Comma", hl.dsp.global("etea:settings"), { description = "Shell: Settings" })
+         hl.unbind("SUPER + Slash")
+@@ -94,9 +89,10 @@ take_pages() {
      # sets up itself (modules/stage/Illumination.qml) since it depends on the settings.
      # Hyprland complains when removing a gesture that isn't there, which is fine here.
      for direction in up down; do
