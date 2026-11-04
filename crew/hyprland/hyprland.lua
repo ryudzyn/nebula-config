@@ -40,19 +40,6 @@ hl.config({
   },
 })
 
--- hyprland-scroll-overview МУСИТЬ завантажитись ДО require("tweaks") нижче --
--- живо впіймана помилка: tweaks.lua виставляє plugin.scrolloverview.* через
--- hl.config, а Hyprland парсить конфіг (і виконує і require, і hl.on-колбеки)
--- ПОСЛІДОВНО зверху вниз на старті сесії. Коли завантаження плагіна стояло
--- всередині hl.on("hyprland.start", ...) НИЖЧЕ require("tweaks"), на
--- холодному старті Hyprland доходив до tweaks.lua раніше, ніж плагін встигав
--- зареєструвати свої конфіг-ключі -- "unknown config key 'plugin.scrolloverview.*'".
--- На живому hyprctl reload (без повного рестарту сесії) це не ловилось,
--- бо плагін там уже залишався завантаженим з попереднього старту.
--- hyprspace раніше був у hl.on("hyprland.start") саме тому, що сам нічого не
--- конфігурував через hl.config -- порядок йому був байдужий.
-hl.plugin.load("/etc/profiles/per-user/ryudzyn/lib/libscrolloverview.so")
-
 require("tweaks")
 
 local terminal = "wezterm"
@@ -312,15 +299,6 @@ local binds = {
     { key = "SUPER + SHIFT + A", desc = "Keep-awake — тумблер (caffeine)", action = hl.dsp.exec_cmd("etea-ipc wake toggle") },
     { key = "SUPER + V", desc = "Історія буфера обміну (ETEA)", action = hl.dsp.exec_cmd("etea-ipc clipboard toggle") },
     { key = "SUPER + Tab", desc = "Орбіта: усі сторінки, ще раз -- планети", action = hl.dsp.exec_cmd("etea-ipc planet orbit") },
-    { section = "Огляд" },
-    -- Той самий SUPER+O, що колись був під hyprspace (видалений як
-    -- unfixable) -- тепер під hyprland-scroll-overview, niri-стиль огляду
-    -- робочих просторів прокруткою. Плагін сам виставляє функцію в Lua
-    -- (hl.plugin.scrolloverview.overview), не через hl.dsp -- обгортка
-    -- функцією обов'язкова, бо виклик має відбутись по натисканню клавіші,
-    -- а не одразу при зчитуванні конфіга.
-    { key = "SUPER + O", desc = "Огляд робочих просторів прокруткою (scroll-overview)", action = function() hl.plugin.scrolloverview.overview("toggle all") end },
-
     { section = "Утиліти" },
     -- Немає нативного еквіваленту в ETEA -- лишаються окремими
     -- інструментами/скриптами (nwg-look конфігурує GTK-тему застосунків
@@ -454,141 +432,5 @@ if helpf then
 end
 hl.bind("SUPER + SHIFT + slash", hl.dsp.exec_cmd("nebula-keys " .. helpfile))
 
--- ALT+Tab -- візуальний перемикач вікон через scroll-overview, окремий модуль
--- (crew/hyprland/alttab.lua, той самий require-шлях, що й tweaks вище).
--- submap_universal/release/transparent -- точні прапорці з офіційної вікі
--- плагіна (ALT-Tab-overview), не здогад: submap_universal тримає бінд живим,
--- поки активний submap "scrolloverview" (інакше звичайні біндинги Hyprland
--- глушаться, доки overview відкритий); release+transparent на Alt_L/Alt_R --
--- спрацьовує саме на ВІДПУСКАННЯ клавіші Alt (а не Tab), і не "з'їдає" подію
--- для інших застосунків.
-local altTab = require("scripts.alttab")
-hl.bind("ALT + Tab", altTab.next, { submap_universal = true })
-hl.bind("ALT + Alt_L", altTab.close, { release = true, transparent = true })
-hl.bind("ALT + Alt_R", altTab.close, { release = true, transparent = true })
-
--- scroll-overview: власний submap + динамічні робочі простори
--- (niri-подібне "нескінченне" гортання). Хелпери мусять бути оголошені ДО
--- hl.define_submap нижче -- Lua-замикання захоплює локальні змінні лексично
--- в момент компіляції функції, тож forward-reference на ще не оголошений
--- local не спрацює (був живо впійманий порядок навпаки, виправлено).
-local lastWorkspaceScrollBind
-
-local function table_value(value, ...)
-    if value == nil then
-        return nil
-    end
-
-    for _, key in ipairs({ ... }) do
-        local ok, item = pcall(function()
-            return value[key]
-        end)
-
-        if ok and item ~= nil then
-            return item
-        end
-    end
-
-    return nil
-end
-
-local function last_workspace_state()
-    local monitor = hl.get_monitor_at_cursor() or hl.get_active_monitor()
-    if not monitor then
-        return false, nil
-    end
-
-    local activeWorkspace = table_value(monitor, "active_workspace")
-    local activeWorkspaceId = table_value(activeWorkspace, "id")
-    if type(activeWorkspaceId) ~= "number" or activeWorkspaceId <= 0 then
-        return false, nil
-    end
-
-    local activeWorkspaceWindows = table_value(activeWorkspace, "windows")
-    if type(activeWorkspaceWindows) ~= "number" or activeWorkspaceWindows == 0 then
-        return false, nil
-    end
-
-    local lastWorkspaceId
-    for _, workspace in ipairs(hl.get_workspaces()) do
-        local id = table_value(workspace, "id")
-
-        if type(id) == "number"
-            and id > 0
-            and table_value(workspace, "special") ~= true
-            and table_value(workspace, "monitor") == monitor then
-            lastWorkspaceId = math.max(lastWorkspaceId or id, id)
-        end
-    end
-
-    return activeWorkspaceId == lastWorkspaceId, monitor
-end
-
-local function create_workspace_at_end()
-    local isLastWorkspace, monitor = last_workspace_state()
-    if not isLastWorkspace or not monitor then
-        return
-    end
-
-    hl.dispatch(hl.dsp.focus({ monitor = table_value(monitor, "name") }))
-    hl.dispatch(hl.dsp.focus({ workspace = "emptynm" }))
-end
-
-local function update_last_workspace_scroll_bind()
-    if not lastWorkspaceScrollBind then
-        return
-    end
-
-    local enabled = false
-    if hl.get_current_submap() == "scrolloverview" then
-        enabled = last_workspace_state()
-    end
-
-    lastWorkspaceScrollBind:set_enabled(enabled)
-end
-
--- Власний submap замість вбудованої клавіатурної навігації overview
--- (https://github.com/yayuuu/hyprland-scroll-overview/wiki/Keybind-submap) --
--- потрібен ЯК ОСНОВА для mouse_down-біндa динамічних робочих просторів
--- (вікі explicitly каже не визначати submap вдруге, якщо він вже є).
--- Поведінка стрілок/Enter/Escape/кліків тут -- точна копія дефолтної
--- вбудованої, просто тепер явно прописана, щоб було куди додати mouse_down.
-hl.define_submap("scrolloverview", function()
-    hl.bind("left",   hl.plugin.scrolloverview.navigate("left"))
-    hl.bind("right",  hl.plugin.scrolloverview.navigate("right"))
-    hl.bind("up",     hl.plugin.scrolloverview.navigate("up"))
-    hl.bind("down",   hl.plugin.scrolloverview.navigate("down"))
-    hl.bind("return", hl.plugin.scrolloverview.overview("select"))
-    hl.bind("escape", hl.plugin.scrolloverview.overview("off"))
-    hl.bind("mouse:272", function()
-        hl.plugin.scrolloverview.overview("select")
-        hl.plugin.scrolloverview.window("select")
-        hl.plugin.scrolloverview.overview("off")
-    end, { mouse = true })
-    hl.bind("mouse:274", hl.plugin.scrolloverview.window("close"), { mouse = true })
-
-    -- mouse_down у звичайному стані вимкнений (built-in скрол overview працює
-    -- як завжди) -- вмикається лише коли курсор на ОСТАННЬОМУ непорожньому
-    -- робочому столі монітора; тоді наступний скрол "вниз" створює новий
-    -- порожній простір і перемикається на нього замість нічого не робити.
-    lastWorkspaceScrollBind = hl.bind("mouse_down", create_workspace_at_end)
-    lastWorkspaceScrollBind:set_enabled(false)
-end)
-
-hl.on("workspace.active", update_last_workspace_scroll_bind)
-hl.on("workspace.created", update_last_workspace_scroll_bind)
-hl.on("workspace.removed", update_last_workspace_scroll_bind)
-hl.on("workspace.move_to_monitor", update_last_workspace_scroll_bind)
-hl.on("window.open", update_last_workspace_scroll_bind)
-hl.on("window.close", update_last_workspace_scroll_bind)
-hl.on("window.move_to_workspace", update_last_workspace_scroll_bind)
-hl.on("monitor.focused", update_last_workspace_scroll_bind)
-hl.on("keybinds.submap", update_last_workspace_scroll_bind)
-
-local lastWorkspaceScrollTimer = hl.timer(update_last_workspace_scroll_bind, {
-    timeout = 50,
-    type = "repeat",
-})
-
-update_last_workspace_scroll_bind()
-
+-- ALT+Tab -- наступне вікно на цьому столі; огляд усіх вікон і столів -- SUPER+Tab (ETEA)
+hl.bind("ALT + Tab", hl.dsp.window.cycle_next())

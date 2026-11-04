@@ -1,4 +1,9 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 let
   # Plymouth-тема "hud_space" (adi1090x/plymouth-themes, pack_3, GPLv3) —
   # анімація відчинення дверей космічного корабля на завантаженні, щоб і
@@ -42,7 +47,10 @@ in
   # і підтверджено спільнотою як типовий воркераунд для "битих"/зависаючих
   # кадрів на цій архітектурі. Ціна -- трохи вище споживання GPU (не
   # критично на десктопі, на відміну від ноутбука).
-  boot.kernelParams = [ "i915.enable_dc=0" "i915.enable_psr=0" ];
+  boot.kernelParams = [
+    "i915.enable_dc=0"
+    "i915.enable_psr=0"
+  ];
 
   # Hyprland — єдина десктопна сесія (bspwm видалено 2026-10-03, halley
   # лишився в pkgs/halley лише як flake-пакет, у greetd/портал не підключений).
@@ -50,6 +58,18 @@ in
   # і власний xdg-desktop-portal-hyprland (xdg.portal.extraPortals +
   # configPackages, для ScreenCast/Screenshot з Noctalia) — нічого з цього не
   # треба дублювати вручну нижче.
+  # Hyprland 0.57.1 зі свіжого nixpkgs, решта системи лишається на своєму: у 0.56.2 захоплення
+  # вікна, яке на мить лишилось без монітора (монітор заснув і повернувся), валило весь композитор.
+  # Прибрати, коли основний nixpkgs дожене цю версію.
+  nixpkgs.overlays = [
+    (final: prev: {
+      inherit (inputs.nixpkgs-hyprland.legacyPackages.${prev.stdenv.hostPlatform.system})
+        hyprland
+        xdg-desktop-portal-hyprland
+        ;
+    })
+  ];
+
   programs.hyprland.enable = true;
   # PAM-служба для hyprlock; вигляд -- у crew/hyprlock.nix
   programs.hyprlock.enable = true;

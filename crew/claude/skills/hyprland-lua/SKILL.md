@@ -6,7 +6,7 @@ description: >
   hl.on() events, hl.dsp dispatchers, window/workspace rules, or any
   Hyprland Lua config task.
   Activate when editing any .lua file under ~/.config/hypr/ or
-  ~/nebula-config/crew/hyprland/ (hyprland.lua, tweaks.lua, alttab.lua — live-linked).
+  ~/nebula-config/crew/hyprland/ (hyprland.lua, tweaks.lua — live-linked).
   Activate when the user writes or asks about any `hyprctl dispatch` command —
   in shell scripts, CLI, or Lua — because Hyprland 0.55+ requires dispatcher
   arguments to use the Lua hl.dsp.* syntax, not the old keyword form.

@@ -1,11 +1,11 @@
 ---
 name: hypr-verify
-description: Apply and visually verify a change to the live Hyprland/ETEA desktop on earth — reload, check for config errors, screenshot. Use after editing hyprland.lua, tweaks.lua, alttab.lua, or anything whose result is visible on screen.
+description: Apply and visually verify a change to the live Hyprland/ETEA desktop on earth — reload, check for config errors, screenshot. Use after editing hyprland.lua, tweaks.lua, or anything whose result is visible on screen.
 ---
 
 # hypr-verify — перевірка змін на живому десктопі
 
-`hyprland.lua`, `tweaks.lua`, `alttab.lua` are live symlinks into `~/nebula-config` — no switch needed. Other files under `crew/` need a `sysup` by the user first; say so and stop.
+`hyprland.lua`, `tweaks.lua` are live symlinks into `~/nebula-config` — no switch needed. Other files under `crew/` need a `sysup` by the user first; say so and stop.
 
 1. **Reload.** `hyprctl reload`. Legacy `hyprctl keyword` is rejected here — runtime changes go through `hyprctl eval '<lua>'` (e.g. `hl.dispatch(hl.dsp.focus({workspace=2}))`).
 2. **Errors.** `hyprctl configerrors` must be empty. Lua errors also appear in Hyprland's red error bar — the screenshot catches those too.

@@ -79,7 +79,7 @@ that a new module must be added to or it silently has no effect:
   dunst, picom, i3lock) was deleted once the Hyprland port was complete (2026-10-03). There is no
   X server (`services.xserver.enable` is off) — X11 apps run through XWayland. Don't reintroduce a
   second X11/Wayland session without checking whether that decision still holds.
-- `hyprland.lua`, `tweaks.lua`, `alttab.lua` are live symlinks into
+- `hyprland.lua`, `tweaks.lua` are live symlinks into
   this checkout — edits apply on `hyprctl reload` without a switch. Hyprland here uses the native
   Lua config: legacy `hyprctl keyword` is rejected ("Use eval."), so use
   `hyprctl eval '<lua>'` (e.g. `hl.exec_cmd(...)`, `hl.dispatch(hl.dsp.focus({workspace=2}))`).
