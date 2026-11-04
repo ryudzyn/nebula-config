@@ -15,6 +15,7 @@
     ./hyprland
     ./etea
     ./hyprlock.nix
+    ./gdocs-open.nix
     ./wezterm.nix
     ./kando.nix
     ./gzml.nix
