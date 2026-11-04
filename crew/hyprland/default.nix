@@ -11,6 +11,29 @@ let
 
   # Wayland-порт nebula-ocr з crew/bspwm.nix: maim -s -> grim+slurp,
   # xclip -> wl-copy. Та сама логіка/notify-send-патерн.
+  # Vesktop просить захоплення кілька разів поспіль на один старт стріму, і портал щоразу питає
+  # заново. Вибір пам'ятається кілька секунд, тож вікно з'являється один раз. Скасування не
+  # запам'ятовується: наступний запит покаже вікно знову.
+  nebula-share-picker = pkgs.writeShellScript "nebula-share-picker" ''
+    choice="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}/nebula-share-choice"
+    remember_seconds=10
+    if [ -s "$choice" ]; then
+      age=$(( $(${pkgs.coreutils}/bin/date +%s) - $(${pkgs.coreutils}/bin/stat -c %Y "$choice") ))
+      if [ "$age" -lt "$remember_seconds" ]; then
+        ${pkgs.coreutils}/bin/cat "$choice"
+        exit 0
+      fi
+    fi
+    answer=$(${pkgs.xdg-desktop-portal-hyprland}/bin/hyprland-share-picker "$@")
+    status=$?
+    case "$answer" in
+      *"[SELECTION]"*) printf '%s\n' "$answer" > "$choice" ;;
+      *) ${pkgs.coreutils}/bin/rm -f "$choice" ;;
+    esac
+    printf '%s\n' "$answer"
+    exit "$status"
+  '';
+
   nebula-ocr-wl = pkgs.writeShellScriptBin "nebula-ocr-wl" ''
     tmp=$(${pkgs.coreutils}/bin/mktemp --suffix=.png)
     trap 'rm -f "$tmp"' EXIT
@@ -539,6 +562,7 @@ in
   home.file.".config/hypr/xdph.conf".text = ''
     screencopy {
       cursor_mode = 2
+      custom_picker_binary = ${nebula-share-picker}
     }
   '';
 
