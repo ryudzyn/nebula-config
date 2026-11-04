@@ -1,0 +1,113 @@
+/* Nebula: стиль обсерваторії для GTK3 поверх Adwaita:dark (Nemo, pavucontrol тощо) */
+@define-color theme_bg_color #0b0e12;
+@define-color theme_fg_color #c9d3dc;
+@define-color theme_base_color #07090c;
+@define-color theme_text_color #c9d3dc;
+@define-color theme_selected_bg_color #2c3540;
+@define-color theme_selected_fg_color #e6ecf1;
+@define-color theme_unfocused_bg_color #0b0e12;
+@define-color theme_unfocused_fg_color #8b98a4;
+@define-color theme_unfocused_base_color #07090c;
+@define-color theme_unfocused_text_color #8b98a4;
+@define-color theme_unfocused_selected_bg_color #1a2027;
+@define-color theme_unfocused_selected_fg_color #c9d3dc;
+@define-color insensitive_bg_color #0b0e12;
+@define-color insensitive_fg_color #5a6570;
+@define-color borders #2c3540;
+@define-color unfocused_borders #1f262e;
+@define-color content_view_bg #07090c;
+@define-color text_view_bg #07090c;
+
+* {
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  border-radius: 0;
+  -gtk-outline-radius: 0;
+  outline-color: alpha(#9fb0bf, 0.4);
+}
+
+window, .background, dialog { background-color: #0b0e12; color: #c9d3dc; }
+
+headerbar, .titlebar {
+  background: #0b0e12;
+  background-image: none;
+  border-bottom: 1px solid #2c3540;
+  box-shadow: none;
+  color: #c9d3dc;
+  min-height: 34px;
+}
+headerbar:backdrop, .titlebar:backdrop { background: #0b0e12; background-image: none; }
+
+button, entry, combobox button, .linked > button {
+  background: #10151b;
+  background-image: none;
+  border: 1px solid #2c3540;
+  box-shadow: none;
+  text-shadow: none;
+  -gtk-icon-shadow: none;
+  color: #c9d3dc;
+}
+button:hover { background: #1a2027; border-color: #4a5763; }
+button:checked, button:active { background: #2c3540; color: #e6ecf1; border-color: #9fb0bf; }
+button:disabled { background: #0b0e12; color: #5a6570; }
+button.flat { background: transparent; border-color: transparent; }
+button.flat:hover { background: #1a2027; }
+
+entry { background: #07090c; caret-color: #9fb0bf; }
+entry:focus { border-color: #9fb0bf; box-shadow: none; }
+
+toolbar, .toolbar, .primary-toolbar { background: #0b0e12; background-image: none; border-color: #2c3540; box-shadow: none; }
+statusbar, .nemo-window statusbar { background: #0b0e12; border-top: 1px solid #2c3540; color: #8b98a4; }
+separator, paned > separator { background: #2c3540; min-width: 1px; min-height: 1px; }
+
+.sidebar, .sidebar .view, placessidebar, placessidebar list, .nemo-window .sidebar, .nemo-window .sidebar .view {
+  background: #0b0e12;
+  color: #c9d3dc;
+  border: none;
+}
+.sidebar .view:selected, .nemo-window .sidebar .view:selected, placessidebar row:selected {
+  background: #2c3540;
+  color: #e6ecf1;
+}
+
+.view, iconview, treeview, list, .nemo-window .view { background-color: #07090c; color: #c9d3dc; }
+.view:selected, iconview:selected, treeview:selected, list row:selected, .view text selection {
+  background-color: #2c3540;
+  color: #e6ecf1;
+}
+.view:hover, treeview:hover { background-color: #10151b; }
+treeview header button, column-header button {
+  background: #0b0e12;
+  border: none;
+  border-right: 1px solid #2c3540;
+  border-bottom: 1px solid #2c3540;
+  color: #8b98a4;
+  font-size: 90%;
+}
+
+menu, .menu, popover, .popover, .context-menu {
+  background: #0b0e12;
+  border: 1px solid #2c3540;
+  box-shadow: none;
+  color: #c9d3dc;
+}
+menuitem:hover, menu menuitem:hover, popover modelbutton:hover { background: #2c3540; color: #e6ecf1; }
+menubar { background: #0b0e12; border-bottom: 1px solid #2c3540; color: #c9d3dc; }
+menubar > menuitem:hover { background: #2c3540; }
+
+scrollbar { background: transparent; border: none; }
+scrollbar slider { background: #3b4652; min-width: 5px; min-height: 5px; border: none; }
+scrollbar slider:hover { background: #8b98a4; }
+
+progressbar progress, scale highlight, levelbar block.filled { background: #9fb0bf; border: none; }
+progressbar trough, scale trough { background: #1a2027; border: none; }
+scale slider { background: #c9d3dc; border: none; box-shadow: none; }
+switch { background: #1a2027; border: 1px solid #2c3540; }
+switch:checked { background: #2c3540; }
+switch slider { background: #c9d3dc; border: none; box-shadow: none; }
+tooltip, tooltip.background { background: #0b0e12; border: 1px solid #2c3540; color: #c9d3dc; box-shadow: none; }
+notebook > header { background: #0b0e12; border-color: #2c3540; }
+notebook > header tab:checked { color: #e6ecf1; box-shadow: inset 0 -2px #9fb0bf; }
+
+/* Панелі Nemo мають власні контури, інакше біля бічної панелі світла лінія */
+.nemo-places-sidebar, .nemo-window scrolledwindow, .nemo-window frame > border, .nemo-window paned { border-color: #2c3540; }
+.nemo-window .sidebar { border-right: 1px solid #2c3540; }

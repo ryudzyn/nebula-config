@@ -34,10 +34,13 @@
       name = "adw-gtk3-dark";
       package = pkgs.adw-gtk3;
     };
+    # Стиль обсерваторії: темний фон, прямі кути, моноширинний шрифт
+    gtk3.extraCss = builtins.readFile ./gtk-nebula.css;
     gtk4.theme = config.gtk.theme;
     iconTheme = {
       name = "Papirus-Dark";
-      package = pkgs.papirus-icon-theme;
+      # Сірі папки пасують до стилю обсерваторії більше за стандартні сині
+      package = pkgs.papirus-icon-theme.override { color = "grey"; };
     };
     # Декларативно фіксує темну тему: пише gtk-application-prefer-dark-theme
     # у gtk-3.0/gtk-4.0 settings.ini і color-scheme=prefer-dark у

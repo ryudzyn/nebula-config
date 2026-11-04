@@ -14,8 +14,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "ryudzyn";
       repo = "etea-shell";
-      rev = "276d9d5335638e82fe4d900a68e6b025ef054e89";
-      hash = "sha256-J9kSh2hRGpy0Tlv59QyUSVtQuGk7VxVxbL9JA8jaY0g=";
+      rev = "419cd804fa3d10c02784ec585741169df41bc2ce";
+      hash = "sha256-s1cwJ5IgzBqy9mL3jnrNcEu81ZyZdtw1sWOO7ouvaMU=";
     };
     # На NixOS немає /usr/share: без цього порожній список мов у Settings
     postPatch = ''
@@ -79,6 +79,8 @@ in
       ExecStart = "${pkgs.quickshell}/bin/qs -p ${etea}";
       Restart = "on-failure";
       RestartSec = 2;
+      # Без цього Quickshell не знає теми значків і лончер показує заглушки
+      Environment = [ "QS_ICON_THEME=Papirus-Dark" ];
     };
   };
 }
