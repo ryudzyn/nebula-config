@@ -14,8 +14,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "ryudzyn";
       repo = "etea-shell";
-      rev = "a0598dd606717cf20502ef8ff29dd59d59dbb879";
-      hash = "sha256-Zp10O4X37/xF2mXKHFvKsz6ItaNSvP5KaMRVK7KpnfE=";
+      rev = "3c5025a41f57fc1e14f6f7f8d920310966d23c40";
+      hash = "sha256-0NB8kRqBf9jEK3Un7fE5MV8BGEO8zPC+q1Hr5b5h1LU=";
     };
     # На NixOS немає /usr/share: без цього порожній список мов у Settings
     postPatch = ''
