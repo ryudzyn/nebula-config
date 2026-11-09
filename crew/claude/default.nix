@@ -73,6 +73,8 @@ let
     "log-digger.md"
     "nix-builder.md"
   ];
+  # llama.cpp на Arc A770 через Vulkan (SYCL тягне весь oneAPI)
+  llamaCpp = pkgs.llama-cpp.override { vulkanSupport = true; };
 in
 {
   home.packages = with pkgs; [
@@ -135,6 +137,15 @@ in
     (writers.writePython3Bin "phone-ui" {
       flakeIgnore = [ "E501" ];
     } (builtins.readFile ./phone-ui.py))
+    # локальна модель для /arena --local (сервіс local-llm нижче)
+    (writeShellApplication {
+      name = "local-llm";
+      runtimeInputs = [
+        curl
+        coreutils
+      ];
+      text = builtins.readFile ./local-llm.sh;
+    })
     # звіт для /disk-cleanup: що займає місце, рештки видалених ігор Steam
     (writeShellApplication {
       name = "disk-report";
@@ -181,5 +192,31 @@ in
       Persistent = true;
     };
     Install.WantedBy = [ "timers.target" ];
+  };
+
+  # Локальна модель для /arena --local: учасники, атаки й захисти йдуть сюди,
+  # судді лишаються на Claude. Без WantedBy -- відеопам'ять зайнята лише
+  # між `local-llm start` і `local-llm stop`. Модель качається вручну в
+  # ~/models (12 ГБ, Hugging Face ggml-org/gpt-oss-20b-GGUF).
+  # --parallel 4: арена шле хвилі запитів, контекст ділиться між слотами
+  # (65536 / 4 = 16k на запит).
+  systemd.user.services.local-llm = {
+    Unit.Description = "Local LLM server (gpt-oss-20b, llama.cpp Vulkan)";
+    Service = {
+      ExecStart = pkgs.lib.concatStringsSep " " [
+        "${llamaCpp}/bin/llama-server"
+        "-m %h/models/gpt-oss-20b-MXFP4.gguf"
+        "--host 127.0.0.1 --port 8090"
+        "-ngl 99 -c 65536 --parallel 4"
+        "--jinja"
+      ];
+      # MangoHud (core/games.nix) чіпляється до кожного Vulkan-процесу як шар,
+      # і llama-server з ним падає (segfault на load_model) -- живо 2026-11-09
+      Environment = [
+        "DISABLE_MANGOHUD=1"
+        "VK_LOADER_LAYERS_DISABLE=*MangoHud*"
+      ];
+      Restart = "no";
+    };
   };
 }

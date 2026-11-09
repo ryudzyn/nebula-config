@@ -9,7 +9,7 @@ description: >-
   one solution survives. Use when the user is not satisfied with an answer,
   calls it a bad answer, says try again or do better, says "arena", or asks
   to make them compete.
-argument-hint: "[--agents N | --quick] [--seed S] <task>"
+argument-hint: "[--agents N | --quick] [--seed S] [--local] <task>"
 ---
 
 # arena
@@ -47,6 +47,7 @@ Read the flags out of the request. Everything that is not a flag is the task.
 | `--quick` | 16 competitors. The everyday setting. |
 | `--seed S` | Fixes the cards and the pairings. Default: random, and recorded. |
 | `--wave W` | Sub-agents per wave. Default 10. Only raise it if the user raised Claude Code's limit. |
+| `--local` | Competitors, attacks and defenses run on the local model (gpt-oss-20b on earth's GPU) instead of sub-agents. Judges stay on Claude. See "Local mode" below. |
 
 No task text at all means: the task is the user's most recent request in this conversation, and your
 last answer to it is the baseline to beat.
@@ -132,6 +133,31 @@ Never paste pairings, attacks, verdicts or solutions into the chat.
 Why waves: Claude Code runs at most 10 tool calls at once by default (the
 `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` setting). So a 100-agent spawn is 10 waves of 10, and a
 100-agent arena is 70 waves in total, 71 with the final check.
+
+### Local mode (`--local`)
+
+Added on earth, not part of the upstream skill. The local model has no tools: it cannot read the
+user's project or run code. `local.py` pastes the arena files a brief names (solutions, attacks,
+baseline) under it, nothing else. So if the task needs the model to open project files or run
+tests, say so and suggest the normal mode instead; for text work (writing, plans, analysis,
+designs, code that fits in the task file) local mode is fine.
+
+1. Before init: `local-llm start` (loads the model, up to a minute). If it fails, tell the user and
+   offer the normal mode.
+2. For **spawn**, **attack** and **defend**, replace the Agent waves with:
+   ```bash
+   ARENA prompts <phase>
+   python3 "${CLAUDE_SKILL_DIR}/local.py" run <phase>
+   ```
+   One command runs the whole phase, 4 jobs at a time. Then `ARENA next` as usual. If it lists
+   failed jobs, run the same `local.py run <phase>` once more (it only redoes the missing ones);
+   after that, the NO OUTPUT rule from step 3 applies.
+3. **judge** and **final** run exactly as in the normal mode, as Claude sub-agents.
+4. When the arena is done (or the user stops it): `local-llm stop`, so the GPU is free again.
+
+In step 1, tell the user the size as usual and add that most calls go to the local model, for
+example "16 agents, 91 calls: 76 local, 15 Claude judges". Local runs are slower than sub-agents:
+expect minutes per phase.
 
 ## Step 5: the result
 
