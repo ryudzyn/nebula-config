@@ -75,6 +75,14 @@ let
   ];
   # llama.cpp на Arc A770 через Vulkan (SYCL тягне весь oneAPI)
   llamaCpp = pkgs.llama-cpp.override { vulkanSupport = true; };
+  localLlmServe = pkgs.writeShellApplication {
+    name = "local-llm-serve";
+    runtimeInputs = [
+      llamaCpp
+      pkgs.coreutils
+    ];
+    text = builtins.readFile ./local-llm-serve.sh;
+  };
 in
 {
   home.packages = with pkgs; [
@@ -196,20 +204,14 @@ in
 
   # Локальна модель для /arena --local: учасники, атаки й захисти йдуть сюди,
   # судді лишаються на Claude. Без WantedBy -- відеопам'ять зайнята лише
-  # між `local-llm start` і `local-llm stop`. Модель качається вручну в
-  # ~/models (12 ГБ, Hugging Face ggml-org/gpt-oss-20b-GGUF).
-  # --parallel 4: арена шле хвилі запитів, контекст ділиться між слотами
-  # (65536 / 4 = 16k на запит).
+  # між `local-llm start` і `local-llm stop`. Моделі качаються вручну в
+  # ~/models з Hugging Face (ggml-org/gpt-oss-20b-GGUF, unsloth/Qwen3.5-9B-GGUF,
+  # ggml-org/Qwen3.6-35B-A3B-GGUF); яку запускати і з якими параметрами --
+  # local-llm-serve.sh.
   systemd.user.services.local-llm = {
-    Unit.Description = "Local LLM server (gpt-oss-20b, llama.cpp Vulkan)";
+    Unit.Description = "Local LLM server (llama.cpp Vulkan)";
     Service = {
-      ExecStart = pkgs.lib.concatStringsSep " " [
-        "${llamaCpp}/bin/llama-server"
-        "-m %h/models/gpt-oss-20b-MXFP4.gguf"
-        "--host 127.0.0.1 --port 8090"
-        "-ngl 99 -c 65536 --parallel 4"
-        "--jinja"
-      ];
+      ExecStart = "${localLlmServe}/bin/local-llm-serve";
       # MangoHud (core/games.nix) чіпляється до кожного Vulkan-процесу як шар,
       # і llama-server з ним падає (segfault на load_model) -- живо 2026-11-09
       Environment = [

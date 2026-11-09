@@ -142,8 +142,9 @@ baseline) under it, nothing else. So if the task needs the model to open project
 tests, say so and suggest the normal mode instead; for text work (writing, plans, analysis,
 designs, code that fits in the task file) local mode is fine.
 
-1. Before init: `local-llm start` (loads the model, up to a minute). If it fails, tell the user and
-   offer the normal mode.
+1. Before init: `local-llm start` (loads the last selected model, up to a few minutes). If the user
+   named a model, pass it: `local-llm start gpt-oss|qwen9b|qwen35b` (`local-llm models` lists
+   them). If it fails, tell the user and offer the normal mode.
 2. For **spawn**, **attack** and **defend**, replace the Agent waves with:
    ```bash
    ARENA prompts <phase>
