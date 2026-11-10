@@ -259,6 +259,25 @@
           },
           {
             "type": "button",
+            "name": "Nebula Hub",
+            "icon": "satellite_alt",
+            "iconTheme": "material-symbols-rounded",
+            "selectWorkflow": {
+              "actions": [
+                {
+                  "type": "execute-command",
+                  "command": "nebula-hub-desktop",
+                  "detached": true,
+                  "isolated": false
+                },
+                {
+                  "type": "close-menu"
+                }
+              ]
+            }
+          },
+          {
+            "type": "button",
             "name": "Game mode",
             "icon": "speed",
             "iconTheme": "material-symbols-rounded",
