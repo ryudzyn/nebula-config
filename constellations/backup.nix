@@ -30,6 +30,7 @@ in
     paths = [
       "${home}/Projects"
       "${home}/nebula-config"
+      "${home}/Brain" # мозок Nebula Hub: підсумки сесій, нотатки (з 2026-11-10)
       "${home}/Documents"
       "${home}/Pictures"
       "${home}/Screenshots"
