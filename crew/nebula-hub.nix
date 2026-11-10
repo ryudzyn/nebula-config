@@ -4,6 +4,7 @@ let
     p.fastapi
     p.uvicorn
     p.websockets
+    p.pyte # екран терміналу фонових задач: відповіді на питання клавішами (attach.py)
   ]);
 
   # Хаб окремим вікном на ПК (desktop/nebula_desktop.py у тому ж чекауті): GTK4 + WebKitGTK,
