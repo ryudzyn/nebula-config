@@ -16,6 +16,14 @@
   services.tailscale.enable = true;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   services.tailscale.openFirewall = true;
+  # ryudzyn -- оператор: `tailscale serve` без sudo (Nebula Hub, crew/nebula-hub.nix).
+  # accept-dns=false: earth має власний DNS (unbound + AdGuard, constellations/dns.nix), який
+  # сам пересилає *.ts.net на 100.100.100.100. Глобальні DNS тейлнету з "Override DNS
+  # servers" (потрібні телефону через баг Android, 2026-11-10) інакше обійшли б unbound.
+  services.tailscale.extraSetFlags = [
+    "--operator=ryudzyn"
+    "--accept-dns=false"
+  ];
 
   # Wake-on-LAN (магічний пакет). Після заміни плати (2026-09-29) вбудована
   # карта -- Realtek RTL8111 на r8169 (enp6s0), драйвер WoL підтримує, на
