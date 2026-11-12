@@ -74,6 +74,7 @@ in
           pkgs.systemd
           pkgs.tailscale
           pkgs.coreutils
+          pkgs.piper-tts # «🔊 прослухати» нотатку мозку (nebula_hub/tts.py; голоси в ~/models/piper)
         ]
       }";
       Restart = "on-failure";
