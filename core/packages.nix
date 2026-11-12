@@ -29,8 +29,12 @@ let
   # віддавав порожню відповідь. Живо перевірено: стрім стартує, другий
   # акаунт у desktop Discord бачить чисту картинку. Спершу тут був ще й
   # override Vencord до 1.15.9 (у nixpkgs був 1.15.7 зі зламаними модалками);
-  # прибрано 2026-11-11, коли nixpkgs наздогнав (1.15.13).
-  vesktop-fresh = pkgs.vesktop.override { withSystemVencord = true; };
+  # прибрано 2026-11-11, коли nixpkgs наздогнав (1.15.13). 2026-11-12 Discord знову
+  # зламав старий Vencord (чорне вікно) -- 1.15.17 з pkgs/vencord, тимчасово.
+  vesktop-fresh = pkgs.vesktop.override {
+    withSystemVencord = true;
+    vencord = pkgs.callPackage ../pkgs/vencord/package.nix { };
+  };
 
   # vivaldi-pipewire (2026-09-30, TODO.md Follow-up #43) -- заміна google-chrome:
   # живо підтверджено, що ЦЕЙ клас захоплення екрана (звичайний Chromium,
