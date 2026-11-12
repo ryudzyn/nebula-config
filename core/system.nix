@@ -125,7 +125,10 @@
       StateDirectoryMode = "0755";
     };
     # smartctl повертає ненульовий код при попередженнях (бітова маска) -- це не збій
+    # Старі знімки стираємо: інакше файл відключеного диска (USB-флешка як
+    # sdb) лишається назавжди й потрапляє у звіт як «живий» диск.
     script = ''
+      rm -f /var/lib/smart-snapshot/*.json
       for d in /dev/sd? /dev/nvme?n1; do
         [ -e "$d" ] || continue
         ${pkgs.smartmontools}/bin/smartctl -j -a "$d" > "/var/lib/smart-snapshot/$(basename "$d").json" || true
@@ -147,21 +150,4 @@
     options = "grp:alt_shift_toggle"; # Перемикання через Alt+Shift
   };
   nixpkgs.config.allowUnfree = true;
-  nixpkgs.overlays = [
-    (final: prev: {
-      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-        (pyFinal: pyPrev: {
-          patool = pyPrev.patool.overridePythonAttrs (old: {
-            doCheck = false;
-          });
-          # 4.5.0 (nixpkgs 2026-10-20): тести на таймінг падають ("returned too early,
-          # elapsed=1.09s"), у кеші немає збірки -- а через moddb від нього залежить
-          # lutris (core/games.nix). Прибрати, коли пакет знову буде в cache.nixos.org.
-          pyrate-limiter = pyPrev.pyrate-limiter.overridePythonAttrs (old: {
-            doCheck = false;
-          });
-        })
-      ];
-    })
-  ];
 }

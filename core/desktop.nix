@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  inputs,
   ...
 }:
 let
@@ -58,17 +57,9 @@ in
   # і власний xdg-desktop-portal-hyprland (xdg.portal.extraPortals +
   # configPackages, для ScreenCast/Screenshot з Noctalia) — нічого з цього не
   # треба дублювати вручну нижче.
-  # Hyprland 0.57.1 зі свіжого nixpkgs, решта системи лишається на своєму: у 0.56.2 захоплення
-  # вікна, яке на мить лишилось без монітора (монітор заснув і повернувся), валило весь композитор.
-  # Прибрати, коли основний nixpkgs дожене цю версію.
-  nixpkgs.overlays = [
-    (final: prev: {
-      inherit (inputs.nixpkgs-hyprland.legacyPackages.${prev.stdenv.hostPlatform.system})
-        hyprland
-        xdg-desktop-portal-hyprland
-        ;
-    })
-  ];
+  # (Тут був overlay з окремим nixpkgs-hyprland заради Hyprland 0.57.1 -- у 0.56.2
+  # захоплення вікна без монітора валило композитор. Прибрано 2026-11-11: основний
+  # nixpkgs наздогнав 0.57.1.)
 
   programs.hyprland.enable = true;
   # PAM-служба для hyprlock; вигляд -- у crew/hyprlock.nix

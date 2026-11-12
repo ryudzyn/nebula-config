@@ -26,26 +26,11 @@ let
   # Vencord: Vesktop сам качав його в ~/.config/vesktop/sessionData і з
   # квітня не оновлював, а Vesktop 1.6.7 шукає openModal у
   # Vencord.Webpack.Common -- вікно налаштувань стріму падало, і Vesktop
-  # віддавав порожню відповідь. Vencord 1.15.7 з nixpkgs теж замалий
-  # (Discord змінився, "findExportedComponent found no module Filter:
-  # Modal"); виправлено в апстрімі в 1.15.8 ("fix modals") / 1.15.9.
-  # pnpm-залежності 1.15.9 ті самі, що й в 1.15.7 (хеш збігся). Прибрати
-  # override, коли nixpkgs наздожене >= 1.15.9. Живо перевірено: стрім
-  # стартує, другий акаунт у desktop Discord бачить чисту картинку.
-  vencord-fresh = pkgs.vencord.overrideAttrs (final: old: {
-    version = "1.15.9";
-    src = pkgs.fetchFromGitHub {
-      owner = "Vendicated";
-      repo = "Vencord";
-      tag = "v${final.version}";
-      hash = "sha256-LuIwFUAJOoV8Su0g1tvhvXhMEJbkpM2BCCOWzQR4JIA=";
-    };
-    pnpmDeps = old.pnpmDeps.overrideAttrs { inherit (final) src; };
-  });
-  vesktop-fresh = pkgs.vesktop.override {
-    withSystemVencord = true;
-    vencord = vencord-fresh;
-  };
+  # віддавав порожню відповідь. Живо перевірено: стрім стартує, другий
+  # акаунт у desktop Discord бачить чисту картинку. Спершу тут був ще й
+  # override Vencord до 1.15.9 (у nixpkgs був 1.15.7 зі зламаними модалками);
+  # прибрано 2026-11-11, коли nixpkgs наздогнав (1.15.13).
+  vesktop-fresh = pkgs.vesktop.override { withSystemVencord = true; };
 
   # vivaldi-pipewire (2026-09-30, TODO.md Follow-up #43) -- заміна google-chrome:
   # живо підтверджено, що ЦЕЙ клас захоплення екрана (звичайний Chromium,
