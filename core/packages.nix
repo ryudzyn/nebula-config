@@ -142,7 +142,8 @@ in
     p7zip
     zathura # PDF -- досі не було жодного переглядача
     ani-cli
-    davinci-resolve
+    # 21.2 з pkgs/davinci-resolve (у nixpkgs поки 21.1.2) -- тимчасово
+    (pkgs.callPackage ../pkgs/davinci-resolve/package.nix { })
     clinfo # діагностика ROCm OpenCL — `clinfo` після switch покаже, чи бачить GPU
 
     # Системні утиліти
