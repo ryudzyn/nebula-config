@@ -5,6 +5,7 @@
     ./terminal/zsh.nix
     ./cli-tools.nix
     ./media.nix
+    ./resolve-prep.nix
     ./vscodium.nix
     ./theming.nix
     ./modes.nix
