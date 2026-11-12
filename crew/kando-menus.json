@@ -316,14 +316,14 @@
           },
           {
             "type": "button",
-            "name": "Стрім зі звуком",
-            "icon": "cast",
+            "name": "Гра з ботом",
+            "icon": "smart_toy",
             "iconTheme": "material-symbols-rounded",
             "selectWorkflow": {
               "actions": [
                 {
                   "type": "execute-command",
-                  "command": "vivaldi --new-window http://127.0.0.1:8787/stream-relay.html",
+                  "command": "sh -c \"$HOME/Projects/ascension-1211/tools/dev2/play-button\"",
                   "detached": true,
                   "isolated": false
                 },
