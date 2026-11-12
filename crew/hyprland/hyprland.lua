@@ -45,6 +45,11 @@ require("tweaks")
 local terminal = "wezterm"
 
 hl.on("hyprland.start", function()
+    -- Сесію відкрив автовхід greetd (core/desktop.nix, initial_session) -- одразу
+    -- блокуємо, до всього іншого: за ПК без пароля нічого не видно.
+    if os.getenv("NEBULA_AUTOLOGIN") == "1" then
+        hl.exec_cmd("nebula-lock")
+    end
     -- graphical-session.target (те, до чого прив'язаний home-manager-івський
     -- etea.service через WantedBy) ніколи сам не активується для
     -- Hyprland на NixOS, а `systemctl --user start graphical-session.target`

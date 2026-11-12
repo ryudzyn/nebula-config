@@ -103,6 +103,17 @@ in
     }
   '';
 
+  # Автовхід лише при старті greetd (тобто після завантаження): одразу Hyprland
+  # без пароля, а hyprland.lua бачить NEBULA_AUTOLOGIN і першим ділом вмикає
+  # hyprlock. Навіщо: після перезавантаження з телефона робочий стіл (ETEA,
+  # Sunshine тощо) піднімається сам, а за ПК все одно потрібен пароль. Після
+  # виходу з сесії -- звичайний ReGreet. Діє з наступного старту greetd (switch
+  # його не перезапускає).
+  services.greetd.settings.initial_session = {
+    user = "ryudzyn";
+    command = "env NEBULA_AUTOLOGIN=1 ${config.programs.hyprland.package}/bin/start-hyprland";
+  };
+
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   # WLR_DRM_NO_MODIFIERS=1 і INTEL_DEBUG=noccs-modifier тут раніше стояли як
   # спроби вилікувати биту демонстрацію екрана на Arc A770 -- обидві живо
