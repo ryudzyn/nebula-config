@@ -1,0 +1,195 @@
+# Nebula OS -- заставка завантаження: Земля, навколо неї по нахиленій орбіті ходить
+# Місяць, а сама орбіта -- це прогрес (точки засвічуються зі стартом системи).
+# Картинки -- з render.py поруч; кольори й шрифт -- як у hyprlock (crew/hyprlock.nix).
+
+W = Window.GetWidth();
+H = Window.GetHeight();
+X0 = Window.GetX();
+Y0 = Window.GetY();
+U = H / 1440;  # одиниця масштабу: макет розрахований на 2560x1440
+
+Window.SetBackgroundTopColor(0.024, 0.031, 0.047);
+Window.SetBackgroundBottomColor(0.016, 0.020, 0.031);
+
+# --- Зорі -------------------------------------------------------------------------
+stars.sprite = Sprite(Image("stars.png").Scale(W, H));
+stars.sprite.SetPosition(X0, Y0, -100);
+
+# Кілька яскравіших зір повільно мерехтять (позиції -- частки екрана)
+glint.image = Image("glint.png");
+glint.x[0] = 0.08; glint.y[0] = 0.14; glint.speed[0] = 0.9;
+glint.x[1] = 0.21; glint.y[1] = 0.71; glint.speed[1] = 0.6;
+glint.x[2] = 0.33; glint.y[2] = 0.22; glint.speed[2] = 1.3;
+glint.x[3] = 0.71; glint.y[3] = 0.12; glint.speed[3] = 0.7;
+glint.x[4] = 0.86; glint.y[4] = 0.38; glint.speed[4] = 1.1;
+glint.x[5] = 0.92; glint.y[5] = 0.81; glint.speed[5] = 0.5;
+glint.x[6] = 0.64; glint.y[6] = 0.88; glint.speed[6] = 0.8;
+glint.x[7] = 0.13; glint.y[7] = 0.47; glint.speed[7] = 1.0;
+glint.count = 8;
+for (i = 0; i < glint.count; i++) {
+  size = (6 + (i % 3) * 3) * U;
+  glint.sprite[i] = Sprite(glint.image.Scale(size, size));
+  glint.sprite[i].SetPosition(X0 + glint.x[i] * W, Y0 + glint.y[i] * H, -90);
+  glint.sprite[i].SetOpacity(0);
+}
+
+# --- Земля ------------------------------------------------------------------------
+# earth.png: диск 560 px + атмосфера навколо; на екрані диск займає 30% висоти
+earth.image = Image("earth.png");
+earth.k = 0.30 * H / 560;
+earth.w = earth.image.GetWidth() * earth.k;
+earth.h = earth.image.GetHeight() * earth.k;
+earth.sprite = Sprite(earth.image.Scale(earth.w, earth.h));
+CX = X0 + W / 2;
+CY = Y0 + H * 0.45;
+earth.sprite.SetPosition(CX - earth.w / 2, CY - earth.h / 2, 0);
+
+# --- Орбіта -----------------------------------------------------------------------
+# Коло радіуса R у площині, нахиленій до нас: y стиснутий у FLAT разів і повернутий
+# на TILT. sin(t) > 0 -- ближня половина (перед Землею), < 0 -- дальня (за нею).
+R = 0.36 * H;
+FLAT = 0.24;
+TILT = -0.22;
+
+fun orbit_x(t) { return CX + R * Math.Cos(t) * Math.Cos(TILT) - R * FLAT * Math.Sin(t) * Math.Sin(TILT); }
+fun orbit_y(t) { return CY + R * Math.Cos(t) * Math.Sin(TILT) + R * FLAT * Math.Sin(t) * Math.Cos(TILT); }
+
+dots.count = 96;
+dots.size = 8 * U;
+if (dots.size < 5) dots.size = 5;
+dots.on = Image("dot-on.png").Scale(dots.size, dots.size);
+dots.off = Image("dot-off.png").Scale(dots.size, dots.size);
+for (i = 0; i < dots.count; i++) {
+  # Прогрес іде від лівого краю орбіти, ближньою половиною вперед
+  t = Math.Pi + i * 2 * Math.Pi / dots.count;
+  dots.t[i] = t;
+  dots.sprite[i] = Sprite(dots.off);
+  z = -10;
+  if (Math.Sin(t) > 0) z = 10;
+  dots.sprite[i].SetPosition(orbit_x(t) - dots.size / 2, orbit_y(t) - dots.size / 2, z);
+  dots.lit[i] = 0;
+}
+
+moon.image = Image("moon.png");
+moon.sprite = Sprite();
+moon.t = Math.Pi * 0.75;
+
+# --- Напис ------------------------------------------------------------------------
+title.image = Image("title.png");
+title.w = title.image.GetWidth() * U;
+title.h = title.image.GetHeight() * U;
+title.sprite = Sprite(title.image.Scale(title.w, title.h));
+title.y = CY + R * 0.62;
+title.sprite.SetPosition(CX - title.w / 2, title.y, 30);
+
+# Нижній рядок: режим (вимкнення/перезавантаження), повідомлення або пароль
+FONT = "JetBrains Mono Light " + Math.Int(14 * U + 0.5);
+INK.r = 0.624; INK.g = 0.690; INK.b = 0.749;
+
+line.sprite = Sprite();
+line.sprite.SetOpacity(0);
+
+fun set_line(text) {
+  if (text == "") {
+    line.sprite.SetOpacity(0);
+    return;
+  }
+  img = Image.Text(text, INK.r, INK.g, INK.b, 0.75, FONT);
+  line.sprite.SetImage(img);
+  line.sprite.SetPosition(CX - img.GetWidth() / 2, title.y + title.h + 26 * U, 30);
+  line.sprite.SetOpacity(1);
+}
+
+mode = Plymouth.GetMode();
+if (mode == "shutdown") set_line("вимкнення");
+else if (mode == "reboot") set_line("перезавантаження");
+else if (mode == "updates" || mode == "system-upgrade" || mode == "firmware-upgrade") set_line("оновлення");
+
+# --- Анімація ---------------------------------------------------------------------
+progress.target = 0;
+progress.shown = 0;
+time = 0;
+
+fun refresh() {
+  global.time++;
+  fade = global.time / 40;
+  if (fade > 1) fade = 1;
+
+  earth.sprite.SetOpacity(fade);
+  title.sprite.SetOpacity(fade * 0.9);
+  stars.sprite.SetOpacity(fade);
+
+  for (i = 0; i < glint.count; i++) {
+    s = Math.Sin(global.time / 50 * glint.speed[i] + i * 1.7);
+    glint.sprite[i].SetOpacity(fade * (0.15 + 0.55 * (0.5 + 0.5 * s)));
+  }
+
+  # Прогрес наздоганяє плавно, а не стрибками
+  global.progress.shown += (global.progress.target - global.progress.shown) * 0.06;
+  lit = Math.Int(global.progress.shown * dots.count + 0.5);
+  for (i = 0; i < dots.count; i++) {
+    want = 0;
+    if (i < lit) want = 1;
+    if (want != dots.lit[i]) {
+      if (want) dots.sprite[i].SetImage(dots.on);
+      else dots.sprite[i].SetImage(dots.off);
+      global.dots.lit[i] = want;
+    }
+    # Дальня половина орбіти тьмяніша
+    a = 0.5;
+    if (Math.Sin(dots.t[i]) > 0) a = 1;
+    dots.sprite[i].SetOpacity(fade * a);
+  }
+
+  # Місяць: оберт приблизно за 9 секунд, ближче до нас -- більший і вище по Z
+  global.moon.t += 2 * Math.Pi / (50 * 9);
+  t = global.moon.t;
+  depth = Math.Sin(t);
+  size = (26 + 8 * depth) * U;
+  moon.sprite.SetImage(moon.image.Scale(size, size));
+  z = -5;
+  if (depth > 0) z = 20;
+  moon.sprite.SetPosition(orbit_x(t) - size / 2, orbit_y(t) - size / 2, z);
+  moon.sprite.SetOpacity(fade);
+}
+Plymouth.SetRefreshFunction(refresh);
+
+fun boot_progress(duration, value) {
+  global.progress.target = value;
+}
+Plymouth.SetBootProgressFunction(boot_progress);
+
+# Оновлення (режим updates/system-upgrade) -- той самий прогрес по орбіті
+fun update_progress(value) {
+  global.progress.target = value / 100;
+}
+Plymouth.SetSystemUpdateFunction(update_progress);
+
+fun on_message(text) {
+  set_line(text);
+}
+Plymouth.SetMessageFunction(on_message);
+
+# --- Пароль / питання (напр. LUKS) -----------------------------------------------
+fun show_password(prompt, bullets) {
+  stars_line = "";
+  for (i = 0; i < bullets; i++) stars_line += "•";
+  if (prompt == "") prompt = "пароль";
+  set_line(prompt + "  " + stars_line);
+}
+Plymouth.SetDisplayPasswordFunction(show_password);
+
+fun show_question(prompt, entry) {
+  set_line(prompt + "  " + entry);
+}
+Plymouth.SetDisplayQuestionFunction(show_question);
+
+fun show_normal() {
+  set_line("");
+}
+Plymouth.SetDisplayNormalFunction(show_normal);
+
+fun on_quit() {
+  global.progress.target = 1;
+}
+Plymouth.SetQuitFunction(on_quit);

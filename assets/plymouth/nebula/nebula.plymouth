@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Nebula
+Description=Nebula OS: Earth, the Moon on its orbit, boot progress along the orbit
+ModuleName=script
+
+[script]
+ImageDir=@out@
+ScriptFile=@out@/nebula.script

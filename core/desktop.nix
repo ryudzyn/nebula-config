@@ -4,30 +4,25 @@
   ...
 }:
 let
-  # Plymouth-тема "hud_space" (adi1090x/plymouth-themes, pack_3, GPLv3) —
-  # анімація відчинення дверей космічного корабля на завантаженні, щоб і
-  # boot виглядав частиною "Nebula OS", а не дефолтним екраном. Файли
-  # (122 PNG-кадри + .script + .plymouth-дескриптор) закомічені напряму в
-  # assets/plymouth/hud_space/ (той самий підхід, що й wallpaper.jpg/
-  # roulette.html) — увесь апстрімний репозиторій тем важить ~290 МіБ
-  # (80+ тем разом), фетчити його цілим заради однієї теми через Nix
-  # безглуздо; large_icons/ (альтернативний набір кадрів для іншого
-  # розширення) не закомічений — hud_space.script його не використовує.
-  # ImageDir/ScriptFile в апстрімному .plymouth хардкоджені на
-  # /usr/share/... — підміняємо на реальний $out, як і з halley/
-  # gzml-visual-tools (той самий клас "апстрім розрахований на FHS" фіксу).
-  plymouth-hud-space = pkgs.runCommand "plymouth-theme-hud-space" { } ''
-    mkdir -p $out/share/plymouth/themes/hud_space
-    cp ${../assets/plymouth/hud_space}/* $out/share/plymouth/themes/hud_space/
-    substituteInPlace $out/share/plymouth/themes/hud_space/hud_space.plymouth \
-      --replace-fail "/usr/share/plymouth/themes/hud_space" "$out/share/plymouth/themes/hud_space"
+  # Plymouth-тема "nebula" (2026-11-12, замінила hud_space з adi1090x) у стилі решти
+  # Nebula OS: Земля з тими самими текстурами й світлом, що планети ETEA і hyprlock,
+  # Місяць на нахиленій орбіті, а
+  # прогрес завантаження -- точки орбіти, що засвічуються. Картинки -- з
+  # assets/plymouth/nebula/render.py (закомічені, як і lock/*.jpg). Шрифт для
+  # динамічного рядка (пароль, повідомлення) -- boot.plymouth.font нижче.
+  plymouth-nebula = pkgs.runCommand "plymouth-theme-nebula" { } ''
+    dir=$out/share/plymouth/themes/nebula
+    mkdir -p $dir
+    cp ${../assets/plymouth/nebula}/*.png ${../assets/plymouth/nebula}/nebula.script $dir/
+    substitute ${../assets/plymouth/nebula}/nebula.plymouth $dir/nebula.plymouth --subst-var-by out $dir
   '';
 in
 {
   boot.plymouth = {
     enable = true;
-    theme = "hud_space";
-    themePackages = [ plymouth-hud-space ];
+    theme = "nebula";
+    themePackages = [ plymouth-nebula ];
+    font = "${pkgs.jetbrains-mono}/share/fonts/truetype/JetBrainsMono-Light.ttf";
   };
 
   # Живий тест 2026-09-29 (TODO.md Follow-up #42): пробували примусово
