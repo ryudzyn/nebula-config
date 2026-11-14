@@ -5,7 +5,7 @@
   # openFirewall=false навмисно: tailscale0 уже в trustedInterfaces (comms.nix), тож
   # Sunshine доступний лише через tailnet, а не з LAN чи інтернету.
   # capSysAdmin не потрібен: на Hyprland захоплення йде через wlr-screencopy, а не KMS.
-  # Пара з телефоном -- одноразово вручну: PIN у веб-панелі https://<earth>:47990.
+  # Пара з телефоном -- одноразово вручну: PIN у веб-панелі https://earth:47990.
   services.sunshine = {
     enable = true;
     autoStart = true;
@@ -13,6 +13,9 @@
     capSysAdmin = false;
     settings = {
       capture = "wlr";
+      # веб-панель приймає форми лише з дозволених адрес (CSRF); з телефона -- коротке ім'я
+      # через MagicDNS (Tailscale DNS на телефоні ввімкнений), без IP у публічному репо
+      csrf_allowed_origins = "https://earth:47990";
     };
   };
 }
