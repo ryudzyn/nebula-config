@@ -95,6 +95,7 @@ in
     # історія хибного сліду).
     vesktop-fresh
     telegram-desktop # месенджер; стара сесія лежить у ~/.local/share/TelegramDesktop (2026-11-14)
+    stoat-desktop # Stoat (колишній Revolt) -- open-source аналог Discord на пробу; трансляцій ще немає (2026-11-14)
     # discord-screenaudio (власна деривація, Qt6/QtWebEngine) прибрано
     # 2026-10-04: живо тестувався 2026-09-30 і був нестабільний (GPU-процес
     # QtWebEngine падав з EGL_BAD_CONTEXT або зависав у циклі
