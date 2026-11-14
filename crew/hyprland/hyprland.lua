@@ -439,3 +439,10 @@ hl.bind("SUPER + SHIFT + slash", hl.dsp.exec_cmd("nebula-keys " .. helpfile))
 
 -- ALT+Tab -- наступне вікно на цьому столі; огляд усіх вікон і столів -- SUPER+Tab (ETEA)
 hl.bind("ALT + Tab", hl.dsp.window.cycle_next())
+
+-- Sunshine запам'ятовує монітори, коли стартує: якщо монітор був вимкнений кнопкою (у Hyprland
+-- тоді 0 виходів), стрим у Moonlight падав з «Failed to initialize video capture» навіть після
+-- ввімкнення (2026-11-14). Монітор з'явився -- перезапустити Sunshine, лише якщо він працює.
+hl.on("monitor.added", function()
+    hl.exec_cmd("systemctl --user try-restart sunshine.service")
+end)
