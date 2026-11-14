@@ -69,14 +69,19 @@ in
       # `-` -- якщо tailscaled ще не готовий, хаб однаково працює локально.
       ExecStartPost = "-${pkgs.coreutils}/bin/timeout 20 ${pkgs.tailscale}/bin/tailscale serve --bg --https=443 http://127.0.0.1:8095";
       # PATH user-юнітів на NixOS порожній: хабу потрібні systemctl/journalctl/tailscale
-      Environment = "PATH=${
-        pkgs.lib.makeBinPath [
-          pkgs.systemd
-          pkgs.tailscale
-          pkgs.coreutils
-          pkgs.piper-tts # «🔊 прослухати» нотатку мозку (nebula_hub/tts.py; голоси в ~/models/piper)
-        ]
-      }";
+      Environment = [
+        "PATH=${
+          pkgs.lib.makeBinPath [
+            pkgs.systemd
+            pkgs.tailscale
+            pkgs.coreutils
+            pkgs.piper-tts # «🔊 прослухати» нотатку мозку (nebula_hub/tts.py; голоси в ~/models/piper)
+            pkgs.wayvnc # «🖥 Екран»: екран Hyprland лише на 127.0.0.1, назовні -- через хаб (screen.py)
+          ]
+        }"
+        # noVNC (клієнт у браузері) хаб роздає з /novnc
+        "NOVNC_DIR=${pkgs.novnc}/share/webapps/novnc"
+      ];
       Restart = "on-failure";
       RestartSec = 3;
     };
