@@ -1,5 +1,10 @@
 # core/packages.nix
-{ config, pkgs, inputs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 let
   # Discord screen-share на Wayland давало чорний кадр (портал і аудіо
   # працюють, але жодного PipeWire відео-вузла не з'являлося) -- живо
@@ -56,14 +61,15 @@ let
   # false і не додає ffmpeg у LD_LIBRARY_PATH. Перезагортаємо unwrapped-пакет
   # з новими назвами. Версію ffmpeg (8 чи 9) wrapper обирає сам за
   # browser.version. Прибрати, коли zen-browser-flake оновить passthru.
-  zen-browser = pkgs.wrapFirefox
-    (inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.zen-browser-unwrapped.overrideAttrs (old: {
-      passthru = old.passthru // {
-        withFFmpeg = true;
-        withGSSAPI = true;
-      };
-    }))
-    { pname = "zen-browser"; };
+  zen-browser = pkgs.wrapFirefox (
+    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.zen-browser-unwrapped.overrideAttrs
+      (old: {
+        passthru = old.passthru // {
+          withFFmpeg = true;
+          withGSSAPI = true;
+        };
+      })
+  ) { pname = "zen-browser"; };
 in
 {
   environment.systemPackages = with pkgs; [
@@ -88,6 +94,7 @@ in
     # був застарілий Vencord, а не Arc (TODO.md Follow-up #57; #43/#49 --
     # історія хибного сліду).
     vesktop-fresh
+    telegram-desktop # месенджер; стара сесія лежить у ~/.local/share/TelegramDesktop (2026-11-14)
     # discord-screenaudio (власна деривація, Qt6/QtWebEngine) прибрано
     # 2026-10-04: живо тестувався 2026-09-30 і був нестабільний (GPU-процес
     # QtWebEngine падав з EGL_BAD_CONTEXT або зависав у циклі
@@ -108,7 +115,7 @@ in
     # (adb/fastboot) — системно, а не через nix-shell щоразу
     android-studio
     android-tools
-    
+
     # Творчі
     kdePackages.kdenlive
     lmms
@@ -173,26 +180,29 @@ in
   programs.obs-studio = {
     enable = true;
     plugins = with pkgs.obs-studio-plugins; [
-      wlrobs                     # захоплення екрана напряму, без portal/PipeWire
+      wlrobs # захоплення екрана напряму, без portal/PipeWire
       obs-pipewire-audio-capture # захоплення звуку конкретних застосунків
-      obs-vaapi                  # апаратний енкодинг -- тепер на Intel Arc A770 (заміна RX590, 2026-09-29)
+      obs-vaapi # апаратний енкодинг -- тепер на Intel Arc A770 (заміна RX590, 2026-09-29)
     ];
   };
 
   hardware.graphics = {
-  enable = true;
-  enable32Bit = true;
-  # Заміна заліза AMD RX590 -> Intel i5-9400 + Arc A770 (2026-09-29):
-  # rocmPackages.clr.icd (AMD-only ROCm OpenCL) прибрано, замість нього --
-  # Intel-специфічні драйвери. intel-media-driver -- VAAPI (iHD) для DG2/Arc
-  # та новіших Gen, потрібен obs-vaapi вище й апаратному декодуванню відео
-  # (mpv/mpvpaper). intel-compute-runtime -- OpenCL (NEO), той самий
-  # прошарок, що ROCm ICD давав для AMD -- потрібен DaVinci Resolve для
-  # GPU-прискорення. Обидва -- живий тест ще не проводили (нове залізо
-  # щойно встановлене), перевірити vainfo/clinfo після switch.
-  extraPackages = [ pkgs.intel-media-driver pkgs.intel-compute-runtime ];
-};
+    enable = true;
+    enable32Bit = true;
+    # Заміна заліза AMD RX590 -> Intel i5-9400 + Arc A770 (2026-09-29):
+    # rocmPackages.clr.icd (AMD-only ROCm OpenCL) прибрано, замість нього --
+    # Intel-специфічні драйвери. intel-media-driver -- VAAPI (iHD) для DG2/Arc
+    # та новіших Gen, потрібен obs-vaapi вище й апаратному декодуванню відео
+    # (mpv/mpvpaper). intel-compute-runtime -- OpenCL (NEO), той самий
+    # прошарок, що ROCm ICD давав для AMD -- потрібен DaVinci Resolve для
+    # GPU-прискорення. Обидва -- живий тест ще не проводили (нове залізо
+    # щойно встановлене), перевірити vainfo/clinfo після switch.
+    extraPackages = [
+      pkgs.intel-media-driver
+      pkgs.intel-compute-runtime
+    ];
+  };
 
-programs.steam.enable = true;
+  programs.steam.enable = true;
 
 }
