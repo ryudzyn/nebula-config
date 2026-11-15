@@ -191,7 +191,13 @@ in
       # nix і notify-phone -- з профілю користувача/системи
       Environment = "PATH=/run/current-system/sw/bin:/etc/profiles/per-user/%u/bin";
       ExecStart = "${weeklyReport}/bin/nebula-weekly-report";
+      # Persistent запускає пропущений звіт одразу при завантаженні -- ntfy (системна служба)
+      # ще не слухає, curl падає (2026-11-15). Повтор через 2 хв, до 5 спроб.
+      Restart = "on-failure";
+      RestartSec = "2min";
     };
+    Unit.StartLimitBurst = 5;
+    Unit.StartLimitIntervalSec = "20min";
   };
   systemd.user.timers.nebula-weekly-report = {
     Unit.Description = "Weekly earth health report";
