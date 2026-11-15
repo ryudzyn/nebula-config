@@ -14,8 +14,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "ryudzyn";
       repo = "etea-shell";
-      rev = "1c99cfb6b4fa20d0ab6aeb251aff31930d0b0b55";
-      hash = "sha256-3rPtwSDJ76rBg7xupFw8h/QDe3P07Ae6CfiBC2RXnTw=";
+      rev = "005a035e16fbb62aef96f4f8260a89903732118f";
+      hash = "sha256-zMT/g6/l1nHHbbqAYmODOl0uiuTFxFRYKyCrRjGyM48=";
     };
     # На NixOS немає /usr/share: без цього порожній список мов у Settings
     postPatch = ''
@@ -82,5 +82,41 @@ in
       # Без цього Quickshell не знає теми значків і лончер показує заглушки
       Environment = [ "QS_ICON_THEME=Papirus-Dark" ];
     };
+  };
+
+  # Жива Земля на шпалерах: супутникові хмари поверх Blue Marble, оновлюються кожні 3 год
+  # (github.com/matteason/live-cloud-maps, CC0; «Contains modified EUMETSAT data»). Щогодини
+  # питаємо з ETag -- без змін нічого не качається. ETEA підхоплює файл сама (World.qml).
+  systemd.user.services.etea-live-earth = {
+    Unit.Description = "Live Earth texture with today's clouds for ETEA";
+    Service = {
+      Type = "oneshot";
+      ExecStart = toString (
+        pkgs.writeShellScript "etea-live-earth" ''
+          set -eu
+          dir="$HOME/.cache/etea"
+          mkdir -p "$dir"
+          ${pkgs.curl}/bin/curl -fsS --max-time 60 \
+            --etag-compare "$dir/earth-live.etag" --etag-save "$dir/earth-live.etag.new" \
+            -o "$dir/.earth-live.tmp" https://clouds.matteason.co.uk/images/2048x1024/earth.jpg
+          # 304 (не змінилось) -- curl нічого не пише; заміна атомарна, щоб ETEA не впіймала півфайлу
+          if [ -s "$dir/.earth-live.tmp" ]; then
+            mv "$dir/.earth-live.tmp" "$dir/earth-live.jpg"
+            mv "$dir/earth-live.etag.new" "$dir/earth-live.etag"
+          fi
+          rm -f "$dir/.earth-live.tmp" "$dir/earth-live.etag.new"
+        ''
+      );
+    };
+  };
+  systemd.user.timers.etea-live-earth = {
+    Unit.Description = "Refresh the live Earth texture hourly";
+    Timer = {
+      OnBootSec = "2min";
+      OnCalendar = "hourly";
+      RandomizedDelaySec = "5min";
+      Persistent = true;
+    };
+    Install.WantedBy = [ "timers.target" ];
   };
 }
