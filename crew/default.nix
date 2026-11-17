@@ -99,6 +99,14 @@
     size = 24;
   };
 
+  # Стандартні XDG-папки (~/Pictures, ~/Videos, ~/Downloads…) у user-dirs.dirs.
+  # Без нього xdg-user-dir повертав $HOME, і скріни/записи ETEA падали в ~/Captures.
+  xdg.userDirs = {
+    enable = true;
+    createDirectories = false;
+    setSessionVariables = true;
+  };
+
   # Версія стану (не змінюй її після встановлення, це потрібно для внутрішніх баз даних)
   home.stateVersion = "23.11";
 }
