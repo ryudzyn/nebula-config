@@ -47,7 +47,7 @@ Read the flags out of the request. Everything that is not a flag is the task.
 | `--quick` | 16 competitors. The everyday setting. |
 | `--seed S` | Fixes the cards and the pairings. Default: random, and recorded. |
 | `--wave W` | Sub-agents per wave. Default 10. Only raise it if the user raised Claude Code's limit. |
-| `--local` | Competitors, attacks and defenses run on the local model (gpt-oss-20b on earth's GPU) instead of sub-agents. Judges stay on Claude. See "Local mode" below. |
+| `--local` | Competitors, attacks and defenses run on the local model (Qwen3.6-35B by default, on earth's GPU) instead of sub-agents. Judges stay on Claude. See "Local mode" below. |
 
 No task text at all means: the task is the user's most recent request in this conversation, and your
 last answer to it is the baseline to beat.
@@ -143,7 +143,7 @@ tests, say so and suggest the normal mode instead; for text work (writing, plans
 designs, code that fits in the task file) local mode is fine.
 
 1. Before init: `local-llm start` (loads the last selected model, up to a few minutes). If the user
-   named a model, pass it: `local-llm start gpt-oss|qwen9b|qwen35b` (`local-llm models` lists
+   named a model, pass it: `local-llm start qwen9b|qwen35b` (`local-llm models` lists
    them). If it fails, tell the user and offer the normal mode.
 2. For **spawn**, **attack** and **defend**, replace the Agent waves with:
    ```bash

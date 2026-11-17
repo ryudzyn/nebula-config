@@ -211,7 +211,7 @@ in
   # Локальна модель для /arena --local: учасники, атаки й захисти йдуть сюди,
   # судді лишаються на Claude. Без WantedBy -- відеопам'ять зайнята лише
   # між `local-llm start` і `local-llm stop`. Моделі качаються вручну в
-  # ~/models з Hugging Face (ggml-org/gpt-oss-20b-GGUF, unsloth/Qwen3.5-9B-GGUF,
+  # ~/models з Hugging Face (unsloth/Qwen3.5-9B-GGUF,
   # ggml-org/Qwen3.6-35B-A3B-GGUF); яку запускати і з якими параметрами --
   # local-llm-serve.sh.
   systemd.user.services.local-llm = {

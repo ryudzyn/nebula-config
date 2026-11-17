@@ -3,15 +3,15 @@
 #   local-llm stop            -- зупинити (звільнити відеопам'ять, напр. перед грою)
 #   local-llm status          -- чи працює, яка модель
 #   local-llm models          -- список моделей
-# Моделі (у ~/models): gpt-oss (за замовчуванням), qwen9b, qwen35b -- параметри
+# Моделі (у ~/models): qwen9b, qwen35b (за замовчуванням) -- параметри
 # кожної в local-llm-serve.sh. Сервер: systemd user unit local-llm
 # (crew/claude/default.nix), OpenAI API на 127.0.0.1:8090.
 
 url="http://127.0.0.1:8090"
 state="${XDG_STATE_HOME:-$HOME/.local/state}/local-llm/model"
-models="gpt-oss qwen9b qwen35b"
+models="qwen9b qwen35b"
 
-current() { cat "$state" 2>/dev/null || echo gpt-oss; }
+current() { cat "$state" 2>/dev/null || echo qwen35b; }
 
 case "${1:-status}" in
 start)
@@ -57,7 +57,7 @@ models)
   echo "$models"
   ;;
 *)
-  echo "usage: local-llm start [gpt-oss|qwen9b|qwen35b] | stop | status | models" >&2
+  echo "usage: local-llm start [qwen9b|qwen35b] | stop | status | models" >&2
   exit 2
   ;;
 esac

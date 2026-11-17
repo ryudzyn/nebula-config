@@ -1,16 +1,12 @@
 # local-llm-serve -- ExecStart сервісу local-llm: запускає llama-server з моделлю,
-# яку вибрав `local-llm start <модель>` (записано в $state, за замовчуванням gpt-oss).
+# яку вибрав `local-llm start <модель>` (записано в $state, за замовчуванням qwen35b).
 # Усі моделі -- у ~/models, API на 127.0.0.1:8090, 4 паралельні слоти по 16k.
 
 state="${XDG_STATE_HOME:-$HOME/.local/state}/local-llm/model"
-model=$(cat "$state" 2>/dev/null || echo gpt-oss)
+model=$(cat "$state" 2>/dev/null || echo qwen35b)
 
 common=(--host 127.0.0.1 --port 8090 -c 65536 --parallel 4 --jinja)
 case "$model" in
-gpt-oss)
-  # 12 ГБ, повністю у відеопам'яті
-  args=(-m "$HOME/models/gpt-oss-20b-MXFP4.gguf" -ngl 99)
-  ;;
 qwen9b)
   # 9.5 ГБ, повністю у відеопам'яті
   args=(-m "$HOME/models/Qwen3.5-9B-Q8_0.gguf" -ngl 99)
@@ -30,7 +26,7 @@ esac
 
 # Зір (фото в запитах; автопідписи медіатеки Nebula Hub): проєктор з того ж репозиторію HF, що й
 # модель (unsloth/Qwen3.5-9B-GGUF mmproj-F16, ggml-org/Qwen3.6-35B-A3B-GGUF mmproj-Q8_0). Немає
-# файлу -- модель стартує як раніше, без зору. gpt-oss зору не має.
+# файлу -- модель стартує як раніше, без зору.
 [ -n "${vision:-}" ] && [ -f "$vision" ] && args+=(--mmproj "$vision")
 
 exec llama-server "${args[@]}" "${common[@]}"
