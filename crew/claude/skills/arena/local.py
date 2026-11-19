@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bracket  # noqa: E402
 
 URL = os.environ.get("ARENA_LOCAL_URL", "http://127.0.0.1:8090")
-LOCAL_PHASES = ("spawn", "attack", "defend")
+LOCAL_PHASES = ("spawn", "attack", "defend", "absorb")
 DEF_MARK, SOL_MARK = "=====DEFENSE=====", "=====SOLUTION====="
 MAX_FILE = 60000  # chars per pasted file, so one huge solution can't eat the context
 

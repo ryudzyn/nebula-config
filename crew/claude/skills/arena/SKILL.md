@@ -55,11 +55,11 @@ last answer to it is the baseline to beat.
 Run `ARENA plan --agents N` (or `--quick`). It prints the rounds, the sub-agent calls and the waves.
 
 - **The user asked for the arena** (typed `/arena`, said "arena", or asked to make them compete):
-  tell them in one line how big it is, for example "100 agents, 7 rounds, 595 sub-agent calls", and
+  tell them in one line how big it is, for example "100 agents, 7 rounds, 694 sub-agent calls", and
   start.
 - **This skill fired because the user is unhappy** ("that's wrong", "try again", "bad answer") and
   never mentioned the arena: ask once before spending anything. Offer three options: the full arena
-  (100 agents, 595 sub-agent calls), `--quick` (16 agents, 91 calls), or an ordinary retry. Wait for
+  (100 agents, 694 sub-agent calls), `--quick` (16 agents, 106 calls), or an ordinary retry. Wait for
   the answer.
 
 Sub-agents write their work into `.arena/` in the current directory. In the default permission mode
@@ -122,7 +122,12 @@ The order `next` takes you through:
 
 - **spawn**, once: every competitor writes its own solution to the task.
 - then every round: **attack** (two per match) → **defend** (two per match) → **judge** (one per
-  match) → `ARENA collect` → `ARENA advance`.
+  match) → `ARENA collect` → **absorb** (one per match: the winner) → `ARENA advance`.
+- **absorb** (the user's rule, used by hand in several arenas before it became a step): each match's
+  winner reads the loser's solution, both sides' attacks and defenses and the verdict, and rewrites
+  its own solution taking in the loser's strongest ideas and answering the loser's best arguments --
+  keeping its own approach. That absorbed solution is what goes into the next round (and, after the
+  last round, it is the champion's answer). `ARENA init --no-absorb` turns it off for a run.
 - **final**, once, only when there is a baseline: a judge compares the champion with the answer the
   user rejected, blind to which is which. Then `ARENA collect`.
 - `next` prints DONE: go to step 5.
@@ -145,7 +150,7 @@ designs, code that fits in the task file) local mode is fine.
 1. Before init: `local-llm start` (loads the last selected model, up to a few minutes). If the user
    named a model, pass it: `local-llm start qwen9b|qwen35b` (`local-llm models` lists
    them). If it fails, tell the user and offer the normal mode.
-2. For **spawn**, **attack** and **defend**, replace the Agent waves with:
+2. For **spawn**, **attack**, **defend** and **absorb**, replace the Agent waves with:
    ```bash
    ARENA prompts <phase>
    python3 "${CLAUDE_SKILL_DIR}/local.py" run <phase>
@@ -157,7 +162,7 @@ designs, code that fits in the task file) local mode is fine.
 4. When the arena is done (or the user stops it): `local-llm stop`, so the GPU is free again.
 
 In step 1, tell the user the size as usual and add that most calls go to the local model, for
-example "16 agents, 91 calls: 76 local, 15 Claude judges". Local runs are slower than sub-agents:
+example "16 agents, 106 calls: 91 local, 15 Claude judges". Local runs are slower than sub-agents:
 expect minutes per phase.
 
 ## Step 5: the result
@@ -308,6 +313,42 @@ When both files are written, reply with this one line and nothing else:
 DEFENDED {{agent}} conceded <n> rebutted <n>
 ```
 <!-- /template:defender -->
+
+### Absorber, the winner of every match
+
+<!-- template:absorber -->
+```text
+You are competitor {{agent}}. You just won match {{match}} of round {{round}} of an arena against {{loser}}. Before you go on to the next round, you get to make your solution stronger with what was good on the other side. Your rewritten solution is the one you will fight with from now on.
+
+=== THE TASK (identical for every competitor) ===
+{{task}}
+=== END OF THE TASK ===
+
+Your strategy card. Keep your approach: it is why you won.
+Reasoning mode: {{reasoning_name}}. {{reasoning_how}}
+Workflow: {{workflow_name}}. {{workflow_how}}
+Strategy: {{strategy_name}}. {{strategy_how}}
+
+Read, in full:
+- your solution as it stood at the end of the match: {{own_solution}}
+- the loser's solution: {{loser_solution}}
+- the loser's attacks on you: {{attacks_on_you}}, and your defense: {{own_defense}}
+- your attacks on the loser: {{your_attacks}}, and its defense: {{loser_defense}}
+- the judge's verdict, with both scores and reasons: {{verdict}}
+
+Do this:
+1. List what the loser did better than you: ideas, parts, details, checks, or arguments in its attacks and defense that were right (including attacks on you that you rebutted too quickly). Be honest: losing the match does not make all of it wrong.
+2. List what of yours the judge or the loser found weak and that still stands.
+3. Rewrite your solution: keep its core and your approach, and take in every strong point from step 1 -- merged into your own structure, improved where you can, not pasted in side by side. Fix what step 2 found. Where the loser's idea contradicts yours, keep the better one and say in one line why. Drop nothing of yours that was good.
+4. The result must be one complete, standalone solution to the task, as the judge would read it. Say nothing about the arena, the match or your card.
+5. Do not create, edit or delete anything outside {{arena_dir}}.
+
+Write the rewritten solution to {{out}}.
+
+When it is written, reply with this one line and nothing else:
+ABSORBED {{agent}} took <n> idea(s) from {{loser}}
+```
+<!-- /template:absorber -->
 
 ### Judge, one per match
 

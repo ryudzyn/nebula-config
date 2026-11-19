@@ -46,9 +46,11 @@ DEFAULT_WAVE = 10          # Claude Code runs at most 10 tool calls at once by d
 ROOT = ".arena"
 LATEST = "LATEST"
 STATE_FILE = "arena.json"
-PHASES = ("spawn", "attack", "defend", "judge", "final")
-TEMPLATES = ("competitor", "attacker", "defender", "judge", "final")
-CALLS_PER_MATCH = 5        # 2 attacks, 2 defenses, 1 judge
+PHASES = ("spawn", "attack", "defend", "judge", "absorb", "final")
+TEMPLATES = ("competitor", "attacker", "defender", "judge", "absorber", "final")
+# 2 attacks, 2 defenses, 1 judge, and 1 absorb: the winner takes in what was strong in the loser's
+# solution and arguments (the user's rule, earth 2026-11-19 -- used by hand in five arenas before).
+CALLS_PER_MATCH = 6
 
 # Mirrors the table in rubric.md. tests/test_bracket.py checks they agree.
 WEIGHTS = (
@@ -248,6 +250,10 @@ def revised_out(d, rnd, mid, aid):
     return os.path.join(d, "r%d" % rnd, "%s.%s.solution.md" % (mid, aid))
 
 
+def absorbed_out(d, rnd, mid, aid):
+    return os.path.join(d, "r%d" % rnd, "%s.%s.absorbed.md" % (mid, aid))
+
+
 def verdict_out(d, rnd, mid):
     return os.path.join(d, "r%d" % rnd, "%s.verdict.json" % mid)
 
@@ -293,6 +299,7 @@ def new_state(n, seed, data, run_dir, wave=DEFAULT_WAVE, has_baseline=False):
         "wave": wave,
         "dir": run_dir,
         "has_baseline": bool(has_baseline),
+        "absorb": True,
         "agents": agents,
         "rounds": [],
         "champion": None,
@@ -421,6 +428,10 @@ def advance(state):
             rev = revised_out(state["dir"], rd["n"], m["id"], aid)
             if _has_output(rev):
                 state["agents"][aid]["solution"] = rev
+        # The winner goes on with what it absorbed from the loser, when that step ran.
+        absorbed = absorbed_out(state["dir"], rd["n"], m["id"], m["winner"])
+        if state.get("absorb") and _has_output(absorbed):
+            state["agents"][m["winner"]]["solution"] = absorbed
         survivors.append(m["winner"])
     if rd["bye"]:
         state["agents"][rd["bye"]]["byes"] += 1
@@ -613,6 +624,17 @@ def phase_jobs(state, phase):
         if rd is None:
             return []
         n = rd["n"]
+        if phase == "absorb":
+            if not state.get("absorb"):
+                return []
+            for m in rd["matches"]:
+                if m["winner"]:
+                    jobs.append({"id": "%s.%s.absorb" % (m["id"], m["winner"]), "kind": "absorber", "round": n,
+                                 "agent": m["winner"], "opponent": m["loser"], "match": m["id"],
+                                 "outputs": [absorbed_out(d, n, m["id"], m["winner"])]})
+            for j in jobs:
+                j["prompt"] = prompt_path(d, j["round"], j["id"])
+            return jobs
         for m in rd["matches"]:
             if m["winner"]:
                 continue
@@ -714,6 +736,14 @@ def render_job(state, job, templates, task):
                  first_attacks=attack_out(d, n, mid, b), second_attacks=attack_out(d, n, mid, a),
                  first_defense=defense_out(d, n, mid, a), second_defense=defense_out(d, n, mid, b),
                  out=job["outputs"][0])
+    elif kind == "absorber":
+        n, mid, me, opp = job["round"], job["match"], job["agent"], job["opponent"]
+        v.update(_card_values(agents[me]["card"]))
+        v.update(agent=me, loser=opp, match=mid, round=n,
+                 own_solution=revised_out(d, n, mid, me), loser_solution=revised_out(d, n, mid, opp),
+                 attacks_on_you=attack_out(d, n, mid, opp), your_attacks=attack_out(d, n, mid, me),
+                 own_defense=defense_out(d, n, mid, me), loser_defense=defense_out(d, n, mid, opp),
+                 verdict=verdict_out(d, n, mid), out=job["outputs"][0])
     elif kind == "final":
         v.update(rounds=rounds_played(state),
                  x_solution=os.path.join(d, "final", "X.md"),
@@ -772,23 +802,27 @@ def next_action(state):
     rd = current_round(state)
     if any(not m["winner"] for m in rd["matches"]):
         return "collect", [], []
+    jobs = phase_jobs(state, "absorb")
+    left = missing_jobs(jobs)
+    if left:
+        return "absorb", left, jobs
     return "advance", [], []
 
 
 # ---------------------------------------------------------------- plan
 
-def plan_rows(n, wave=DEFAULT_WAVE):
+def plan_rows(n, wave=DEFAULT_WAVE, absorb=True):
     rows = []
     for rnd, alive in enumerate(bracket_sizes(n)[:-1], start=1):
         m = alive // 2
-        waves = 2 * math.ceil(2 * m / wave) + math.ceil(m / wave)
+        waves = 2 * math.ceil(2 * m / wave) + math.ceil(m / wave) * (2 if absorb else 1)
         rows.append({"round": rnd, "alive": alive, "matches": m, "bye": alive % 2,
-                     "calls": CALLS_PER_MATCH * m, "waves": waves})
+                     "calls": (CALLS_PER_MATCH if absorb else CALLS_PER_MATCH - 1) * m, "waves": waves})
     return rows
 
 
-def plan_totals(n, wave=DEFAULT_WAVE):
-    rows = plan_rows(n, wave)
+def plan_totals(n, wave=DEFAULT_WAVE, absorb=True):
+    rows = plan_rows(n, wave, absorb)
     calls = n + sum(r["calls"] for r in rows)
     waves = math.ceil(n / wave) + sum(r["waves"] for r in rows)
     return {"agents": n, "rounds": len(rows), "calls": calls, "waves": waves, "rows": rows}
@@ -846,7 +880,7 @@ def cmd_plan(args):
     n = _agents_arg(args)
     if n < 1:
         raise ArenaError("--agents must be at least 1")
-    t = plan_totals(n, args.wave)
+    t = plan_totals(n, args.wave, not args.no_absorb)
     if args.json:
         print(json.dumps(t, indent=1))
         return 0
@@ -902,12 +936,13 @@ def cmd_init(args):
             open(os.path.join(d, "rubric.md"), "w", encoding="utf-8") as dst:
         dst.write(src.read())
     state = new_state(n, seed, data, d, wave=args.wave, has_baseline=bool(baseline))
+    state["absorb"] = not args.no_absorb
     save_state(state)
     if default_dir:
         os.makedirs(ROOT, exist_ok=True)
         with open(os.path.join(ROOT, LATEST), "w", encoding="utf-8") as fh:
             fh.write(d + "\n")
-    t = plan_totals(n, args.wave)
+    t = plan_totals(n, args.wave, state["absorb"])
     print("arena ready: %s" % d)
     print("seed %s. %d agents, %d distinct cards dealt from %d, no repeats."
           % (seed, n, n, combo_count(data)))
@@ -1170,6 +1205,7 @@ def build_parser():
     s.add_argument("--quick", action="store_true")
     s.add_argument("--wave", type=int, default=DEFAULT_WAVE)
     s.add_argument("--json", action="store_true")
+    s.add_argument("--no-absorb", action="store_true", help="skip the winner's absorb step")
     s.set_defaults(func=cmd_plan)
 
     s = sub.add_parser("init", parents=[common], help="deal the cards and write arena.json")
@@ -1180,6 +1216,8 @@ def build_parser():
     s.add_argument("--task", help="the task as a string, instead of --task-file")
     s.add_argument("--baseline-file", help="the answer the user was not satisfied with")
     s.add_argument("--wave", type=int, default=DEFAULT_WAVE, help="parallel sub-agents per wave (default 10)")
+    s.add_argument("--no-absorb", action="store_true",
+                   help="skip the absorb step (by default each match's winner absorbs the loser's strong ideas)")
     s.set_defaults(func=cmd_init)
 
     s = sub.add_parser("next", parents=[common], help="what to do now")
