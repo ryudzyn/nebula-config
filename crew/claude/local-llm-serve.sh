@@ -1,11 +1,12 @@
 # local-llm-serve -- ExecStart сервісу local-llm: запускає llama-server з моделлю,
 # яку вибрав `local-llm start <модель>` (записано в $state, за замовчуванням qwen35b).
-# Усі моделі -- у ~/models, API на 127.0.0.1:8090, 4 паралельні слоти по 16k.
+# Усі моделі -- у ~/models, API на 127.0.0.1:8090, 4 паралельні слоти зі спільним контекстом 64k
+# (--kv-unified, 2026-11-19: по 16k на слот довгі запити арени обрізались або висли до таймауту).
 
 state="${XDG_STATE_HOME:-$HOME/.local/state}/local-llm/model"
 model=$(cat "$state" 2>/dev/null || echo qwen35b)
 
-common=(--host 127.0.0.1 --port 8090 -c 65536 --parallel 4 --jinja)
+common=(--host 127.0.0.1 --port 8090 -c 65536 --parallel 4 --kv-unified --jinja)
 case "$model" in
 qwen9b)
   # 9.5 ГБ, повністю у відеопам'яті
