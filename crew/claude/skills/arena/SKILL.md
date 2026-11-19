@@ -150,7 +150,7 @@ designs, code that fits in the task file) local mode is fine.
 1. Before init: `local-llm start` (loads the last selected model, up to a few minutes). If the user
    named a model, pass it: `local-llm start qwen9b|qwen35b` (`local-llm models` lists
    them). If it fails, tell the user and offer the normal mode.
-2. For **spawn**, **attack**, **defend** and **absorb**, replace the Agent waves with:
+2. For **spawn**, **attack** and **defend**, replace the Agent waves with:
    ```bash
    ARENA prompts <phase>
    python3 "${CLAUDE_SKILL_DIR}/local.py" run <phase>
@@ -158,11 +158,14 @@ designs, code that fits in the task file) local mode is fine.
    One command runs the whole phase, 4 jobs at a time. Then `ARENA next` as usual. If it lists
    failed jobs, run the same `local.py run <phase>` once more (it only redoes the missing ones);
    after that, the NO OUTPUT rule from step 3 applies.
-3. **judge** and **final** run exactly as in the normal mode, as Claude sub-agents.
+3. **judge** and **final** run exactly as in the normal mode, as Claude sub-agents. So does **absorb**, on the
+   cheap model (`model: "haiku"`): it reads six files at once, and the local model, out of context, handed back
+   131-380-word fragments for 1200-word solutions (earth 2026-11-19). `advance` also refuses an absorbed solution
+   shorter than 60% of the one it rewrites, and keeps the winner's own.
 4. When the arena is done (or the user stops it): `local-llm stop`, so the GPU is free again.
 
 In step 1, tell the user the size as usual and add that most calls go to the local model, for
-example "16 agents, 106 calls: 91 local, 15 Claude judges". Local runs are slower than sub-agents:
+example "16 agents, 106 calls: 76 local, 15 Claude judges, 15 Haiku absorbs". Local runs are slower than sub-agents:
 expect minutes per phase.
 
 ## Step 5: the result

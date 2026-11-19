@@ -408,6 +408,21 @@ def record(state, mid, winner, reason=None, survived=None, scores=None, source="
     return m, previous
 
 
+def _words(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return len(fh.read().split())
+    except OSError:
+        return 0
+
+
+def _whole_enough(absorbed, before):
+    """An absorbed solution counts only if it is a whole one: at least 60% of the solution it rewrites. A local model
+    out of context once handed back 131 words for a 1205-word solution (earth 2026-11-19); then the winner goes on with
+    its own revised solution instead."""
+    return _words(absorbed) >= 0.6 * _words(before)
+
+
 def advance(state):
     """Close the current round: eliminate every loser, carry the winners' revised
     solutions forward, give the bye its free pass, and open the next round."""
@@ -430,7 +445,7 @@ def advance(state):
                 state["agents"][aid]["solution"] = rev
         # The winner goes on with what it absorbed from the loser, when that step ran.
         absorbed = absorbed_out(state["dir"], rd["n"], m["id"], m["winner"])
-        if state.get("absorb") and _has_output(absorbed):
+        if state.get("absorb") and _has_output(absorbed) and _whole_enough(absorbed, state["agents"][m["winner"]]["solution"]):
             state["agents"][m["winner"]]["solution"] = absorbed
         survivors.append(m["winner"])
     if rd["bye"]:
