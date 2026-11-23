@@ -408,7 +408,7 @@ end
 -- Прямо під час завантаження конфігу Hyprland такий бінд (модифікатор як клавіша) мовчки відкидає
 -- (2026-11-23), а поставлений трохи згодом -- тримає; тому через таймер.
 hl.timer(function()
-    hl.bind("SUPER + Super_L", hl.dsp.exec_cmd("sich stop"), { release = true })
+    hl.bind("SUPER + Super_L", hl.dsp.exec_cmd("sich stop"), { release = true, non_consuming = true })
 end, { timeout = 500, type = "oneshot" })
 
 -- Робочі простори 1-10 (10 -- клавіша 0, пояс астероїдів в ETEA): SUPER — перейти,
@@ -424,7 +424,10 @@ end
 -- Спрацьовує на відпусканні, і лише якщо між натисканням і відпусканням не було іншої
 -- клавіші -- тож CTRL+SHIFT+T у браузері розкладку не чіпає. Модифікатор, який
 -- відпускаєш, ще входить у маску, тому в біндах він двічі (ALT + SHIFT + Shift_L).
--- locked -- щоб перемикалось і на екрані блокування. Перевірити без клавіш:
+-- locked -- щоб перемикалось і на екрані блокування. non_consuming обов'язкове: бінд на
+-- відпусканні модифікатора інакше з'їдає саме відпускання, і програма вважає Ctrl затиснутим --
+-- «a» ставала Ctrl+A (виділити все), наступна літера стирала текст (2026-11-23). Те саме для
+-- бінда Січа на відпускання Super вище. Перевірити без клавіш:
 -- hyprctl eval 'nebula_layout("group")'
 function nebula_layout(what)
     local i = 0
@@ -442,10 +445,10 @@ function nebula_layout(what)
     hl.exec_cmd("hyprctl switchxkblayout all " .. to)
 end
 for _, keys in ipairs({ "ALT + SHIFT + Shift_L", "ALT + SHIFT + Shift_R", "ALT + SHIFT + Alt_L" }) do
-    hl.bind(keys, function() nebula_layout("group") end, { release = true, locked = true })
+    hl.bind(keys, function() nebula_layout("group") end, { release = true, locked = true, non_consuming = true })
 end
 for _, keys in ipairs({ "CTRL + SHIFT + Shift_L", "CTRL + SHIFT + Shift_R", "CTRL + SHIFT + Control_L", "CTRL + SHIFT + Control_R" }) do
-    hl.bind(keys, function() nebula_layout("lang") end, { release = true, locked = true })
+    hl.bind(keys, function() nebula_layout("lang") end, { release = true, locked = true, non_consuming = true })
 end
 
 -- Довідка комбінацій (SUPER+SHIFT+/): оверлей nebula-keys (crew/keybind-help.nix) --
