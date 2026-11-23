@@ -36,9 +36,20 @@ answer() { # $1 -- JSON від хаба
     sat answer "" "Нічого не почув." || note "Січ" "Нічого не почув." 4000
     return
   fi
+  if [ -n "$audio" ] && [ -f "$audio" ] && sat speaking "$heard" "$said"; then
+    # бульбашка висить, поки звучить голос, і ще трохи; потім супутник відлітає --
+    # якщо тим часом не почалась нова розмова (тоді він уже її)
+    local mine
+    mine=$(cat "$run/session" 2>/dev/null)
+    pw-play "$audio"
+    sleep 2
+    [ "$(cat "$run/session" 2>/dev/null)" = "$mine" ] && sat hide
+    return 0
+  fi
   sat answer "$heard" "$said" || note "Січ" "«$heard»${said:+
 $said}" 12000
   [ -n "$audio" ] && [ -f "$audio" ] && pw-play "$audio"
+  return 0
 }
 
 fail() {
@@ -54,6 +65,7 @@ start)
   hyprctl binds -j 2>/dev/null | jq -e 'any(.[]; .key == "Super_L" and .release)' >/dev/null ||
     hyprctl eval 'hl.bind("SUPER + Super_L", hl.dsp.exec_cmd("sich stop"), { release = true })' >/dev/null 2>&1 || true
   rm -f "$run/rec.wav"
+  date +%s%N >"$run/session"
   timeout "$MAX" pw-record --rate 16000 --channels 1 --format s16 "$run/rec.wav" &
   echo $! >"$run/pid"
   sat listening || note "Січ слухає…" "" "$((MAX * 1000))"
@@ -82,6 +94,7 @@ type | say)
     text="$*"
   fi
   [ -n "${text// /}" ] || exit 0
+  date +%s%N >"$run/session"
   sat think "$text" || note "Січ думає…" "$text"
   out=$(jq -n --arg t "$text" '{text: $t, speak: true}' |
     curl -fsS --max-time 180 -H "Tailscale-User-Login: $(owner)" -H "Content-Type: application/json" \
