@@ -39,6 +39,10 @@ fail() { note "Січ" "Хаб не відповів: $1" 8000; exit 1; }
 case "${1:-}" in
 start)
   [ -f "$run/pid" ] && kill -0 "$(cat "$run/pid")" 2>/dev/null && exit 0
+  # запасний бінд «відпустив Super -- стоп» (hyprland.lua ставить його таймером) після sysup
+  # бувало зникав (2026-11-23) -- відновити, якщо нема
+  hyprctl binds -j 2>/dev/null | jq -e 'any(.[]; .key == "Super_L" and .release)' >/dev/null ||
+    hyprctl eval 'hl.bind("SUPER + Super_L", hl.dsp.exec_cmd("sich stop"), { release = true })' >/dev/null 2>&1 || true
   rm -f "$run/rec.wav"
   timeout "$MAX" pw-record --rate 16000 --channels 1 --format s16 "$run/rec.wav" &
   echo $! >"$run/pid"
