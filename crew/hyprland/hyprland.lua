@@ -306,6 +306,13 @@ local binds = {
     { key = "SUPER + SHIFT + A", desc = "Keep-awake — тумблер (caffeine)", action = hl.dsp.exec_cmd("etea-ipc wake toggle") },
     { key = "SUPER + V", desc = "Історія буфера обміну (ETEA)", action = hl.dsp.exec_cmd("etea-ipc clipboard toggle") },
     { key = "SUPER + Tab", desc = "Орбіта: усі сторінки, ще раз -- планети", action = hl.dsp.exec_cmd("etea-ipc planet orbit") },
+    { section = "Січ" },
+    -- Голосовий асистент (crew/sich, мозок у Nebula Hub): мікрофон пише, лише поки тримаєш
+    -- SUPER+Z; відпустив -- фразу забирає Січ. Відпускання самого Super теж зупиняє запис
+    -- (нижче, поза таблицею), бо з модифікатором release-бінд не спрацює, якщо Super відпустити першим.
+    { key = "SUPER + Z", desc = "Тримай і говори", action = hl.dsp.exec_cmd("sich start") },
+    { key = "SUPER + Z", desc = "Відпустив — Січ виконує", action = hl.dsp.exec_cmd("sich stop"), opts = { release = true } },
+    { key = "SUPER + SHIFT + Z", desc = "Написати Січу текстом", action = hl.dsp.exec_cmd("sich type") },
     { section = "Утиліти" },
     -- Немає нативного еквіваленту в ETEA -- лишаються окремими
     -- інструментами/скриптами (nwg-look конфігурує GTK-тему застосунків
@@ -396,6 +403,13 @@ for _, b in ipairs(binds) do
         hl.bind(b.key, b.action, opts)
     end
 end
+
+-- Січ: Super відпустили раніше за Z -- однаково зупинити запис (sich stop без запису нічого не робить).
+-- Прямо під час завантаження конфігу Hyprland такий бінд (модифікатор як клавіша) мовчки відкидає
+-- (2026-11-23), а поставлений трохи згодом -- тримає; тому через таймер.
+hl.timer(function()
+    hl.bind("SUPER + Super_L", hl.dsp.exec_cmd("sich stop"), { release = true })
+end, { timeout = 500, type = "oneshot" })
 
 -- Робочі простори 1-10 (10 -- клавіша 0, пояс астероїдів в ETEA): SUPER — перейти,
 -- SUPER+SHIFT — перекинути вікно

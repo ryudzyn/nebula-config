@@ -14,6 +14,7 @@
     ./remote-control.nix
     ./stream-relay.nix
     ./nebula-hub.nix
+    ./sich
     ./hyprland
     ./etea
     ./hyprlock.nix
