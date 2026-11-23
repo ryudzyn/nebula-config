@@ -1,8 +1,11 @@
 { pkgs, ... }:
 let
   # Фон екрана блокування -- планета поточного столу: той самий кадр, що на робочому столі,
-  # заздалегідь відрендерений assets/planets/render-lock.py (hyprlock не виконує шейдери).
+  # заздалегідь відрендерений assets/planets/render-lock.py (hyprlock не виконує шейдери);
+  # Сонце й пояс -- шейдером ETEA, assets/planets/render-lock-shader.qml. Порядок -- як
+  # Planets.pages в ETEA: 1 -- Сонце, 2-9 -- планети, 10 -- пояс астероїдів.
   planets = [
+    "sun"
     "mercury"
     "venus"
     "earth"
@@ -11,13 +14,14 @@ let
     "saturn"
     "uranus"
     "neptune"
+    "belt"
   ];
   nebula-lock = pkgs.writeShellScriptBin "nebula-lock" ''
     names=(${builtins.concatStringsSep " " planets})
     page=$(hyprctl activeworkspace -j | ${pkgs.jq}/bin/jq -r .id)
     [ "$page" -ge 1 ] 2>/dev/null || page=1
     mkdir -p "$HOME/.cache/nebula-lock"
-    ln -sfn "${../assets/planets/lock}/''${names[$(( (page - 1) % 8 ))]}.jpg" "$HOME/.cache/nebula-lock/current.jpg"
+    ln -sfn "${../assets/planets/lock}/''${names[$(( (page - 1) % ''${#names[@]} ))]}.jpg" "$HOME/.cache/nebula-lock/current.jpg"
     exec hyprlock
   '';
 in
