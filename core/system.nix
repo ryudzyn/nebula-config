@@ -14,7 +14,7 @@
   # падає з "Unable to find file: ter-v16n" (підтверджено живим запуском).
   console.packages = [ pkgs.terminus_font ];
   console.font = "ter-v16n";
-  # Перевикористовуємо ту саму xkb-розкладку (us,ua,de + alt+shift toggle),
+  # Перевикористовуємо ту саму xkb-розкладку (us,ua,de,ru + alt+shift toggle),
   # що й для X11/Wayland (services.xserver.xkb нижче), у самій консолі — щоб
   # Alt+Shift перемикав на українську й там так само.
   console.useXkbConfig = true;
@@ -139,13 +139,15 @@
   };
   systemd.timers.smart-snapshot.timerConfig.Persistent = true;
 
-  # УВАГА: та сама розкладка (us,ua,de + grp:alt_shift_toggle) продубльована ще
+  # УВАГА: та сама розкладка (us,ua,de,ru; у Hyprland -- без grp-опції, свої бінди) продубльована ще
   # в crew/hyprland/hyprland.lua (input.kb_layout/kb_options) — Hyprland не
   # читає services.xserver.xkb. Зміна розкладки — обидві копії правити разом.
   # Тут вона лишається заради консолі (console.useXkbConfig вище).
   services.xserver.xkb = {
     # Додаємо німецьку розкладку для зручного набору специфічних літер і текстів
-    layout = "us,ua,de";
+    # Порядок -- як kb_layout у crew/hyprland/hyprland.lua; групові бінди (ALT+SHIFT /
+    # CTRL+SHIFT) є лише в Hyprland, у консолі Alt+Shift просто йде по колу всіма чотирма.
+    layout = "us,ua,de,ru";
     variant = "";
     options = "grp:alt_shift_toggle"; # Перемикання через Alt+Shift
   };

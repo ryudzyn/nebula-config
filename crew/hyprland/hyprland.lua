@@ -27,9 +27,11 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 hl.config({
   input = {
     -- Та сама розкладка, що й у core/system.nix (services.xserver.xkb) —
-    -- тримати обидві копії в синхроні при зміні розкладки.
-    kb_layout = "us,ua,de",
-    kb_options = "grp:alt_shift_toggle",
+    -- тримати обидві копії в синхроні при зміні розкладки. Порядок важливий:
+    -- парні -- латиниця (us, de), непарні -- кирилиця (ua, ru); перемикають
+    -- бінди nebula_layout нижче, не xkb (xkb уміє лише йти по колу всіма).
+    kb_layout = "us,ua,de,ru",
+    kb_options = "",
     -- follow_mouse=0 -- перевірено вдруге, з живим EE2, PoE все одно
     -- перехоплював контроль. Не той фікс, прибрано остаточно. Реальна
     -- причина зникання попапу при наведенні -- власна uiohook-логіка
@@ -395,10 +397,41 @@ for _, b in ipairs(binds) do
     end
 end
 
--- Робочі простори 1-9: SUPER — перейти, SUPER+SHIFT — перекинути вікно
-for i = 1, 9 do
-    hl.bind("SUPER + " .. i, hl.dsp.focus({ workspace = i }))
-    hl.bind("SUPER + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
+-- Робочі простори 1-10 (10 -- клавіша 0, пояс астероїдів в ETEA): SUPER — перейти,
+-- SUPER+SHIFT — перекинути вікно
+for i = 1, 10 do
+    hl.bind("SUPER + " .. i % 10, hl.dsp.focus({ workspace = i }))
+    hl.bind("SUPER + SHIFT + " .. i % 10, hl.dsp.window.move({ workspace = i }))
+end
+
+-- Розкладки двома групами (2026-11-23): латиниця -- us, de; кирилиця -- ua, ru.
+-- ALT+SHIFT -- між групами, завжди на першу мову групи (us або ua);
+-- CTRL+SHIFT -- друга мова в тій самій групі (us<->de, ua<->ru).
+-- Спрацьовує на відпусканні, і лише якщо між натисканням і відпусканням не було іншої
+-- клавіші -- тож CTRL+SHIFT+T у браузері розкладку не чіпає. Модифікатор, який
+-- відпускаєш, ще входить у маску, тому в біндах він двічі (ALT + SHIFT + Shift_L).
+-- locked -- щоб перемикалось і на екрані блокування. Перевірити без клавіш:
+-- hyprctl eval 'nebula_layout("group")'
+function nebula_layout(what)
+    local i = 0
+    for _, d in ipairs(hl.get_devices()) do
+        if d.main and d.active_layout_index then
+            i = d.active_layout_index
+        end
+    end
+    local to
+    if what == "group" then
+        to = (i % 2 == 0) and 1 or 0
+    else
+        to = (i + 2) % 4
+    end
+    hl.exec_cmd("hyprctl switchxkblayout all " .. to)
+end
+for _, keys in ipairs({ "ALT + SHIFT + Shift_L", "ALT + SHIFT + Shift_R", "ALT + SHIFT + Alt_L" }) do
+    hl.bind(keys, function() nebula_layout("group") end, { release = true, locked = true })
+end
+for _, keys in ipairs({ "CTRL + SHIFT + Shift_L", "CTRL + SHIFT + Shift_R", "CTRL + SHIFT + Control_L", "CTRL + SHIFT + Control_R" }) do
+    hl.bind(keys, function() nebula_layout("lang") end, { release = true, locked = true })
 end
 
 -- Довідка комбінацій (SUPER+SHIFT+/): оверлей nebula-keys (crew/keybind-help.nix) --
@@ -427,9 +460,12 @@ if helpf then
         end
     end
     section = "Робочі простори"
-    add("SUPER + 1-9", "Перемкнутись на робочий простір 1-9")
-    add("SUPER + SHIFT + 1-9", "Перекинути вікно на робочий простір 1-9")
+    add("SUPER + 1-9, 0", "Перемкнутись на робочий простір 1-10")
+    add("SUPER + SHIFT + 1-9, 0", "Перекинути вікно на робочий простір 1-10")
     add("ALT + Tab", "Перемикач вікон (огляд)")
+    section = "Розкладка"
+    add("ALT + SHIFT", "Латиниця / кирилиця (на англійську чи українську)")
+    add("CTRL + SHIFT", "Друга мова групи: англійська / німецька, українська / російська")
     section = "Основні"
     add("SUPER + SHIFT + slash", "Ця довідка комбінацій")
     helpf:write("[" .. table.concat(entries, ",\n") .. "]\n")
