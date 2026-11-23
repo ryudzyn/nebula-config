@@ -10,12 +10,12 @@ let
   # Налаштування -- не тут, а в ~/.config/etea/settings.json (GUI, Super+,).
   etea = pkgs.stdenvNoCC.mkDerivation {
     pname = "etea-shell";
-    version = "0-unstable-2026-11-04";
+    version = "0-unstable-2026-11-23";
     src = pkgs.fetchFromGitHub {
       owner = "ryudzyn";
       repo = "etea-shell";
-      rev = "f48bec18df9c099ddd7a61e4ebef54d3d535b3fd";
-      hash = "sha256-XsTmqb269kbM+XHefnXdGIbJLWh2CZwc/8zo2rgntXU=";
+      rev = "f360f29089719f61928e2256de869aa2c2c5576a";
+      hash = "sha256-Moolr9eV2RFe66GoOrNr94jfUGC3iirUAD6+SXeYpWM=";
     };
     # На NixOS немає /usr/share: без цього порожній список мов у Settings
     postPatch = ''
