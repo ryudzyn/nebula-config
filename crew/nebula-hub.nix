@@ -4,6 +4,7 @@ let
     p.fastapi
     p.uvicorn
     p.websockets
+    p.sympy # Січ: інтеграли, похідні, границі (nebula_hub/mathcalc.py)
     p.pyte # екран терміналу фонових задач: відповіді на питання клавішами (attach.py)
   ]);
 
