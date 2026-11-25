@@ -10,12 +10,12 @@ let
   # Налаштування -- не тут, а в ~/.config/etea/settings.json (GUI, Super+,).
   etea = pkgs.stdenvNoCC.mkDerivation {
     pname = "etea-shell";
-    version = "0-unstable-2026-11-23";
+    version = "0-unstable-2026-11-25";
     src = pkgs.fetchFromGitHub {
       owner = "ryudzyn";
       repo = "etea-shell";
-      rev = "1d8c13c94c8709d4fa700b0014380437b1891ee8";
-      hash = "sha256-+AlKdeESqDuzwAMZEwrQ3Zp1mVhzEVLkmRaGM637FPc=";
+      rev = "da73f989a7598cc1e9cc75b56ff9632290728943";
+      hash = "sha256-w5P3DzN0H19SUYzOMnBjJcEbsBsZzn3eNMWGUGJCduQ=";
     };
     # На NixOS немає /usr/share: без цього порожній список мов у Settings
     postPatch = ''
@@ -27,6 +27,8 @@ let
     dontWrapQtApps = true;
     buildPhase = ''
       cp -r ${../../assets/planets} assets/planets
+      # Відео-теми NASA (DeepVideo.qml): посилання, а не копія -- 50 МБ у сторі вже лежать
+      ln -s ${../../assets/video} assets/video
       # Тема "Глибокий космос": шейдери шпалер, перекладені під Qt
       for wallpaper in ${../../assets/shaders}/*.frag; do
         sh ${../../assets/shaders/port-qt.sh} "$wallpaper" "shaders/deep-$(basename "$wallpaper")"
@@ -79,8 +81,16 @@ in
       ExecStart = "${pkgs.quickshell}/bin/qs -p ${etea}";
       Restart = "on-failure";
       RestartSec = 2;
-      # Без цього Quickshell не знає теми значків і лончер показує заглушки
-      Environment = [ "QS_ICON_THEME=Papirus-Dark" ];
+      Environment = [
+        # Без цього Quickshell не знає теми значків і лончер показує заглушки
+        "QS_ICON_THEME=Papirus-Dark"
+        # Відео-теми (Земля / чорна діра NASA): QtMultimedia в Quickshell із nixpkgs не входить
+        "QML_IMPORT_PATH=${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
+        "QT_PLUGIN_PATH=${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
+        # MangoHud (core/games.nix) чіпляється до кожного Vulkan-процесу; на декодуванні відео
+        # Quickshell з ним падав (2026-11-24, перевірено: без шару грає)
+        "DISABLE_MANGOHUD=1"
+      ];
     };
   };
 

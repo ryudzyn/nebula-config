@@ -319,10 +319,9 @@ local binds = {
     -- взагалі, не саму ETEA, тож не замінюється).
     { key = "SUPER + SHIFT + O", desc = "OCR виділеної ділянки екрана → буфер", action = hl.dsp.exec_cmd("nebula-ocr-wl") },
     { key = "SUPER + SHIFT + X", desc = "Піпетка кольору → hex у буфер", action = hl.dsp.exec_cmd("nebula-color-picker-wl") },
-    -- Пікер живих космічних шпалер (Земля/чорна діра/вимкнути) -- Wayland-
-    -- порт bspwm-івського nebula-earth-toggle (там був простий xplanet-
-    -- тогл), деталі в crew/hyprland/default.nix біля скрипта.
-    { key = "SUPER + SHIFT + G", desc = "Космічна шпалера: Земля / чорна діра / вимкнути", action = hl.dsp.exec_cmd("nebula-space-wallpaper-wl") },
+    -- Вибір шпалери: налаштування ETEA одразу на розділі «Світ» (планети, шейдери,
+    -- пейзажі, відео NASA). До 2026-11-24 тут був окремий fuzzel-пікер.
+    { key = "SUPER + SHIFT + G", desc = "Шпалера: вибір теми в ETEA (планети / космос / пейзажі / відео)", action = hl.dsp.exec_cmd("etea-ipc settings world") },
     -- Наступний ракурс для АКТИВНОЇ шейдер-шпалери (0°/90°/180°/270°, цикл).
     -- glpaper не приймає live-uniform -- перезапуск із новим CAM_OFFSET, тому
     -- коротка пауза/стрибок анімації при кожному натисканні неминучий
